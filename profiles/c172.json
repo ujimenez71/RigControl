@@ -1,0 +1,62 @@
+// Cessna 172 G1000 (MSFS 2024, asobo_c172sp_g1000) con Yoke Alpha + Bravo.
+// Nombres B: sacados con "RigProbe sim eventos" con el avión cargado.
+// Yoke: interruptores b13..b30 (arriba = ON = impar), magnetos b31..b35. Trim: rueda del Bravo (b22/b23).
+// Bravo: HDG b1, NAV b2, APR b3, REV b4, ALT b5, VS b6, IAS b7, AP b8.
+{
+  "name": "Cessna 172 G1000",
+  "aircraft": [ "c172" ],
+  "timing": { "longMs": 500, "doubleMs": 300, "sequenceMs": 1000 },
+
+  "devices": {
+    "bravo": "294B:1901:E0E92F0F191E2B00",
+    "yoke": "294B:1900"
+  },
+
+  "bindings": [
+    // ---- Interruptores del Yoke
+    { "input": "yoke:b13", "gesture": "press", "action": "B:ELECTRICAL_ALTERNATOR_1=1" },
+    { "input": "yoke:b14", "gesture": "press", "action": "B:ELECTRICAL_ALTERNATOR_1=0" },
+    { "input": "yoke:b15", "gesture": "press", "action": "B:ELECTRICAL_BATTERY_1=1" },
+    { "input": "yoke:b16", "gesture": "press", "action": "B:ELECTRICAL_BATTERY_1=0" },
+    { "input": "yoke:b17", "gesture": "press", "action": "B:ELECTRICAL_LINE_BUS_1_TO_AVIONICS_BUS_1=1" },
+    { "input": "yoke:b18", "gesture": "press", "action": "B:ELECTRICAL_LINE_BUS_1_TO_AVIONICS_BUS_1=0" },
+    { "input": "yoke:b19", "gesture": "press", "action": "B:ELECTRICAL_LINE_BUS_2_TO_AVIONICS_BUS_2=1" },
+    { "input": "yoke:b20", "gesture": "press", "action": "B:ELECTRICAL_LINE_BUS_2_TO_AVIONICS_BUS_2=0" },
+
+    { "input": "yoke:b21", "gesture": "press", "action": "B:LIGHTING_BEACON_1=1" },
+    { "input": "yoke:b22", "gesture": "press", "action": "B:LIGHTING_BEACON_1=0" },
+    { "input": "yoke:b23", "gesture": "press", "action": "B:LIGHTING_LANDING_1=1" },
+    { "input": "yoke:b24", "gesture": "press", "action": "B:LIGHTING_LANDING_1=0" },
+    { "input": "yoke:b25", "gesture": "press", "action": "B:LIGHTING_TAXI_1=1" },
+    { "input": "yoke:b26", "gesture": "press", "action": "B:LIGHTING_TAXI_1=0" },
+    { "input": "yoke:b27", "gesture": "press", "action": "B:LIGHTING_NAV_0=1" },
+    { "input": "yoke:b28", "gesture": "press", "action": "B:LIGHTING_NAV_0=0" },
+    { "input": "yoke:b29", "gesture": "press", "action": "B:LIGHTING_STROBE_0=1" },
+    { "input": "yoke:b30", "gesture": "press", "action": "B:LIGHTING_STROBE_0=0" },
+
+    // ---- Magnetos: OFF=0, R=1, L=2, BOTH=3, START=4 (verificado en el C172).
+    { "input": "yoke:b31", "gesture": "press", "action": "B:ENGINE_MAGNETO_1=0" },
+    { "input": "yoke:b32", "gesture": "press", "action": "B:ENGINE_MAGNETO_1=1" },
+    { "input": "yoke:b33", "gesture": "press", "action": "B:ENGINE_MAGNETO_1=2" },
+    { "input": "yoke:b34", "gesture": "press", "action": "B:ENGINE_MAGNETO_1=3" },
+    { "input": "yoke:b35", "gesture": "press", "action": "B:ENGINE_MAGNETO_1=4" },
+
+    // ---- Autopiloto del G1000 (botones del PFD)
+    { "input": "bravo:b1", "gesture": "short", "action": "B:AS1000_AUTOPILOT_HEADING_PFD" },
+    { "input": "bravo:b1", "gesture": "long", "action": "B:AS1000_HEADING_SYNC_PFD" },
+    { "input": "bravo:b2", "gesture": "short", "action": "B:AS1000_AUTOPILOT_NAVIGATION_PFD" },
+    { "input": "bravo:b3", "gesture": "short", "action": "B:AS1000_AUTOPILOT_APPROACH_PFD" },
+    { "input": "bravo:b4", "gesture": "short", "action": "B:AS1000_AUTOPILOT_BACKCOURSE_PFD" },
+    { "input": "bravo:b5", "gesture": "short", "action": "B:AS1000_AUTOPILOT_ALTITUDE_PFD" },
+    { "input": "bravo:b6", "gesture": "short", "action": "B:AS1000_AUTOPILOT_VERTICALSPEED_PFD" },
+    { "input": "bravo:b7", "gesture": "short", "action": "B:AS1000_AUTOPILOT_FLIGHTLEVELCHANGE_PFD" },
+    { "input": "bravo:b8", "gesture": "short", "action": "B:AS1000_AUTOPILOT_AP_PFD" },
+    { "input": "bravo:b8", "gesture": "double", "action": "K:AUTOPILOT_OFF" },
+
+    // ---- Trim con la rueda del Bravo: un pulso (~16 ms) por cada clic; b22 = morro abajo, b23 = morro arriba.
+    // (Alternativa con el hat del Yoke, mantenido y repetido:
+    //  { "input": "yoke:hat1.up", "gesture": "hold", "action": "K:ELEV_TRIM_DN", "repeatMs": 50 })
+    { "input": "bravo:b22", "gesture": "press", "action": "K:ELEV_TRIM_DN" },
+    { "input": "bravo:b23", "gesture": "press", "action": "K:ELEV_TRIM_UP" }
+  ]
+}

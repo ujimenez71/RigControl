@@ -1,0 +1,152 @@
+# RigControl
+
+Software propio de control del rig de simulación, inspirado en Hangar Control de OverKill Simulations
+(https://overkillsimulations.com/hangar-control/), adaptado a mis periféricos concretos.
+El proyecto actual `RigProbe` es la herramienta de sondeo (fase 1); crecerá hacia la app completa.
+
+## Stack
+
+- .NET 10 (`net10.0-windows`, x64), C#, Windows 11
+- Vortice.DirectInput para entradas; HidSharp para HID (salidas: LEDs, pantallas)
+- IDE: Visual Studio Community 2026. Se compila y ejecuta con `dotnet run -- <comando>`
+- UI futura: WPF (pendiente de decidir frente a WinUI 3)
+
+## Periféricos (10 dispositivos, todos con VID:PID único)
+
+| Alias | VID:PID | Uso | Salidas |
+|---|---|---|---|
+| Moza AB9 + MH16 | 346E:1000 | jet, helo (stick/cíclico) | NO TOCAR: FFB y config de Pit House |
+| Throttle F-15EX (Orion Throttle Base II) | 4098:BD64 | jet | output 14 B (protocolo SimAppPro) |
+| Pedales WinWing metal | 4098:BEF0 | jet, helo, ga | output 14 B |
+| MFD izquierdo (CarrierAce) | 4098:BEE1 | jet | output 14 B |
+| MFD derecho (CarrierAce) | 4098:BEE2 | jet | output 14 B |
+| PTO 2 (CarrierAce) | 4098:BF05 | jet | output 14 B |
+| ICP (ViperAce) | 4098:BF06 | jet | output 64 B, dejar para el final |
+| Colectivo AH-64 (VPC Rotor TCS PLUS) | 3344:832E | helo | interfaz mi_01 = config VPC, NO TOCAR |
+| Yoke Alpha (Honeycomb) | 294B:1900 | ga | sin LEDs, ignorar su output |
+| Bravo (Honeycomb) | 294B:1901 | ga | feature report 5 B = luces anunciadoras |
+
+Simuladores: DCS World (jets y helicópteros) y MSFS 2024 (aviación general). Vuelo en VR.
+
+## Reglas de diseño
+
+- Identidad de dispositivo: clave `VID:PID:serial` (o `VID:PID` sin serial). Nunca `InstanceGuid`.
+- Abrir todo en modo **no exclusivo / compartido**. Conviven SimAppPro, Pit House, VPC Configurator
+  y SimHub. Nunca enviar force feedback ni tocar firmware.
+- DirectInput y HID se emparejan por VID:PID (válido porque todos son únicos).
+- Polling ~60 Hz, sin reflexión ni asignaciones innecesarias en el bucle caliente.
+- Catálogo en `%APPDATA%\RigControl\devices.json`, editable a mano; los alias y tags se conservan.
+
+## Estado actual
+
+Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <perfil>`, `run <perfil>|auto [--dry]`,
+`sim [eventos [filtro]]`.
+- Fase 3 (✅ completa). Acciones con prefijo, interpretadas al compilar (`Bindings/ActionSpec.cs`):
+  `K:EVENTO[=entero]`, `B:INPUT_EVENT[=valor, 1 por defecto]`, `L:Var=valor`, `key:CTRL+SHIFT+G`;
+  sin prefijo = solo se imprime (INFO en Conflict Guard). `ActionDispatcher` las reparte;
+  `--dry` no envía nada.
+  - Teclado (`KeyboardOutput`), ✅ verificado con el rig en el Bloc de notas (01/11/2026): SendInput
+    por scancode, toque de 50 ms soltado en `Tick`, hold = tecla mantenida INICIO→FIN, cuenta de
+    referencias por tecla, todo se suelta al salir. Va a la ventana con el foco.
+    OJO: las apps en español localizan atajos (Bloc de notas: CTRL+A = Abrir, CTRL+E = Seleccionar
+    todo). No es un fallo nuestro.
+  - SimConnect (`SimConnectOutput`), ✅ verificado con MSFS 2024 (SunRise 12.2) y el UH-1H
+    (01/11/2026): B: (batería, beacon, luz de aterrizaje), K:TOGGLE_NAV_LIGHTS y L: correctos.
+    P/Invoke directo a la `SimConnect.dll` nativa del SDK de MSFS 2024 (`C:\MSFS 2024 SDK`, v1.8.1);
+    el .csproj la copia a la salida (variable `MSFS2024_SDK` o ruta por defecto) y fuerza x64.
+    No usar la DLL managed (es para .NET Framework) ni `D:\MSFS SDK` (SDK de 2020, sin B:/L:).
+    Todo en el hilo del bucle: `Tick` conecta/reintenta cada 3 s y vacía `GetNextDispatch`.
+    K: se registran al cargar el perfil; si MSFS rechaza el nombre, se avisa y no se vuelven a
+    enviar. B: se enumeran por avión (hash) al conectar y al cambiar de avión. Avión cargado vía
+    sistema "AircraftLoaded", ruta normalizada desde `simobjects\` (MSFS la da relativa o absoluta).
+    `sim` muestra conexión y avión; `sim eventos [filtro]` lista los B: del avión cargado.
+  - Cambio automático de perfil (`run auto`, `AutoProfileSource`), ✅ verificado UH-1H → C172
+    (01/11/2026): lee todos los .json de `%APPDATA%\RigControl\profiles`; cada perfil declara
+    `"aircraft": ["uh1h"]` (trozos de la ruta normalizada del aircraft.cfg, "*" = comodín). Gana el
+    primero por nombre de archivo; si ninguno encaja, mandos sin bindings. Guardar cualquier perfil
+    recarga la carpeta; un perfil roto mantiene su versión anterior. `run <perfil>` usa
+    `FileProfileSource`. Ambos derivan de `ProfileSource` (el runner solo llama a `Poll`).
+    Rutas vistas: UH-1H `simobjects\airplanes\microsoft_uh1h\...`, C172
+    `simobjects\airplanes\asobo_c172sp_g1000\...` (233 B:).
+  - Perfiles en `%APPDATA%\RigControl\profiles` (copias de `profiles/` del repo; editar en el repo
+    y copiar): `c172.json` ✅ verificado en vuelo (01/11/2026): interruptores del Yoke → B: eléctricos
+    y luces, magnetos `B:ENGINE_MAGNETO_1` OFF=0 R=1 L=2 BOTH=3 START=4, autopiloto del G1000 en el
+    Bravo (`B:AS1000_AUTOPILOT_*_PFD`, HDG largo = sync, AP doble = `K:AUTOPILOT_OFF`), trim con la
+    rueda del Bravo (b22 → `K:ELEV_TRIM_DN`, b23 → `K:ELEV_TRIM_UP`, un evento por clic).
+    `uh1h.json` (B: de batería/luces). `ejemplo-ga.json` = demo de funciones, sin "aircraft".
+  - `"repeatMs"` en un hold con K:/B:/L: lo reenvía mientras se mantiene (`ActionDispatcher`, sin
+    asignaciones). Probado con un simulador falso; ya no lo usa ningún perfil (el trim pasó a la rueda).
+  - En pruebas que envían teclas, comprobar SIEMPRE que la ventana destino tiene el foco antes de enviar.
+- Motor de bindings (fase 2, ✅ completa) en `Bindings/`: perfiles JSON en `%APPDATA%\RigControl\profiles`
+  (ejemplo en `profiles/ejemplo-ga.json`), gestos press/release/short/long/hold/double/sequence,
+  condiciones all/any/not + capas, Conflict Guard. `BindingEngine` es puro (tiempo inyectado) y
+  probado con escenarios simulados. Las salidas reales (teclado, SimConnect) son la fase 3.
+  Condiciones evaluadas al pulsar; los bindings condicionados que se cumplen tienen prioridad
+  sobre los que no llevan condición. `run` verificado con el Bravo real (28/09/2026): short, long,
+  double, secuencia y tren correctos.
+- Recarga en caliente (01/11/2026, ✅ verificada con el rig): `run` vigila el JSON
+  (FileSystemWatcher, espera 300 ms tras el último aviso) y lo recarga con `ProfileLoader.LoadAndCheck`
+  (lo mismo que `check`). Si el nuevo tiene errores o duplicados, se mantiene el anterior. Al
+  cambiar: `BindingEngine.EndHolds` cierra los hold activos, el estado actual se toma como base sin
+  disparar nada, y `BindingRunner.Attach` reutiliza/abre/cierra dispositivos según el perfil nuevo
+  (base para el cambio automático de perfil de la fase 3). Fase 2 completa.
+- Zonas de eje (01/11/2026): `alias:z>90`, `alias:z<10`, `alias:z=40..60` (en %, ejes x y z rx ry rz
+  s0 s1). Son entradas virtuales "pulsadas" mientras el eje está dentro, así que valen todos los
+  gestos y las condiciones sin tocar `BindingEngine`. Histéresis (`axisHysteresis`, 2 % por defecto)
+  en `AxisZone`: entrar exige meterse el margen dentro, salir basta con cruzar el borde (zonas
+  contiguas nunca se solapan; los extremos 0/100 no llevan margen). Probado con escenarios
+  simulados y ✅ verificado con el Bravo real (01/11/2026): `y>95`, `y<20` condicionado al tren
+  arriba y b24, correctos y sin repeticiones. `monitor` muestra el % de cada eje.
+- Para que el usuario vea la salida de `run`/`monitor` en directo, lanzarlo en una ventana propia
+  (`Start-Process .\bin\Debug\net10.0\RigProbe.exe -ArgumentList run,<perfil>`); en segundo plano
+  solo la ve Claude.
+- Bravo (verificado con `monitor`): HDG b1, NAV b2, APR b3, REV b4, ALT b5, VS b6, IAS b7, AP b8,
+  tren arriba b31, tren abajo b32.
+- Palancas del Bravo, de izquierda a derecha (verificado con `monitor` el 01/11/2026):
+  1 = eje Y, 2 = X, 3 = RZ, 4 = RY, 5 = RX, 6 = Z. Abajo (hacia el piloto) = 0 %, arriba = 100 %.
+  Al pasar del tope de abajo cada una da un botón mientras está ahí (¿reversa/corte?):
+  1 b24, 2 b25, 3 b26, 4 b27, 5 b28, 6 b33 (ojo: la 6 no es b29). La 4 (RY) solo llegó a 0,9–98,3 %:
+  no usar zonas más allá del 1 % / 98 % en ella. Rueda de trim ✅: un pulso de ~16 ms por clic,
+  b22 = morro abajo, b23 = morro arriba. b21 y b34–b47 cambiaron de golpe una vez sin tocar nada a
+  propósito (sin identificar).
+- Yoke Alpha, ✅ mapeo COMPLETO (verificado con `monitor` el 01/11/2026):
+  - Empuñadura izquierda, ✅ verificada el 01/11/2026: dos botones blancos sin etiqueta, b1 (el
+    primero yendo de arriba abajo y de izquierda a derecha) y b2; hat1 de 4 direcciones (0/90/180/270°).
+  - Dos basculantes verticales con retorno, también en la empuñadura izquierda: izquierdo
+    b6 (arriba) / b5 (abajo); derecho b8 (arriba) / b7 (abajo). (El "b7 repetido" del 28/09 era
+    el basculante derecho movido dos veces hacia abajo.)
+  - Empuñadura derecha, ✅ verificada el 01/11/2026: dos botones sin etiqueta, b3 (el primero
+    pulsado yendo de arriba abajo y de izquierda a derecha) y b4. Dos basculantes horizontales con
+    retorno: izquierdo b9 (izquierda) / b10 (derecha); derecho b11 (izquierda) / b12 (derecha).
+  - Interruptores de dos posiciones, ✅ verificados el 01/11/2026 (un botón por posición, siempre
+    uno activo; arriba = ON = impar): ALT b13/b14, BAT b15/b16, BUS1 b17/b18, BUS2 b19/b20,
+    BCN b21/b22, LAND b23/b24, TAXI b25/b26, NAV b27/b28, STROBE b29/b30 (ON/OFF).
+  - Llave de magnetos, ✅ verificada el 01/11/2026: b31 OFF, b32 R, b33 L, b34 BOTH, b35 START
+    (vuelve a BOTH por muelle). Al girar rápido hay ~30 ms entre posiciones sin ningún botón activo.
+  - En `profiles/ejemplo-ga.json`, shift = yoke:b5 (basculante izquierdo abajo): mejor moverlo a
+    un botón (b1–b4) si se va a mantener pulsado como modificador.
+- DirectInput devuelve todo a cero en las primeras lecturas tras abrir; el estado real llega a los
+  ~500 ms. `monitor` y `run` ignoran el primer segundo (`BindingRunner.WarmUpMs`).
+- `monitor` y `run` funcionan sin consola interactiva (se pueden lanzar en segundo plano y leer su
+  salida); en ese caso no se sale con ESC, hay que detener el proceso.
+- `BravoLights.cs`: mapeo de bits de la comunidad, ✅ verificado contra las luces físicas con
+  `bravo-test` (28/09/2026): las 28 luces coinciden con su nombre.
+
+## Plan
+
+1. ✅ Detección y visor de entradas; catálogo de dispositivos
+2. ✅ Motor de bindings: pulsación corta, larga, mantenida, soltar, doble toque y secuencia;
+   lógica condicional AND/OR (capas/modificadores); perfiles JSON que referencian claves de
+   dispositivo; Conflict Guard (detectar bindings duplicados)
+3. ✅ Salidas: SimConnect para MSFS 2024 (eventos K:, L:, A:, B:), detección del avión y cambio
+   automático de perfil; teclado con SendInput como respaldo; hold con repetición (`repeatMs`).
+   Falta: escribir A: (simvars).
+4. DCS por UDP (Export.lua / DCS-BIOS), bidireccional; feedback a LEDs WinWing (requiere
+   capturar el protocolo con Wireshark + USBPcap) y al Bravo
+5. App Hangar (lanzar apps en secuencia), gestor de ventanas, mods por symlinks, snapshots,
+   prioridad de CPU
+
+## Convenciones
+
+- Comentarios y mensajes de consola en español
+- Hablar conmigo en español

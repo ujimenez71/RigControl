@@ -1,0 +1,72 @@
+// Perfil de ejemplo para aviación general (Bravo + Yoke Alpha).
+// Bravo verificado con "monitor": HDG b1, NAV b2, APR b3, REV b4, ALT b5, VS b6, IAS b7, AP b8,
+// tren arriba b31, tren abajo b32 (la palanca mantiene siempre uno de los dos activo).
+// Yoke verificado: b1/b2 botones izq., b3/b4 botones der., b5/b6 y b7/b8 basculantes izq.,
+// b9..b12 basculantes der., hat1; interruptores b13..b30 (impar = ON), magnetos b31..b35.
+// Entradas: "alias:b12" (botón, base 1), "alias:hat1.up" (up/right/down/left) o zona de eje en %:
+// "alias:z>90", "alias:z<10", "alias:z=40..60" (ejes x, y, z, rx, ry, rz, s0, s1, como en monitor).
+// Una zona se comporta como un botón pulsado mientras el eje está dentro: press al entrar,
+// release al salir, y sirve también en condiciones.
+// Gestos: press, release, short, long, hold, double; o "sequence": [...] sin gesto.
+{
+  "name": "Ejemplo GA",
+
+  // Perfil de demostración de las funciones del motor (no es para un avión concreto: el real del
+  // C172 es c172.json). Para "run auto", "aircraft": [ "trozo de ruta" ] lo asocia a aviones
+  // (ver la ruta con "RigProbe sim"); "*" sería comodín.
+  "aircraft": [],
+  "timing": { "longMs": 500, "doubleMs": 300, "sequenceMs": 1000 },
+
+  // Margen (en % del recorrido) para entrar en una zona; evita parpadeos por ruido del eje.
+  "axisHysteresis": 2,
+
+  "devices": {
+    "bravo": "294B:1901:E0E92F0F191E2B00",
+    "yoke": "294B:1900"
+  },
+
+  "layers": {
+    // Activa mientras mantienes el basculante izquierdo del yoke hacia abajo (b5).
+    "shift": { "input": "yoke:b5" },
+    "trenAbajo": { "input": "bravo:b32" },
+    "trenArriba": { "input": "bravo:b31" }
+  },
+
+  "bindings": [
+    { "input": "bravo:b1", "gesture": "short", "action": "AP HDG" },
+    { "input": "bravo:b1", "gesture": "long", "action": "HDG sync" },
+    { "input": "bravo:b1", "gesture": "short", "when": { "layer": "shift" }, "action": "AP HDG (shift)" },
+    { "input": "bravo:b2", "gesture": "short", "action": "AP NAV" },
+    { "input": "bravo:b3", "gesture": "short", "action": "AP APR" },
+    { "input": "bravo:b4", "gesture": "short", "action": "AP REV" },
+    { "input": "bravo:b5", "gesture": "short", "action": "AP ALT" },
+    { "input": "bravo:b6", "gesture": "short", "action": "AP VS" },
+    { "input": "bravo:b7", "gesture": "short", "action": "AP IAS" },
+
+    { "input": "bravo:b8", "gesture": "short", "action": "AP master" },
+    { "input": "bravo:b8", "gesture": "double", "action": "AP desconectar" },
+
+    { "input": "bravo:b31", "gesture": "press", "action": "Tren arriba" },
+    { "input": "bravo:b32", "gesture": "press", "action": "Tren abajo" },
+
+    { "input": "yoke:hat1.up", "gesture": "hold", "action": "Trim morro abajo" },
+    { "input": "yoke:hat1.down", "gesture": "hold", "action": "Trim morro arriba" },
+
+    {
+      "input": "yoke:b1",
+      "gesture": "press",
+      "when": { "all": [ { "layer": "shift" }, { "layer": "trenAbajo" } ] },
+      "action": "Luces de aterrizaje (shift y tren abajo)"
+    },
+
+    // Zonas de eje. Palancas del Bravo de izquierda a derecha: Y, X, RZ, RY, RX, Z
+    // (abajo = 0 %, arriba = 100 %). Aquí, la palanca 1 (eje Y) como gases.
+    { "input": "bravo:y>95", "gesture": "press", "action": "Gases a fondo" },
+    { "input": "bravo:y<20", "gesture": "press", "when": { "layer": "trenArriba" }, "action": "AVISO: gases reducidos con tren arriba" },
+    // Pasado el tope de abajo, la palanca 1 da el botón 24.
+    { "input": "bravo:b24", "gesture": "press", "action": "Palanca 1 por debajo del ralentí" },
+
+    // NAV, APR, NAV seguidos: prueba de secuencia.
+    { "sequence": [ "bravo:b2", "bravo:b3", "bravo:b2" ], "action": "Secuencia de prueba" }
+  ]
+}
