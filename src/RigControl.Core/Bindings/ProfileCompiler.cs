@@ -54,6 +54,8 @@ public sealed class ProfileCompiler
         foreach (var name in _file.Layers.Keys)
             ResolveLayer(name);
 
+        var (lights, watched) = CompileLights();
+
         var bindings = new List<Binding>();
         for (var i = 0; i < _file.Bindings.Count; i++)
         {
@@ -67,6 +69,8 @@ public sealed class ProfileCompiler
             Timing = t,
             AxisHysteresis = _hysteresis,
             Aircraft = [.. _file.Aircraft.Select(a => a.Trim().Replace('/', '\\').ToLowerInvariant())],
+            Lights = lights,
+            WatchedVars = watched,
             DeviceAliases = [.. _aliases],
             DeviceKeys = [.. _keys],
             Inputs = [.. _inputs],
@@ -139,6 +143,68 @@ public sealed class ProfileCompiler
             Number = number, Gesture = gesture, Inputs = inputs, When = when,
             Action = f.Action, Output = output!, Trigger = trigger, RepeatMs = f.RepeatMs ?? 0,
         };
+    }
+
+    // ---------------------------------------------------------------- luces
+
+    /// <summary>"lights": { "NombreLuz": "condición" | ["condición", ...] } -> reglas y variables a vigilar.</summary>
+    private (LightRule[] Rules, SimVarSpec[] Vars) CompileLights()
+    {
+        var vars = new List<SimVarSpec>();
+        int VarIndex(SimVarSpec spec)
+        {
+            var i = vars.FindIndex(v => v.Name.Equals(spec.Name, StringComparison.OrdinalIgnoreCase) &&
+                                        v.Unit.Equals(spec.Unit, StringComparison.OrdinalIgnoreCase));
+            if (i >= 0) return i;
+            vars.Add(spec);
+            return vars.Count - 1;
+        }
+
+        var rules = new List<LightRule>();
+        var seen = BravoLed.None;
+        foreach (var (name, value) in _file.Lights)
+        {
+            var where = $"lights.{name}";
+            if (!Enum.TryParse<BravoLed>(name, ignoreCase: true, out var led) || led == BravoLed.None ||
+                !Enum.IsDefined(led))
+            {
+                _errors.Add($"{where}: luz desconocida. Valen: {string.Join(", ", Enum.GetNames<BravoLed>().Skip(1))}.");
+                continue;
+            }
+            if ((seen & led) != 0)
+            {
+                _errors.Add($"{where}: la luz está repetida.");
+                continue;
+            }
+            seen |= led;
+
+            List<string> texts;
+            if (value.ValueKind == System.Text.Json.JsonValueKind.String) texts = [value.GetString()!];
+            else if (value.ValueKind == System.Text.Json.JsonValueKind.Array &&
+                     value.EnumerateArray().All(e => e.ValueKind == System.Text.Json.JsonValueKind.String))
+                texts = [.. value.EnumerateArray().Select(e => e.GetString()!)];
+            else
+            {
+                _errors.Add($"{where}: se espera una condición (texto) o una lista de condiciones.");
+                continue;
+            }
+            if (texts.Count == 0)
+            {
+                _errors.Add($"{where}: la lista de condiciones está vacía.");
+                continue;
+            }
+
+            var conditions = new List<LightCondition>();
+            foreach (var text in texts)
+            {
+                if (LightParser.TryParse(text, VarIndex, out var c, out var error)) conditions.Add(c);
+                else _errors.Add($"{where}: {error}");
+            }
+            if (conditions.Count == texts.Count)
+                rules.Add(new LightRule(led, Enum.GetName(led)!, [.. conditions], string.Join(" Y ", texts)));
+        }
+
+        return ([.. rules], [.. vars]);
     }
 
     private static bool TryParseGesture(string? text, out Gesture gesture)

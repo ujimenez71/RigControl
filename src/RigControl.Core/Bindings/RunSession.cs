@@ -68,8 +68,20 @@ public sealed class RunSession : IDisposable
         using var di = DInput.DirectInput8Create();
         using var keyboard = new KeyboardOutput();
         using var dispatcher = new ActionDispatcher(keyboard, _sim, _dryRun);
-        BindingRunner.Run(di, _source, new TrackingSink(this, dispatcher), stop, _window);
+        // Las luces son realimentación local (no envían nada al simulador): funcionan también en simulación.
+        using var lights = new BravoLightsOutput();
+        _lights = lights;
+        try { BindingRunner.Run(di, _source, new TrackingSink(this, dispatcher, lights), stop, _window); }
+        finally { _lights = null; }
     }
+
+    private volatile BravoLightsOutput? _lights;
+
+    /// <summary>Luces del Bravo encendidas ahora mismo por el perfil.</summary>
+    public BravoLed Lights => _lights?.Current ?? BravoLed.None;
+
+    /// <summary>El perfil activo define luces del Bravo.</summary>
+    public bool LightsActive => _lights?.Active ?? false;
 
     /// <summary>Arranca el bucle en un hilo propio (para la app).</summary>
     public void Start()
@@ -106,16 +118,22 @@ public sealed class RunSession : IDisposable
         _cts?.Dispose();
     }
 
-    /// <summary>Pasa todo al dispatcher y apunta qué perfil está activo.</summary>
-    private sealed class TrackingSink(RunSession session, ActionDispatcher inner) : IActionSink
+    /// <summary>Pasa todo al dispatcher, apunta qué perfil está activo y actualiza las luces del Bravo.</summary>
+    private sealed class TrackingSink(RunSession session, ActionDispatcher inner, BravoLightsOutput lights) : IActionSink
     {
         public void OnAction(Binding binding, ActionPhase phase, long timeMs) => inner.OnAction(binding, phase, timeMs);
-        public void Tick(long timeMs) => inner.Tick(timeMs);
+
+        public void Tick(long timeMs)
+        {
+            inner.Tick(timeMs); // incluye SimConnect: aquí llegan los valores nuevos
+            lights.Update(session._sim.Values, session._sim.IsConnected, timeMs);
+        }
 
         public void ProfileLoaded(CompiledProfile profile)
         {
             session._profile = profile;
-            inner.ProfileLoaded(profile);
+            inner.ProfileLoaded(profile); // SimConnect pide las variables del perfil nuevo
+            lights.SetProfile(profile);
         }
     }
 }

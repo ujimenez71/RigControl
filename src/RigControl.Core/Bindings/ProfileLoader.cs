@@ -53,6 +53,8 @@ public static class ProfileLoader
             }
             if (profile.Aircraft.Length > 0)
                 Log.Info($"  aviones   -> {string.Join(", ", profile.Aircraft)}");
+            foreach (var r in profile.Lights)
+                Log.Info($"  luz {r.Name,-15} <- {r.Text}");
         }
 
         var findings = ConflictGuard.Check(profile);

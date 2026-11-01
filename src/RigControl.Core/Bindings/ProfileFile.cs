@@ -33,6 +33,12 @@ public sealed class ProfileFile
 
     public List<BindingFile> Bindings { get; set; } = [];
 
+    /// <summary>
+    /// Luces del Bravo según el simulador: nombre de la luz (ver BravoLed) -> condición o lista de
+    /// condiciones que deben cumplirse todas, p. ej. "Autopilot": "A:AUTOPILOT MASTER".
+    /// </summary>
+    public Dictionary<string, JsonElement> Lights { get; set; } = [];
+
     public static string ProfilesDir { get; } =
         Path.Combine(Path.GetDirectoryName(DeviceCatalog.DefaultPath)!, "profiles");
 

@@ -78,6 +78,12 @@ public sealed class CompiledProfile
     /// <summary>Archivo del que se cargó (lo rellena ProfileLoader).</summary>
     public string? SourcePath { get; set; }
 
+    /// <summary>Luces del Bravo que dependen del simulador.</summary>
+    public LightRule[] Lights { get; init; } = [];
+
+    /// <summary>Variables del simulador que hay que vigilar para las luces (el índice es el de LightCondition.Var).</summary>
+    public SimVarSpec[] WatchedVars { get; init; } = [];
+
     /// <summary>Perfil sin bindings, para cuando ningún perfil encaja con el avión.</summary>
     public static CompiledProfile Empty(string name) => new()
     {

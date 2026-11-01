@@ -58,5 +58,33 @@
     //  { "input": "yoke:hat1.up", "gesture": "hold", "action": "K:ELEV_TRIM_DN", "repeatMs": 50 })
     { "input": "bravo:b22", "gesture": "press", "action": "K:ELEV_TRIM_DN" },
     { "input": "bravo:b23", "gesture": "press", "action": "K:ELEV_TRIM_UP" }
-  ]
+  ],
+
+  // ---- Luces del Bravo según el estado del avión (fase 4). Una condición o una lista (todas deben
+  // cumplirse). "A:VARIABLE, unidades" con > >= < <= = o rango "=a..b"; sin operador = distinto de 0.
+  // PENDIENTE DE VERIFICAR EN VUELO: nombres de simvars según la documentación de MSFS.
+  // Los avisos exigen bus con tensión (> 1 V), como en el avión real.
+  "lights": {
+    "Autopilot": "A:AUTOPILOT MASTER",
+    "Hdg": "A:AUTOPILOT HEADING LOCK",
+    "Nav": "A:AUTOPILOT NAV1 LOCK",
+    "Apr": "A:AUTOPILOT APPROACH HOLD",
+    "Rev": "A:AUTOPILOT BACKCOURSE HOLD",
+    "Alt": "A:AUTOPILOT ALTITUDE LOCK",
+    "Vs": "A:AUTOPILOT VERTICAL HOLD",
+    "Ias": "A:AUTOPILOT FLIGHT LEVEL CHANGE",
+
+    "LowVolts": "A:ELECTRICAL MAIN BUS VOLTAGE, Volts=1..24.5",
+    "LowOilPressure": [ "A:GENERAL ENG OIL PRESSURE:1, psi<20", "A:ELECTRICAL MAIN BUS VOLTAGE, Volts>1" ],
+    "Vacuum": [ "A:SUCTION PRESSURE, inHg<3", "A:ELECTRICAL MAIN BUS VOLTAGE, Volts>1" ],
+    "StarterEngaged": "A:GENERAL ENG STARTER:1",
+    "ParkingBrake": [ "A:BRAKE PARKING POSITION", "A:ELECTRICAL MAIN BUS VOLTAGE, Volts>1" ],
+    "AntiIce": [ "A:PITOT HEAT", "A:ELECTRICAL MAIN BUS VOLTAGE, Volts>1" ],
+    "Door": [ "A:EXIT OPEN:0, percent>5", "A:ELECTRICAL MAIN BUS VOLTAGE, Volts>1" ],
+
+    // Tren fijo: tres verdes con el bus con tensión (como recordatorio visual).
+    "GearLeftGreen": [ "A:GEAR LEFT POSITION, percent>99", "A:ELECTRICAL MAIN BUS VOLTAGE, Volts>1" ],
+    "GearNoseGreen": [ "A:GEAR CENTER POSITION, percent>99", "A:ELECTRICAL MAIN BUS VOLTAGE, Volts>1" ],
+    "GearRightGreen": [ "A:GEAR RIGHT POSITION, percent>99", "A:ELECTRICAL MAIN BUS VOLTAGE, Volts>1" ]
+  }
 }

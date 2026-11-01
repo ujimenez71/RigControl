@@ -41,6 +41,19 @@ public sealed class SimConnectOutput : ISimOutput, IDisposable
     private uint _nextDefinition = 1;
     private CompiledProfile? _profile;
 
+    // Variables vigiladas (luces): cada una con su definición y su petición (mismo número).
+    // Van en otro rango para no chocar con las definiciones de L: de las acciones.
+    private const uint FirstWatch = 10_000;
+    private uint _nextWatch = FirstWatch;
+    private readonly Dictionary<uint, int> _watchIndex = [];
+    private double[] _values = [];
+
+    /// <summary>
+    /// Último valor de cada variable de CompiledProfile.WatchedVars (mismo índice); NaN = aún sin dato.
+    /// MSFS solo las envía cuando cambian.
+    /// </summary>
+    public double[] Values => _values;
+
     // Últimos envíos, para atribuir las excepciones (sin asignar memoria al enviar).
     private const int SentRing = 64;
     private readonly uint[] _sentIds = new uint[SentRing];
@@ -67,6 +80,8 @@ public sealed class SimConnectOutput : ISimOutput, IDisposable
     public void Prepare(CompiledProfile profile)
     {
         _profile = profile;
+        _values = new double[profile.WatchedVars.Length];
+        Array.Fill(_values, double.NaN);
         if (IsConnected) RegisterProfile();
         CheckInputEvents();
     }
@@ -162,6 +177,8 @@ public sealed class SimConnectOutput : ISimOutput, IDisposable
         _registrations.Clear();
         _rejected.Clear();
         _inputEvents.Clear();
+        _watchIndex.Clear();
+        Array.Fill(_values, double.NaN);
         _nextEventId = FirstClientEvent;
         _nextDefinition = 1;
 
@@ -183,6 +200,7 @@ public sealed class SimConnectOutput : ISimOutput, IDisposable
 
     private void RegisterProfile()
     {
+        WatchProfileVars();
         foreach (var b in _profile!.Bindings)
         {
             var a = b.Output;
@@ -202,6 +220,32 @@ public sealed class SimConnectOutput : ISimOutput, IDisposable
                 Remember($"L:{a.Name}");
                 _lvarDefs[a.Name] = def;
             }
+        }
+    }
+
+    /// <summary>
+    /// Pide a MSFS las variables de las luces del perfil, cada una cuando cambie (por fotograma de
+    /// simulación). Las del perfil anterior se dejan de pedir.
+    /// </summary>
+    private void WatchProfileVars()
+    {
+        foreach (var id in _watchIndex.Keys)
+        {
+            SimConnect_RequestDataOnSimObject(_handle, id, id, 0, 0 /* PERIOD_NEVER */, 0, 0, 0, 0);
+            SimConnect_ClearDataDefinition(_handle, id);
+        }
+        _watchIndex.Clear();
+
+        var vars = _profile!.WatchedVars;
+        for (var i = 0; i < vars.Length; i++)
+        {
+            var id = _nextWatch++;
+            SimConnect_AddToDataDefinition(_handle, id, vars[i].DatumName, vars[i].Unit, 4 /* FLOAT64 */, 0.001f, uint.MaxValue);
+            Remember($"{vars[i]} (luces)");
+            SimConnect_RequestDataOnSimObject(_handle, id, id, 0 /* avión del usuario */,
+                3 /* PERIOD_SIM_FRAME */, 1 /* FLAG_CHANGED */, 0, 0, 0);
+            Remember($"{vars[i]} (luces)");
+            _watchIndex[id] = i;
         }
     }
 
@@ -252,6 +296,11 @@ public sealed class SimConnectOutput : ISimOutput, IDisposable
             case 6: // EVENT_FILENAME: RECV_EVENT + szFileName[260]
                 if ((uint)Marshal.ReadInt32(p, 16) == EventAircraftLoaded)
                     SetAircraft(Marshal.PtrToStringAnsi(p + 24));
+                break;
+
+            case 8: // SIMOBJECT_DATA: dwRequestID, dwObjectID, dwDefineID, dwFlags, entry, outOf, count, datos en 40
+                if (_watchIndex.TryGetValue((uint)Marshal.ReadInt32(p, 12), out var index) && index < _values.Length)
+                    _values[index] = BitConverter.Int64BitsToDouble(Marshal.ReadInt64(p, 40));
                 break;
 
             case 15: // SYSTEM_STATE: dwRequestID, dwInteger, fFloat, szString[260]
@@ -349,6 +398,8 @@ public sealed class SimConnectOutput : ISimOutput, IDisposable
     [DllImport(Dll)] private static extern int SimConnect_MapClientEventToSimEvent(IntPtr hSimConnect, uint eventId, [MarshalAs(UnmanagedType.LPStr)] string eventName);
     [DllImport(Dll)] private static extern int SimConnect_TransmitClientEvent_EX1(IntPtr hSimConnect, uint objectId, uint eventId, uint groupId, uint flags, uint data0, uint data1, uint data2, uint data3, uint data4);
     [DllImport(Dll)] private static extern int SimConnect_AddToDataDefinition(IntPtr hSimConnect, uint defineId, [MarshalAs(UnmanagedType.LPStr)] string datumName, [MarshalAs(UnmanagedType.LPStr)] string unitsName, int datumType, float epsilon, uint datumId);
+    [DllImport(Dll)] private static extern int SimConnect_ClearDataDefinition(IntPtr hSimConnect, uint defineId);
+    [DllImport(Dll)] private static extern int SimConnect_RequestDataOnSimObject(IntPtr hSimConnect, uint requestId, uint defineId, uint objectId, uint period, uint flags, uint origin, uint interval, uint limit);
     [DllImport(Dll)] private static extern int SimConnect_SetDataOnSimObject(IntPtr hSimConnect, uint defineId, uint objectId, uint flags, uint arrayCount, uint cbUnitSize, ref double pDataSet);
     [DllImport(Dll)] private static extern int SimConnect_SubscribeToSystemEvent(IntPtr hSimConnect, uint eventId, [MarshalAs(UnmanagedType.LPStr)] string systemEventName);
     [DllImport(Dll)] private static extern int SimConnect_RequestSystemState(IntPtr hSimConnect, uint requestId, [MarshalAs(UnmanagedType.LPStr)] string szState);
