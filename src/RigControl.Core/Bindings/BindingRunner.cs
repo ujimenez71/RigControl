@@ -39,7 +39,7 @@ public static class BindingRunner
     public const int WarmUpMs = 1000;
 
     /// <summary>Bucle principal a ~60 Hz hasta que se cancele <paramref name="stop"/> (ESC en consola, botón en la app).</summary>
-    public static void Run(IDirectInput8 di, ProfileSource source, IActionSink sink, CancellationToken stop)
+    public static void Run(IDirectInput8 di, ProfileSource source, IActionSink sink, CancellationToken stop, IntPtr window = default)
     {
         var clock = Stopwatch.StartNew();
         var open = new Dictionary<string, OpenDevice>(StringComparer.OrdinalIgnoreCase);
@@ -47,7 +47,7 @@ public static class BindingRunner
 
         sink.ProfileLoaded(profile);
         var engine = new BindingEngine(profile, sink);
-        var devices = Attach(di, profile, open, clock.ElapsedMilliseconds);
+        var devices = Attach(di, profile, open, clock.ElapsedMilliseconds, window);
         PrintActive(profile);
 
         using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(16));
@@ -63,7 +63,7 @@ public static class BindingRunner
                 profile = next;
                 sink.ProfileLoaded(profile);
                 engine = new BindingEngine(profile, sink);
-                devices = Attach(di, profile, open, now);
+                devices = Attach(di, profile, open, now, window);
                 PrintActive(profile);
             }
 
@@ -104,7 +104,7 @@ public static class BindingRunner
     /// Prepara los dispositivos para un perfil: reutiliza los ya abiertos, abre los nuevos y cierra
     /// los que ya no se usan. Base para el cambio automático de perfil de la fase 3.
     /// </summary>
-    private static List<DeviceSlots> Attach(IDirectInput8 di, CompiledProfile profile, Dictionary<string, OpenDevice> open, long now)
+    private static List<DeviceSlots> Attach(IDirectInput8 di, CompiledProfile profile, Dictionary<string, OpenDevice> open, long now, IntPtr window)
     {
         List<ScannedDevice>? scanned = null;
         var result = new List<DeviceSlots>();
@@ -122,19 +122,19 @@ public static class BindingRunner
                 var found = scanned.FirstOrDefault(s => s.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
                 if (found is null)
                 {
-                    Console.WriteLine($"AVISO: \"{alias}\" ({key}) no está conectado; sus bindings no funcionarán.");
+                    Log.Warning($"\"{alias}\" ({key}) no está conectado; sus bindings no funcionarán.");
                     continue;
                 }
 
                 try
                 {
-                    dev = new OpenDevice(found.ProductName, DeviceScanner.OpenShared(di, found.Instance.InstanceGuid), now);
+                    dev = new OpenDevice(found.ProductName, DeviceScanner.OpenShared(di, found.Instance.InstanceGuid, window), now);
                     open[key] = dev;
-                    Console.WriteLine($"Abierto: {alias} ({found.ProductName})");
+                    Log.Info($"Abierto: {alias} ({found.ProductName})");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"No se pudo abrir {alias}: {ex.Message}");
+                    Log.Error($"No se pudo abrir {alias}: {ex.Message}");
                     continue;
                 }
             }
@@ -146,7 +146,7 @@ public static class BindingRunner
 
         foreach (var key in open.Keys.Where(k => !used.Contains(k)).ToList())
         {
-            Console.WriteLine($"Cerrado: {open[key].Name} (el perfil ya no lo usa)");
+            Log.Info($"Cerrado: {open[key].Name} (el perfil ya no lo usa)");
             Close(open[key]);
             open.Remove(key);
         }
@@ -155,7 +155,7 @@ public static class BindingRunner
     }
 
     private static void PrintActive(CompiledProfile profile) =>
-        Console.WriteLine($"\nPerfil \"{profile.Name}\": {profile.Bindings.Length} binding(s). " +
+        Log.Info($"\nPerfil \"{profile.Name}\": {profile.Bindings.Length} binding(s). " +
                           "Se recarga al guardar.\n");
 
     private static void Close(OpenDevice dev)
@@ -223,6 +223,6 @@ public sealed class ConsoleActionSink : IActionSink
             _ => "",
         };
         var suffix = result.Length == 0 ? "" : $"  {result}";
-        Console.WriteLine($"{DateTime.Now:HH:mm:ss.fff}  {what}{binding.Action,-30}  <- {binding}{suffix}");
+        Log.Action($"{what}{binding.Action,-30}  <- {binding}{suffix}");
     }
 }

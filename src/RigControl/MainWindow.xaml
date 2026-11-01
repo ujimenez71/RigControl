@@ -10,16 +10,16 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <!-- Menú lateral -->
-        <!-- Fondo transparente: así sigue el tema (claro/oscuro); solo una línea de separación. -->
+        <!-- Menú lateral. Fondo transparente: así sigue el tema (claro/oscuro); solo una línea de separación. -->
         <Border Grid.Column="0" Padding="12,16" Background="Transparent" BorderThickness="0,0,1,0"
                 BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Top">
                     <TextBlock Text="RigControl" FontSize="20" FontWeight="SemiBold" Margin="8,0,0,16" />
-                    <ListBox x:Name="Nav" SelectedIndex="0" BorderThickness="0" Background="Transparent">
+                    <ListBox x:Name="Nav" SelectedIndex="0" BorderThickness="0" Background="Transparent"
+                             SelectionChanged="Nav_SelectionChanged">
                         <ListBoxItem Content="🎮  Monitor" />
-                        <ListBoxItem Content="▶  Ejecución" IsEnabled="False" ToolTip="Próximamente: perfil activo, avión y acciones en directo" />
+                        <ListBoxItem Content="▶  Ejecución" />
                         <ListBoxItem Content="📝  Perfiles" IsEnabled="False" ToolTip="Próximamente" />
                     </ListBox>
                 </StackPanel>
@@ -28,6 +28,7 @@
             </DockPanel>
         </Border>
 
-        <views:MonitorView Grid.Column="1" x:Name="Monitor" />
+        <views:MonitorView Grid.Column="1" x:Name="MonitorPage" />
+        <views:RunView Grid.Column="1" x:Name="RunPage" Visibility="Collapsed" />
     </Grid>
 </Window>

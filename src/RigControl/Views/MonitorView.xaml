@@ -197,6 +197,7 @@
                            VerticalAlignment="Center" />
             </DockPanel>
             <ListBox ItemsSource="{Binding Log}" FontFamily="Cascadia Mono, Consolas" FontSize="12"
+                     ItemContainerStyle="{StaticResource LogItem}"
                      VirtualizingPanel.IsVirtualizing="True" />
         </DockPanel>
     </Grid>

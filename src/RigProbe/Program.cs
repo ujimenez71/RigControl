@@ -30,6 +30,9 @@ internal static class Program
 
     private static int Main(string[] args)
     {
+        // Core avisa por Log; en consola se imprime tal cual, con la hora delante de cada acción.
+        Log.Sink = e => Console.WriteLine(e.Level == LogLevel.Action ? $"{e.Time:HH:mm:ss.fff}  {e.Text}" : e.Text);
+
         var mode = args.FirstOrDefault()?.ToLowerInvariant() ?? "list";
         var includeAllHid = args.Skip(1).Any(a => a.Equals("all", StringComparison.OrdinalIgnoreCase));
 
@@ -54,7 +57,7 @@ internal static class Program
             case "check" when args.Length > 1:
                 return ProfileLoader.LoadAndCheck(ProfileFile.Resolve(args[1])) is null ? 1 : 0;
             case "run" when args.Length > 1:
-                return Run(di, args[1], args.Skip(2).Any(a => a.Equals("--dry", StringComparison.OrdinalIgnoreCase)));
+                return Run(args[1], args.Skip(2).Any(a => a.Equals("--dry", StringComparison.OrdinalIgnoreCase)));
             case "sim":
                 var listEvents = args.Length > 1 && args[1].Equals("eventos", StringComparison.OrdinalIgnoreCase);
                 SimStatus(listEvents, listEvents && args.Length > 2 ? args[2] : null);
@@ -70,30 +73,10 @@ internal static class Program
     // ----------------------------------------------------------------- run
 
     /// <summary>"run perfil": un archivo fijo. "run auto": la carpeta de perfiles, según el avión de MSFS.</summary>
-    private static int Run(IDirectInput8 di, string target, bool dryRun)
+    private static int Run(string target, bool dryRun)
     {
-        using var sim = new SimConnectOutput();
-        ProfileSource source;
-
-        if (target.Equals("auto", StringComparison.OrdinalIgnoreCase))
-        {
-            var dir = ProfileFile.ProfilesDir;
-            if (!Directory.Exists(dir))
-            {
-                Directory.CreateDirectory(dir);
-                Console.WriteLine($"Creada la carpeta de perfiles {dir} (está vacía: copia ahí tus .json).");
-            }
-            source = new AutoProfileSource(dir, sim);
-        }
-        else
-        {
-            var path = ProfileFile.Resolve(target);
-            var profile = ProfileLoader.LoadAndCheck(path);
-            if (profile is null) return 1;
-            source = new FileProfileSource(path, profile);
-        }
-
-        if (dryRun) Console.WriteLine("Modo --dry: las acciones solo se imprimen, no se envía nada.");
+        using var session = RunSession.Create(target, dryRun);
+        if (session is null) return 1;
         Console.WriteLine("Pulsa ESC para salir.");
 
         // El runner (en Core) no lee la consola: aquí se vigila ESC y se le pide parar.
@@ -108,10 +91,7 @@ internal static class Program
         }) { IsBackground = true };
         escWatcher.Start();
 
-        using (source)
-        using (var keyboard = new KeyboardOutput())
-        using (var dispatcher = new ActionDispatcher(keyboard, sim, dryRun))
-            BindingRunner.Run(di, source, dispatcher, stop.Token);
+        session.Run(stop.Token);
         stop.Cancel();
         return 0;
     }

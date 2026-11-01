@@ -25,16 +25,16 @@ public sealed class FileProfileSource(string path, CompiledProfile initial) : Pr
     {
         if (!_watch.Due(timeMs)) return null;
 
-        Console.WriteLine($"\n{DateTime.Now:HH:mm:ss.fff}  ---- El perfil ha cambiado, recargando ----");
+        Log.Info($"\n---- El perfil ha cambiado, recargando ----");
         try
         {
             var profile = ProfileLoader.LoadAndCheck(path);
-            if (profile is null) Console.WriteLine("Se mantiene el perfil anterior.\n");
+            if (profile is null) Log.Warning("Se mantiene el perfil anterior.\n");
             return profile;
         }
         catch (IOException ex)
         {
-            Console.WriteLine($"No se pudo leer ({ex.Message}); reintentando...");
+            Log.Warning($"No se pudo leer ({ex.Message}); reintentando...");
             _watch.Retry(timeMs);
             return null;
         }
@@ -76,7 +76,7 @@ public sealed class AutoProfileSource : ProfileSource
         var reloaded = false;
         if (_watch.Due(timeMs))
         {
-            Console.WriteLine($"\n{DateTime.Now:HH:mm:ss.fff}  ---- Cambios en los perfiles, recargando la carpeta ----");
+            Log.Info($"\n---- Cambios en los perfiles, recargando la carpeta ----");
             try
             {
                 LoadAll(keepPrevious: true);
@@ -84,7 +84,7 @@ public sealed class AutoProfileSource : ProfileSource
             }
             catch (IOException ex)
             {
-                Console.WriteLine($"No se pudo leer ({ex.Message}); reintentando...");
+                Log.Warning($"No se pudo leer ({ex.Message}); reintentando...");
                 _watch.Retry(timeMs);
             }
         }
@@ -116,18 +116,18 @@ public sealed class AutoProfileSource : ProfileSource
             var profile = ProfileLoader.LoadAndCheck(file, verbose: false);
             if (profile is null && keepPrevious && previous.TryGetValue(key, out var old))
             {
-                Console.WriteLine($"  {Path.GetFileName(file)}: se mantiene la versión anterior.");
+                Log.Warning($"  {Path.GetFileName(file)}: se mantiene la versión anterior.");
                 profile = old;
             }
             if (profile is not null) _profiles[key] = profile;
         }
 
-        Console.WriteLine($"Perfiles en {_dir}:");
-        if (_profiles.Count == 0) Console.WriteLine("  (ninguno válido)");
+        Log.Info($"Perfiles en {_dir}:");
+        if (_profiles.Count == 0) Log.Info("  (ninguno válido)");
         foreach (var (path, p) in _profiles)
         {
             var aircraft = p.Aircraft.Length == 0 ? "sin \"aircraft\": solo uso manual" : string.Join(", ", p.Aircraft);
-            Console.WriteLine($"  {Path.GetFileName(path),-24} \"{p.Name}\"  aviones: {aircraft}");
+            Log.Info($"  {Path.GetFileName(path),-24} \"{p.Name}\"  aviones: {aircraft}");
         }
     }
 
@@ -145,8 +145,8 @@ public sealed class AutoProfileSource : ProfileSource
     {
         var aircraft = _aircraft ?? "(todavía sin avión: esperando a MSFS)";
         var file = p.SourcePath is null ? "" : $" ({Path.GetFileName(p.SourcePath)})";
-        Console.WriteLine($"\n{DateTime.Now:HH:mm:ss.fff}  ==== Avión: {aircraft}");
-        Console.WriteLine(ReferenceEquals(p, None)
+        Log.Info($"\n==== Avión: {aircraft}");
+        Log.Info(ReferenceEquals(p, None)
             ? "                ==== Ningún perfil encaja con este avión: mandos sin bindings."
             : $"                ==== Perfil activo: \"{p.Name}\"{file}");
     }

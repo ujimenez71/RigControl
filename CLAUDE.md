@@ -14,8 +14,11 @@ Software propio de control del rig de simulación, inspirado en Hangar Control d
   (`ViewModels/ObservableObject`), vistas en `Views/`.
 - `profiles/`: perfiles de ejemplo/fuente; los que se usan van en `%APPDATA%\RigControl\profiles`.
 - El runner (`BindingRunner.Run`) recibe un `CancellationToken`: la consola lo cancela con ESC.
-  Core aún escribe en `Console` (runner, SimConnect, loader): para la pantalla de ejecución de la
-  app habrá que pasar a un registro (log) inyectable.
+- Core NO escribe en la consola: usa `Log` (Info/Warning/Error/Action, `Log.Sink`). RigProbe lo
+  imprime (hora delante de las acciones); la app lo encola y lo vuelca cada 50 ms.
+- `RunSession` (Core) = un "run" completo (SimConnect, teclado, fuente de perfiles, runner) con
+  estado legible desde otro hilo (SimConnected, SimName, Aircraft, Profile). La consola usa
+  `Run(token)`; la app `Start()/Stop()` en un hilo propio con su propia instancia de DirectInput.
 
 ## Stack
 
@@ -120,7 +123,11 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
 - App WPF, pantalla Monitor ✅ (01/11/2026): lista de dispositivos con punto de actividad, detalle
   con ejes (barra + % + valor bruto, solo los que existen según `GetObjects`), hats con flecha y
   botones que se iluminan; registro de cambios (pausable). Lee a ~60 Hz con un DispatcherTimer en
-  el hilo de la interfaz usando `DeviceMonitor` (Core). Pendiente: pantalla de Ejecución y Perfiles.
+  el hilo de la interfaz usando `DeviceMonitor` (Core); se para mientras la pantalla está oculta.
+- App WPF, pantalla Ejecución (01/11/2026): automático o perfil fijo, casilla Simulación (= --dry),
+  Iniciar/Detener; tarjetas Simulador / Avión / Perfil activo; registro coloreado por nivel.
+  Probado sin MSFS con UI Automation (iniciar en simulación, detener); falta probarla con MSFS y el
+  rig. Al cerrar la ventana se detiene la ejecución. Pendiente: pantalla Perfiles.
 - Bravo (verificado con `monitor`): HDG b1, NAV b2, APR b3, REV b4, ALT b5, VS b6, IAS b7, AP b8,
   tren arriba b31, tren abajo b32.
 - Palancas del Bravo, de izquierda a derecha (verificado con `monitor` el 01/11/2026):

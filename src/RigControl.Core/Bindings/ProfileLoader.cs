@@ -11,8 +11,8 @@ public static class ProfileLoader
     public static CompiledProfile? LoadAndCheck(string path, bool verbose = true)
     {
         var name = Path.GetFileName(path);
-        void Info(string text) { if (verbose) Console.WriteLine(text); }
-        void Error(string text) => Console.WriteLine(verbose ? text : $"  {name}: {text.Trim()}");
+        void Info(string text) { if (verbose) Log.Info(text); }
+        void Error(string text) => Log.Error(verbose ? text : $"  {name}: {text.Trim()}");
 
         Info($"Perfil: {path}");
         if (!File.Exists(path))
@@ -47,19 +47,19 @@ public static class ProfileLoader
             for (var d = 0; d < profile.DeviceKeys.Length; d++)
             {
                 var entry = catalog.Find(profile.DeviceKeys[d]);
-                Console.WriteLine(entry is null
+                Log.Info(entry is null
                     ? $"AVISO  \"{profile.DeviceAliases[d]}\" ({profile.DeviceKeys[d]}) no está en el catálogo; comprueba la clave con \"catalog\"."
                     : $"  {profile.DeviceAliases[d],-10} -> {entry.Alias}");
             }
             if (profile.Aircraft.Length > 0)
-                Console.WriteLine($"  aviones   -> {string.Join(", ", profile.Aircraft)}");
+                Log.Info($"  aviones   -> {string.Join(", ", profile.Aircraft)}");
         }
 
         var findings = ConflictGuard.Check(profile);
         if (verbose)
         {
-            Console.WriteLine($"\nConflict Guard: {(findings.Count == 0 ? "sin incidencias" : $"{findings.Count} incidencia(s)")}");
-            foreach (var f in findings) Console.WriteLine($"  {f}");
+            Log.Info($"\nConflict Guard: {(findings.Count == 0 ? "sin incidencias" : $"{findings.Count} incidencia(s)")}");
+            foreach (var f in findings) Log.Info($"  {f}");
         }
 
         if (findings.Any(f => f.Severity == Severity.Error))

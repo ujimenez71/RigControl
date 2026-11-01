@@ -64,6 +64,14 @@ public sealed class MonitorViewModel : ObservableObject, IDisposable
 
     public void ClearLog() => Log.Clear();
 
+    /// <summary>Pantalla oculta: deja de leer (los dispositivos siguen abiertos). Visible otra vez: sigue.</summary>
+    public void SetVisible(bool visible)
+    {
+        if (_monitor is null) return;
+        if (visible) _timer.Start();
+        else _timer.Stop();
+    }
+
     public void Dispose()
     {
         _timer.Stop();

@@ -4,5 +4,12 @@
              StartupUri="MainWindow.xaml"
              ThemeMode="System">
     <!-- ThemeMode="System": estilo Fluent de Windows 11, claro u oscuro según el sistema. -->
-    <Application.Resources />
+    <Application.Resources>
+        <!-- Registros compactos: una línea por entrada (el tema Fluent deja mucho margen en cada elemento). -->
+        <Style x:Key="LogItem" TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+            <Setter Property="Padding" Value="8,1" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Margin" Value="0" />
+        </Style>
+    </Application.Resources>
 </Application>

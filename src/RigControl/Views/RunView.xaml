@@ -1,0 +1,150 @@
+<UserControl x:Class="RigControl.Views.RunView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:RigControl.ViewModels"
+             xmlns:core="clr-namespace:RigControl.Core;assembly=RigControl.Core">
+    <UserControl.Resources>
+        <!-- Tarjeta de estado -->
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Padding" Value="16,12" />
+            <Setter Property="Margin" Value="0,0,12,0" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}" />
+        </Style>
+        <Style x:Key="CardTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Opacity" Value="0.65" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+        </Style>
+        <Style x:Key="CardValue" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Cabecera -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock Text="Ejecución" FontSize="24" FontWeight="SemiBold" />
+            <TextBlock Opacity="0.7" TextWrapping="Wrap">
+                <Run Text="Ejecuta los perfiles de " /><Run Text="{Binding ProfilesDir, Mode=OneWay}" FontFamily="Cascadia Mono, Consolas" />
+                <Run Text=". Guardar un perfil lo recarga al momento." />
+            </TextBlock>
+        </StackPanel>
+
+        <!-- Controles -->
+        <WrapPanel Grid.Row="1" Margin="0,0,0,16" VerticalAlignment="Center">
+            <TextBlock Text="Perfil" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <ComboBox ItemsSource="{Binding Targets}" SelectedItem="{Binding SelectedTarget}" MinWidth="300"
+                      IsEnabled="{Binding IsIdle}" VerticalAlignment="Center" DropDownOpened="Targets_DropDownOpened" />
+            <CheckBox Content="Simulación (no envía nada)" IsChecked="{Binding DryRun}" IsEnabled="{Binding IsIdle}"
+                      Margin="16,0,16,0" VerticalAlignment="Center"
+                      ToolTip="Como --dry: las acciones se registran pero no se envían al simulador ni al teclado" />
+            <Button Content="{Binding StartStopText}" Click="StartStop_Click" MinWidth="120" Padding="16,6"
+                    VerticalAlignment="Center">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsRunning}" Value="False">
+                                <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.AccentColorBrushKey}}" />
+                                <Setter Property="Foreground" Value="White" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </WrapPanel>
+
+        <!-- Estado -->
+        <Grid Grid.Row="2" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="SIMULADOR" Style="{StaticResource CardTitle}" />
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="10" Height="10" Margin="0,0,8,0" VerticalAlignment="Center">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Setter Property="Fill" Value="Gray" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SimConnected}" Value="True">
+                                            <Setter Property="Fill" Value="LimeGreen" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
+                        <TextBlock Text="{Binding SimText}" Style="{StaticResource CardValue}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="1" Style="{StaticResource Card}" ToolTip="{Binding AircraftPath}">
+                <StackPanel>
+                    <TextBlock Text="AVIÓN" Style="{StaticResource CardTitle}" />
+                    <TextBlock Text="{Binding AircraftText}" Style="{StaticResource CardValue}" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource Card}" Margin="0">
+                <StackPanel>
+                    <TextBlock Text="PERFIL ACTIVO" Style="{StaticResource CardTitle}" />
+                    <TextBlock Text="{Binding ProfileText}" Style="{StaticResource CardValue}" />
+                    <TextBlock Text="{Binding ProfileDetail}" FontSize="12" Opacity="0.65" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Registro -->
+        <DockPanel Grid.Row="3">
+            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                <Button DockPanel.Dock="Right" Content="Limpiar" Click="ClearLog_Click" />
+                <TextBlock Text="Acciones y mensajes (lo más reciente arriba)" FontSize="16" FontWeight="SemiBold"
+                           VerticalAlignment="Center" />
+            </DockPanel>
+            <ListBox ItemsSource="{Binding Entries}" FontFamily="Cascadia Mono, Consolas" FontSize="12"
+                     ItemContainerStyle="{StaticResource LogItem}"
+                     VirtualizingPanel.IsVirtualizing="True" ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                <ListBox.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:LogItem}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Time}" Opacity="0.55" Margin="0,0,12,0" />
+                            <TextBlock Text="{Binding Text}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Level}" Value="{x:Static core:LogLevel.Action}">
+                                                <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.AccentColorLight2BrushKey}}" />
+                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Level}" Value="{x:Static core:LogLevel.Warning}">
+                                                <Setter Property="Foreground" Value="Orange" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Level}" Value="{x:Static core:LogLevel.Error}">
+                                                <Setter Property="Foreground" Value="OrangeRed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </DockPanel>
+    </Grid>
+</UserControl>

@@ -49,6 +49,9 @@ public sealed class SimConnectOutput : ISimOutput, IDisposable
 
     public bool IsConnected => _handle != IntPtr.Zero;
 
+    /// <summary>Nombre y versión del simulador conectado (p. ej. "SunRise 12.2"), o null.</summary>
+    public string? SimName { get; private set; }
+
     /// <summary>Ruta del avión cargado (aircraft.cfg) tal como la da el simulador, o null.</summary>
     public string? Aircraft { get; private set; }
 
@@ -108,7 +111,7 @@ public sealed class SimConnectOutput : ISimOutput, IDisposable
             case ActionKind.InputEvent:
                 if (!_inputEvents.TryGetValue(action.Name, out var hash))
                 {
-                    Console.WriteLine($"         B:{action.Name} no existe en este avión (ver \"sim eventos\").");
+                    Log.Warning($"B:{action.Name} no existe en este avión (ver \"sim eventos\").");
                     return false;
                 }
                 var v = action.Value;
@@ -149,7 +152,7 @@ public sealed class SimConnectOutput : ISimOutput, IDisposable
         catch (DllNotFoundException)
         {
             _available = false;
-            Console.WriteLine("SimConnect: no se encuentra SimConnect.dll junto al ejecutable. " +
+            Log.Error("SimConnect: no se encuentra SimConnect.dll junto al ejecutable. " +
                               "Instala el SDK de MSFS 2024 y recompila. Las acciones K:/B:/L: no se enviarán.");
             return;
         }
@@ -174,7 +177,8 @@ public sealed class SimConnectOutput : ISimOutput, IDisposable
         SimConnect_Close(_handle);
         _handle = IntPtr.Zero;
         Aircraft = null;
-        if (reason is not null) Console.WriteLine($"SimConnect: desconectado ({reason}). Reintentando cada {RetryMs / 1000} s.");
+        SimName = null;
+        if (reason is not null) Log.Warning($"SimConnect: desconectado ({reason}). Reintentando cada {RetryMs / 1000} s.");
     }
 
     private void RegisterProfile()
@@ -214,7 +218,7 @@ public sealed class SimConnectOutput : ISimOutput, IDisposable
             .Where(b => b.Output.Kind == ActionKind.InputEvent && !_inputEvents.ContainsKey(b.Output.Name))
             .Select(b => $"B:{b.Output.Name}").Distinct().ToList();
         if (missing.Count > 0)
-            Console.WriteLine($"SimConnect: este avión no tiene {string.Join(", ", missing)} (ver \"sim eventos\").");
+            Log.Warning($"SimConnect: este avión no tiene {string.Join(", ", missing)} (ver \"sim eventos\").");
     }
 
     // ------------------------------------------------------------ mensajes
@@ -232,8 +236,8 @@ public sealed class SimConnectOutput : ISimOutput, IDisposable
 
             case 2: // OPEN: szApplicationName[256], versión mayor/menor, build mayor/menor...
                 var app = Marshal.PtrToStringAnsi(p + 12) ?? "?";
-                Console.WriteLine($"SimConnect: conectado a {app} {Marshal.ReadInt32(p, 268)}.{Marshal.ReadInt32(p, 272)}" +
-                                  $" (build {Marshal.ReadInt32(p, 276)}.{Marshal.ReadInt32(p, 280)}).");
+                SimName = $"{app} {Marshal.ReadInt32(p, 268)}.{Marshal.ReadInt32(p, 272)}";
+                Log.Info($"SimConnect: conectado a {SimName} (build {Marshal.ReadInt32(p, 276)}.{Marshal.ReadInt32(p, 280)}).");
                 break;
 
             case 3: // QUIT
@@ -278,7 +282,7 @@ public sealed class SimConnectOutput : ISimOutput, IDisposable
         var path = NormalizeAircraft(raw);
         if (path == Aircraft) return;
         Aircraft = path;
-        Console.WriteLine($"SimConnect: avión cargado: {path}");
+        Log.Info($"SimConnect: avión cargado: {path}");
         _inputEvents.Clear();
         SimConnect_EnumerateInputEvents(_handle, RequestInputEvents);
         AircraftChanged?.Invoke(path);
@@ -302,7 +306,7 @@ public sealed class SimConnectOutput : ISimOutput, IDisposable
         if (entry < outOf - 1) return;
         _inputEvents.Clear();
         foreach (var (name, hash) in _inputEventsLoading) _inputEvents[name] = hash;
-        Console.WriteLine($"SimConnect: {_inputEvents.Count} InputEvent(s) B: disponibles en este avión.");
+        Log.Info($"SimConnect: {_inputEvents.Count} InputEvent(s) B: disponibles en este avión.");
         CheckInputEvents();
         InputEventsReady?.Invoke(_inputEvents);
     }
@@ -331,7 +335,7 @@ public sealed class SimConnectOutput : ISimOutput, IDisposable
             43 => "el avión no aceptó el InputEvent",
             _ => $"excepción {code}",
         };
-        Console.WriteLine($"SimConnect: {what ?? $"paquete {sendId}"}: {reason}.");
+        Log.Warning($"SimConnect: {what ?? $"paquete {sendId}"}: {reason}.");
     }
 
     // --------------------------------------------------------- P/Invoke
