@@ -12,6 +12,10 @@ Software propio de control del rig de simulación, inspirado en Hangar Control d
   `dotnet run --project src/RigProbe -- <comando>`; exe en `src/RigProbe/bin/Debug/net10.0/RigProbe.exe`.
 - `src/RigControl/`: app WPF (`dotnet run --project src/RigControl`). MVVM sin librerías
   (`ViewModels/ObservableObject`), vistas en `Views/`.
+- `tests/RigControl.Tests/`: pruebas de escenarios en consola, sin paquetes externos
+  (`dotnet run --project tests/RigControl.Tests`; `--hardware` añade la prueba que escribe en el
+  Bravo real). Ejes, acciones, repetición, luces y DCS-BIOS (con un DCS falso por UDP local).
+  Pasarlas antes de cada commit que toque Core.
 - `profiles/`: perfiles de ejemplo/fuente; los que se usan van en `%APPDATA%\RigControl\profiles`.
 - El runner (`BindingRunner.Run`) recibe un `CancellationToken`: la consola lo cancela con ESC.
 - Core NO escribe en la consola: usa `Log` (Info/Warning/Error/Action, `Log.Sink`). RigProbe lo
@@ -60,6 +64,25 @@ Simuladores: DCS World (jets y helicópteros) y MSFS 2024 (aviación general). V
 
 Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <perfil>`, `run <perfil>|auto [--dry]`,
 `sim [eventos [filtro]]`.
+- Fase 4 (en curso, hecho sin el usuario el 01/11/2026; NADA de esto probado aún en vuelo):
+  - Luces del Bravo desde MSFS: sección `"lights"` del perfil: nombre de `BravoLed` -> condición o
+    lista (AND) sobre `A:VAR[, unidades]` o `L:Var` con `> >= < <= =`, rango `=a..b`, `!` niega;
+    sin operador = distinto de 0 (`LightRules.cs`). `SimConnectOutput` pide esas variables con
+    PERIOD_SIM_FRAME + FLAG_CHANGED (definiciones desde 10000) y guarda `Values`;
+    `BravoLightsOutput` evalúa y escribe solo al cambiar. Si el perfil no tiene luces NO toca el
+    Bravo (no pelear con otros programas). Funciona también en simulación (--dry).
+    `c172.json` tiene 18 luces (AP, avisos con bus > 1 V, tres verdes): nombres de simvars según
+    la documentación, PENDIENTE de que MSFS los acepte (si no, avisa "nombre no reconocido").
+    Probado con valores simulados y escribiendo en el Bravo real (prueba `--hardware`).
+    Pantalla Ejecución: panel "Luces del Bravo" con las 28 luces y sus colores.
+  - DCS-BIOS (`DcsBiosOutput`): escucha 239.255.50.10:5010 (multicast compartido) y manda órdenes
+    de texto a 127.0.0.1:7778. Acción `D:CONTROL` = pulsador (1 al pulsar, 0 al soltar; toque = 0
+    a los 50 ms), `D:CONTROL VALOR` (INC, DEC, TOGGLE, números). Avión en la dirección 0x0000
+    (24 car.) -> `"aircraft": ["dcs:f-15e"]` en `run auto`. Probado con un DCS falso por UDP.
+    DCS-BIOS NO está instalado (01/11/2026): el Export.lua activo (`Saved Games\DCS\Scripts\
+    export.lua`) carga Volanta y HFSExport; en Hooks hay SimHub, bHaptics y PassthroughForge. El
+    export de SimAppPro (wwt) y MOZA solo están en el antiguo `DCS.openbeta`. No tocar Export.lua
+    sin el usuario.
 - Fase 3 (✅ completa). Acciones con prefijo, interpretadas al compilar (`Bindings/ActionSpec.cs`):
   `K:EVENTO[=entero]`, `B:INPUT_EVENT[=valor, 1 por defecto]`, `L:Var=valor`, `key:CTRL+SHIFT+G`;
   sin prefijo = solo se imprime (INFO en Conflict Guard). `ActionDispatcher` las reparte;
@@ -169,8 +192,10 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
 3. ✅ Salidas: SimConnect para MSFS 2024 (eventos K:, L:, A:, B:), detección del avión y cambio
    automático de perfil; teclado con SendInput como respaldo; hold con repetición (`repeatMs`).
    Falta: escribir A: (simvars).
-4. DCS por UDP (Export.lua / DCS-BIOS), bidireccional; feedback a LEDs WinWing (requiere
-   capturar el protocolo con Wireshark + USBPcap) y al Bravo
+4. (en curso) DCS por UDP (Export.lua / DCS-BIOS), bidireccional; feedback a LEDs WinWing (requiere
+   capturar el protocolo con Wireshark + USBPcap) y al Bravo. Hecho: luces del Bravo desde MSFS
+   y cliente DCS-BIOS (ver "Fase 4" arriba). Falta: instalar DCS-BIOS (con el usuario), luces y
+   condiciones desde el estado de DCS (necesita los JSON de DCS-BIOS), LEDs WinWing.
 5. App Hangar (lanzar apps en secuencia), gestor de ventanas, mods por symlinks, snapshots,
    prioridad de CPU
 

@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace RigControl.Core.Bindings;
 
-public enum ActionKind { Print, SimEvent, InputEvent, LVar, Key }
+public enum ActionKind { Print, SimEvent, InputEvent, LVar, Key, DcsBios }
 
 /// <summary>
 /// Acción compilada (se interpreta al cargar el perfil, nunca en el bucle caliente).
@@ -11,6 +11,8 @@ public enum ActionKind { Print, SimEvent, InputEvent, LVar, Key }
 ///   "B:AUTOPILOT_HEADING_HOLD", "B:X=0"     -> InputEvent de MSFS 2024 (valor por defecto 1)
 ///   "L:MiVar=1"                             -> variable local del avión (valor obligatorio)
 ///   "key:CTRL+SHIFT+G"                      -> teclado con SendInput (respaldo)
+///   "D:UFC_1", "D:MASTER_ARM_SW 1", "D:HDG_KNOB INC" -> DCS por DCS-BIOS. Sin valor = pulsador:
+///                                              1 al pulsar y 0 al soltar (en un toque, 0 a los 50 ms)
 ///   cualquier otro texto                    -> solo se imprime
 /// </summary>
 public sealed class ActionSpec
@@ -27,7 +29,37 @@ public sealed class ActionSpec
 
     public bool IsSim => Kind is ActionKind.SimEvent or ActionKind.InputEvent or ActionKind.LVar;
 
+    /// <summary>Orden DCS-BIOS ya codificada ("NOMBRE VALOR\n"): la del pulsar, o la única si lleva valor.</summary>
+    public byte[]? DcsMessage { get; init; }
+
+    /// <summary>Solo en pulsadores (D: sin valor): la orden de soltar ("NOMBRE 0\n").</summary>
+    public byte[]? DcsRelease { get; init; }
+
+    /// <summary>Acción que va a un simulador (MSFS o DCS), no al teclado ni a la consola.</summary>
+    public bool IsExternal => IsSim || Kind == ActionKind.DcsBios;
+
     /// <summary>Devuelve null y un mensaje si el texto tiene prefijo conocido pero está mal escrito.</summary>
+    /// <summary>"NOMBRE" (pulsador) o "NOMBRE VALOR"; el nombre es el identificador de DCS-BIOS.</summary>
+    private static ActionSpec? ParseDcsBios(string text, string body, out string? error)
+    {
+        error = null;
+        var parts = body.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var nameOk = parts.Length is 1 or 2 &&
+                     parts[0].All(c => char.IsAsciiLetterOrDigit(c) || c == '_');
+        if (!nameOk)
+        {
+            error = $"acción \"{text}\": se espera \"D:CONTROL\" (pulsador) o \"D:CONTROL VALOR\" " +
+                    "(p. ej. \"D:UFC_1\", \"D:MASTER_ARM_SW 1\", \"D:HDG_KNOB INC\").";
+            return null;
+        }
+
+        var name = parts[0].ToUpperInvariant();
+        static byte[] Msg(string s) => System.Text.Encoding.ASCII.GetBytes(s + "\n");
+        return parts.Length == 2
+            ? new ActionSpec { Kind = ActionKind.DcsBios, Name = name, DcsMessage = Msg($"{name} {parts[1]}") }
+            : new ActionSpec { Kind = ActionKind.DcsBios, Name = name, DcsMessage = Msg($"{name} 1"), DcsRelease = Msg($"{name} 0") };
+    }
+
     public static ActionSpec? Parse(string text, out string? error)
     {
         error = null;
@@ -39,7 +71,10 @@ public sealed class ActionSpec
             return chord is null ? null : new ActionSpec { Kind = ActionKind.Key, Keys = chord };
         }
 
-        var kind = t.Length >= 2 && t[1] == ':' ?char.ToUpperInvariant(t[0]) switch
+        if (t.Length >= 2 && t[1] == ':' && char.ToUpperInvariant(t[0]) == 'D')
+            return ParseDcsBios(text, t[2..].Trim(), out error);
+
+        var kind = t.Length >= 2 && t[1] == ':' ? char.ToUpperInvariant(t[0]) switch
         {
             'K' => ActionKind.SimEvent,
             'B' => ActionKind.InputEvent,

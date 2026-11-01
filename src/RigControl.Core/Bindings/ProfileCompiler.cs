@@ -129,8 +129,8 @@ public sealed class ProfileCompiler
         {
             if (gesture != Gesture.Hold)
                 _errors.Add($"{where}: \"repeatMs\" solo vale con \"gesture\": \"hold\".");
-            else if (output is not null && !output.IsSim)
-                _errors.Add($"{where}: \"repeatMs\" solo vale con acciones K:, B: o L: (un key: mantenido ya es una tecla pulsada).");
+            else if (output is not null && !output.IsExternal)
+                _errors.Add($"{where}: \"repeatMs\" solo vale con acciones K:, B:, L: o D: (un key: mantenido ya es una tecla pulsada).");
             if (repeat is < 20 or > 2000)
                 _errors.Add($"{where}: \"repeatMs\" debe estar entre 20 y 2000.");
         }

@@ -92,6 +92,7 @@
                         </Ellipse>
                         <TextBlock Text="{Binding SimText}" Style="{StaticResource CardValue}" />
                     </StackPanel>
+                    <TextBlock Text="{Binding DcsText}" FontSize="12" Opacity="0.65" />
                 </StackPanel>
             </Border>
 

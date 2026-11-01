@@ -92,6 +92,9 @@ public sealed class RunViewModel : ObservableObject, IDisposable
 
     public bool SimConnected { get => _simConnected; private set => Set(ref _simConnected, value); }
     public string SimText { get => _simText; private set => Set(ref _simText, value); }
+
+    private string _dcsText = "";
+    public string DcsText { get => _dcsText; private set => Set(ref _dcsText, value); }
     public string AircraftText { get => _aircraftText; private set => Set(ref _aircraftText, value); }
     public string AircraftPath { get => _aircraftPath; private set => Set(ref _aircraftPath, value); }
     public string ProfileText { get => _profileText; private set => Set(ref _profileText, value); }
@@ -193,6 +196,7 @@ public sealed class RunViewModel : ObservableObject, IDisposable
         {
             SimConnected = false;
             SimText = "—";
+            DcsText = "";
             AircraftText = "—";
             AircraftPath = "";
             ProfileText = "Detenido";
@@ -200,12 +204,15 @@ public sealed class RunViewModel : ObservableObject, IDisposable
             return;
         }
 
-        SimConnected = s.SimConnected;
-        SimText = s.SimConnected ? $"Conectado · {s.SimName}" : "Esperando a MSFS…";
+        SimConnected = s.SimConnected || s.DcsActive;
+        SimText = s.SimConnected ? $"MSFS · {s.SimName}" : s.DcsActive ? "DCS (DCS-BIOS)" : "Esperando a MSFS o DCS…";
+        DcsText = s.DcsActive ? $"DCS-BIOS: recibiendo datos" : "DCS-BIOS: sin datos";
 
         var aircraft = s.Aircraft;
-        AircraftPath = aircraft ?? "";
-        AircraftText = aircraft is null ? (s.SimConnected ? "Sin avión (¿en el menú?)" : "—") : ShortAircraft(aircraft);
+        AircraftPath = aircraft ?? (s.DcsAircraft is { } d ? $"DCS: {d}" : "");
+        AircraftText = aircraft is not null ? ShortAircraft(aircraft)
+            : s.DcsAircraft is { } dcsName ? dcsName
+            : s.SimConnected ? "Sin avión (¿en el menú?)" : "—";
 
         var p = s.Profile;
         if (p is null || p.Bindings.Length == 0 && p.SourcePath is null)

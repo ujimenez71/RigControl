@@ -14,14 +14,18 @@ public interface ISimOutput
 }
 
 /// <summary>
-/// Reparte cada acción a su salida e imprime lo que hace:
+/// Reparte cada acción a su salida y la registra:
 ///  - key:  toque en Trigger; en un hold, tecla pulsada en INICIO y soltada en FIN.
-///  - K:/B:/L:  se envían en Trigger e INICIO. Con "repeatMs", un hold se reenvía cada tantos ms
-///    hasta el FIN (sin imprimir cada repetición).
-///  - sin prefijo: solo se imprime.
-/// Con dryRun no se envía nada, solo se imprime. Sin asignaciones en OnAction/Tick salvo el texto de consola.
+///  - K:/B:/L:  se envían en Trigger e INICIO.
+///  - D: (DCS-BIOS)  pulsador: toque (1 y 0 a los 50 ms) en Trigger, 1 en INICIO y 0 en FIN;
+///    con valor: se envía en Trigger e INICIO.
+///  - Con "repeatMs", un hold con K:/B:/L:/D: se reenvía cada tantos ms hasta el FIN (sin registrar
+///    cada repetición).
+///  - sin prefijo: solo se registra.
+/// Con dryRun no se envía nada. Sin asignaciones en OnAction/Tick salvo el texto del registro.
 /// </summary>
-public sealed class ActionDispatcher(KeyboardOutput? keyboard, ISimOutput? sim, bool dryRun) : IActionSink, IDisposable
+public sealed class ActionDispatcher(KeyboardOutput? keyboard, ISimOutput? sim, bool dryRun, DcsBiosOutput? dcs = null)
+    : IActionSink, IDisposable
 {
     private const int MaxRepeats = 16;
     private readonly Binding?[] _repeating = new Binding?[MaxRepeats];
@@ -39,7 +43,7 @@ public sealed class ActionDispatcher(KeyboardOutput? keyboard, ISimOutput? sim, 
             else if (phase == ActionPhase.Start) keyboard.Down(keys);
             else keyboard.Up(keys);
         }
-        else if (a.IsSim)
+        else if (a.IsExternal)
         {
             if (binding.RepeatMs > 0)
             {
@@ -47,13 +51,30 @@ public sealed class ActionDispatcher(KeyboardOutput? keyboard, ISimOutput? sim, 
                 else if (phase == ActionPhase.End) StopRepeat(binding);
             }
 
-            if (phase != ActionPhase.End)
+            if (dryRun)
             {
-                if (dryRun) result = binding.RepeatMs > 0 && phase == ActionPhase.Start ? $"(simulado, cada {binding.RepeatMs} ms)" : "(simulado)";
-                else if (sim is null || !sim.IsConnected) result = "(sin conexión con el simulador)";
-                else if (!sim.Send(a)) result = "(el simulador no lo aceptó)";
-                else if (binding.RepeatMs > 0 && phase == ActionPhase.Start) result = $"(repitiendo cada {binding.RepeatMs} ms)";
+                if (phase != ActionPhase.End || a.DcsRelease is not null)
+                    result = binding.RepeatMs > 0 && phase == ActionPhase.Start ? $"(simulado, cada {binding.RepeatMs} ms)" : "(simulado)";
             }
+            else if (a.Kind == ActionKind.DcsBios)
+            {
+                if (dcs is null || !dcs.IsActive) result = "(sin datos de DCS-BIOS)";
+                var ok = phase switch
+                {
+                    ActionPhase.Trigger => dcs?.Send(a, tap: true) ?? false,
+                    ActionPhase.Start => dcs?.Send(a, tap: false) ?? false,
+                    _ => a.DcsRelease is null || (dcs?.Release(a) ?? false),
+                };
+                if (!ok && result.Length == 0) result = "(no se pudo enviar a DCS-BIOS)";
+            }
+            else if (phase != ActionPhase.End)
+            {
+                if (sim is null || !sim.IsConnected) result = "(sin conexión con el simulador)";
+                else if (!sim.Send(a)) result = "(el simulador no lo aceptó)";
+            }
+
+            if (result.Length == 0 && binding.RepeatMs > 0 && phase == ActionPhase.Start)
+                result = $"(repitiendo cada {binding.RepeatMs} ms)";
         }
 
         ConsoleActionSink.Print(binding, phase, result);
@@ -63,6 +84,7 @@ public sealed class ActionDispatcher(KeyboardOutput? keyboard, ISimOutput? sim, 
     {
         keyboard?.Tick(timeMs);
         sim?.Tick(timeMs); // también en --dry: hace falta para saber qué avión hay ("run auto")
+        dcs?.Tick(timeMs);
 
         for (var i = 0; i < MaxRepeats; i++)
         {
@@ -70,7 +92,9 @@ public sealed class ActionDispatcher(KeyboardOutput? keyboard, ISimOutput? sim, 
             if (b is null || timeMs < _nextRepeat[i]) continue;
             _nextRepeat[i] += b.RepeatMs;
             if (_nextRepeat[i] <= timeMs) _nextRepeat[i] = timeMs + b.RepeatMs; // el bucle se retrasó: no ráfagas
-            if (!dryRun && sim is { IsConnected: true }) sim.Send(b.Output);
+            if (dryRun) continue;
+            if (b.Output.Kind == ActionKind.DcsBios) dcs?.Send(b.Output, tap: false);
+            else if (sim is { IsConnected: true }) sim.Send(b.Output);
         }
     }
 

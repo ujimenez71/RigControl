@@ -4,6 +4,9 @@
     <Project Path="src/RigControl/RigControl.csproj" />
     <Project Path="src/RigProbe/RigProbe.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/RigControl.Tests/RigControl.Tests.csproj" />
+  </Folder>
   <Folder Name="/profiles/">
     <File Path="profiles/c172.json" />
     <File Path="profiles/ejemplo-ga.json" />

@@ -59,11 +59,14 @@ public sealed class AutoProfileSource : ProfileSource
     private bool _aircraftChanged;
     private CompiledProfile _current;
 
-    public AutoProfileSource(string dir, SimConnectOutput sim)
+    /// <param name="dcs">Opcional: DCS por DCS-BIOS; su avión llega como "dcs:nombre" (p. ej. "dcs:f-15ese").</param>
+    public AutoProfileSource(string dir, SimConnectOutput sim, DcsBiosOutput? dcs = null)
     {
         _dir = dir;
         _watch = new FileWatch(Path.Combine(dir, "x.json"), "*.json");
+        // Ambos avisan desde el hilo del bucle (en su Tick), así que no hace falta sincronizar.
         sim.AircraftChanged += path => { _aircraft = path; _aircraftChanged = true; };
+        if (dcs is not null) dcs.AircraftChanged += name => { _aircraft = name; _aircraftChanged = true; };
 
         LoadAll(keepPrevious: false);
         _current = Select(announce: true);
