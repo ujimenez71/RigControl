@@ -1,0 +1,8 @@
+<Application x:Class="RigControl.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="MainWindow.xaml"
+             ThemeMode="System">
+    <!-- ThemeMode="System": estilo Fluent de Windows 11, claro u oscuro según el sistema. -->
+    <Application.Resources />
+</Application>

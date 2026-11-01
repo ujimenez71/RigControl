@@ -1,4 +1,4 @@
-namespace RigProbe.Bindings;
+namespace RigControl.Core.Bindings;
 
 /// <summary>Valida un ProfileFile y lo compila. Acumula todos los errores en vez de parar en el primero.</summary>
 public sealed class ProfileCompiler

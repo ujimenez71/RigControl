@@ -1,6 +1,6 @@
 using HidSharp;
 
-namespace RigProbe;
+namespace RigControl.Core;
 
 /// <summary>
 /// Luces del Honeycomb Bravo. Mapeo de bits según el protocolo documentado por la comunidad:

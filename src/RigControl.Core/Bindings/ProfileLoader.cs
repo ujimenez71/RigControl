@@ -1,4 +1,4 @@
-namespace RigProbe.Bindings;
+namespace RigControl.Core.Bindings;
 
 /// <summary>Carga un perfil, lo compila, lo cruza con el catálogo y pasa el Conflict Guard (lo que hace "check").</summary>
 public static class ProfileLoader

@@ -2,14 +2,30 @@
 
 Software propio de control del rig de simulación, inspirado en Hangar Control de OverKill Simulations
 (https://overkillsimulations.com/hangar-control/), adaptado a mis periféricos concretos.
-El proyecto actual `RigProbe` es la herramienta de sondeo (fase 1); crecerá hacia la app completa.
+
+## Estructura (solución `RigControl.slnx`, repo git en rama `main`)
+
+- `src/RigControl.Core/`: biblioteca con todo lo que no es interfaz: dispositivos (`DeviceScanner`,
+  `DeviceCatalog`, `DeviceMonitor`), `BravoLights`, y `Bindings/` (motor, perfiles, salidas teclado
+  y SimConnect). Copia `SimConnect.dll` del SDK a la salida de quien la referencia.
+- `src/RigProbe/`: consola de sondeo y pruebas (`Program.cs`, `ConsoleInput.cs`).
+  `dotnet run --project src/RigProbe -- <comando>`; exe en `src/RigProbe/bin/Debug/net10.0/RigProbe.exe`.
+- `src/RigControl/`: app WPF (`dotnet run --project src/RigControl`). MVVM sin librerías
+  (`ViewModels/ObservableObject`), vistas en `Views/`.
+- `profiles/`: perfiles de ejemplo/fuente; los que se usan van en `%APPDATA%\RigControl\profiles`.
+- El runner (`BindingRunner.Run`) recibe un `CancellationToken`: la consola lo cancela con ESC.
+  Core aún escribe en `Console` (runner, SimConnect, loader): para la pantalla de ejecución de la
+  app habrá que pasar a un registro (log) inyectable.
 
 ## Stack
 
-- .NET 10 (`net10.0-windows`, x64), C#, Windows 11
+- .NET 10, C#, Windows 11, x64 (`PlatformTarget` x64 en todos: SimConnect.dll es de 64 bits)
 - Vortice.DirectInput para entradas; HidSharp para HID (salidas: LEDs, pantallas)
-- IDE: Visual Studio Community 2026. Se compila y ejecuta con `dotnet run -- <comando>`
-- UI futura: WPF (pendiente de decidir frente a WinUI 3)
+- IDE: Visual Studio Community 2026
+- UI: WPF en `net10.0-windows` con el tema Fluent (`ThemeMode="System"` en App.xaml; aviso
+  experimental WPF0001 silenciado). Elegido frente a WinUI 3 (01/11/2026): mismo aspecto Windows 11,
+  sin Windows App SDK ni empaquetado, diseñador de VS. Usar colores del tema (DynamicResource /
+  SystemColors.AccentColorBrushKey), no pinceles clásicos como ControlBrush (no siguen el modo oscuro).
 
 ## Periféricos (10 dispositivos, todos con VID:PID único)
 
@@ -98,8 +114,13 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
   simulados y ✅ verificado con el Bravo real (01/11/2026): `y>95`, `y<20` condicionado al tren
   arriba y b24, correctos y sin repeticiones. `monitor` muestra el % de cada eje.
 - Para que el usuario vea la salida de `run`/`monitor` en directo, lanzarlo en una ventana propia
-  (`Start-Process .\bin\Debug\net10.0\RigProbe.exe -ArgumentList run,<perfil>`); en segundo plano
-  solo la ve Claude.
+  (`Start-Process .\src\RigProbe\bin\Debug\net10.0\RigProbe.exe -ArgumentList run,<perfil>`); en
+  segundo plano solo la ve Claude. Para la app WPF se puede verificar el aspecto con una captura de
+  la ventana (GetWindowRect + CopyFromScreen) y leer la imagen.
+- App WPF, pantalla Monitor ✅ (01/11/2026): lista de dispositivos con punto de actividad, detalle
+  con ejes (barra + % + valor bruto, solo los que existen según `GetObjects`), hats con flecha y
+  botones que se iluminan; registro de cambios (pausable). Lee a ~60 Hz con un DispatcherTimer en
+  el hilo de la interfaz usando `DeviceMonitor` (Core). Pendiente: pantalla de Ejecución y Perfiles.
 - Bravo (verificado con `monitor`): HDG b1, NAV b2, APR b3, REV b4, ALT b5, VS b6, IAS b7, AP b8,
   tren arriba b31, tren abajo b32.
 - Palancas del Bravo, de izquierda a derecha (verificado con `monitor` el 01/11/2026):

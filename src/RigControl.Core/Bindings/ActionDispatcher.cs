@@ -1,4 +1,4 @@
-namespace RigProbe.Bindings;
+namespace RigControl.Core.Bindings;
 
 /// <summary>Destino de las acciones K:/B:/L: (SimConnect). Send devuelve false si no se pudo enviar.</summary>
 public interface ISimOutput

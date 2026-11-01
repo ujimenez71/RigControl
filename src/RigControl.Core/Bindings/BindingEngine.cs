@@ -1,4 +1,4 @@
-namespace RigProbe.Bindings;
+namespace RigControl.Core.Bindings;
 
 public interface IActionSink
 {

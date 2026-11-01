@@ -1,4 +1,4 @@
-namespace RigProbe.Bindings;
+namespace RigControl.Core.Bindings;
 
 /// <summary>
 /// Condición compilada. Evaluate no asigna memoria: recibe el estado actual de todas las entradas.

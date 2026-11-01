@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
 
-namespace RigProbe.Bindings;
+namespace RigControl.Core.Bindings;
 
 public enum ActionKind { Print, SimEvent, InputEvent, LVar, Key }
 

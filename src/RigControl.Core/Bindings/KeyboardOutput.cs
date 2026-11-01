@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace RigProbe.Bindings;
+namespace RigControl.Core.Bindings;
 
 /// <summary>
 /// Teclado virtual con SendInput por scancode. Las teclas llevan cuenta de referencias, así que dos

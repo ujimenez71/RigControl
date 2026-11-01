@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using Vortice.DirectInput;
 
-namespace RigProbe.Bindings;
+namespace RigControl.Core.Bindings;
 
 /// <summary>
 /// Conecta el motor con los dispositivos reales: abre por clave (nunca por InstanceGuid),
@@ -38,7 +38,8 @@ public static class BindingRunner
     /// </summary>
     public const int WarmUpMs = 1000;
 
-    public static void Run(IDirectInput8 di, ProfileSource source, IActionSink sink)
+    /// <summary>Bucle principal a ~60 Hz hasta que se cancele <paramref name="stop"/> (ESC en consola, botón en la app).</summary>
+    public static void Run(IDirectInput8 di, ProfileSource source, IActionSink sink, CancellationToken stop)
     {
         var clock = Stopwatch.StartNew();
         var open = new Dictionary<string, OpenDevice>(StringComparer.OrdinalIgnoreCase);
@@ -52,7 +53,7 @@ public static class BindingRunner
         using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(16));
         while (timer.WaitForNextTickAsync().AsTask().GetAwaiter().GetResult())
         {
-            if (ConsoleInput.EscapePressed()) break;
+            if (stop.IsCancellationRequested) break;
             var now = clock.ElapsedMilliseconds;
 
             // Recarga del archivo o cambio de avión. El estado actual se toma como base sin disparar nada.
@@ -155,7 +156,7 @@ public static class BindingRunner
 
     private static void PrintActive(CompiledProfile profile) =>
         Console.WriteLine($"\nPerfil \"{profile.Name}\": {profile.Bindings.Length} binding(s). " +
-                          "Se recarga al guardar. Pulsa ESC para salir.\n");
+                          "Se recarga al guardar.\n");
 
     private static void Close(OpenDevice dev)
     {

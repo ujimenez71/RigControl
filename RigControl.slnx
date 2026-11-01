@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/RigControl.Core/RigControl.Core.csproj" />
+    <Project Path="src/RigControl/RigControl.csproj" />
+    <Project Path="src/RigProbe/RigProbe.csproj" />
+  </Folder>
+  <Folder Name="/profiles/">
+    <File Path="profiles/c172.json" />
+    <File Path="profiles/ejemplo-ga.json" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path="CLAUDE.md" />
+    <File Path=".gitignore" />
+  </Folder>
+</Solution>

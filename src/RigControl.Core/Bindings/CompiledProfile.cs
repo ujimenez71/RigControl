@@ -1,4 +1,4 @@
-namespace RigProbe.Bindings;
+namespace RigControl.Core.Bindings;
 
 public enum Gesture { Press, Release, Short, Long, Hold, Double, Sequence }
 

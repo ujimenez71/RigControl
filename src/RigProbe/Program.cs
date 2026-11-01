@@ -1,5 +1,6 @@
 using HidSharp;
-using RigProbe.Bindings;
+using RigControl.Core;
+using RigControl.Core.Bindings;
 using Vortice.DirectInput;
 
 namespace RigProbe;
@@ -93,10 +94,25 @@ internal static class Program
         }
 
         if (dryRun) Console.WriteLine("Modo --dry: las acciones solo se imprimen, no se envía nada.");
+        Console.WriteLine("Pulsa ESC para salir.");
+
+        // El runner (en Core) no lee la consola: aquí se vigila ESC y se le pide parar.
+        using var stop = new CancellationTokenSource();
+        var escWatcher = new Thread(() =>
+        {
+            while (!stop.IsCancellationRequested)
+            {
+                if (ConsoleInput.EscapePressed()) stop.Cancel();
+                Thread.Sleep(50);
+            }
+        }) { IsBackground = true };
+        escWatcher.Start();
+
         using (source)
         using (var keyboard = new KeyboardOutput())
         using (var dispatcher = new ActionDispatcher(keyboard, sim, dryRun))
-            BindingRunner.Run(di, source, dispatcher);
+            BindingRunner.Run(di, source, dispatcher, stop.Token);
+        stop.Cancel();
         return 0;
     }
 

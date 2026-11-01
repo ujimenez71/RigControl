@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace RigProbe.Bindings;
+namespace RigControl.Core.Bindings;
 
 /// <summary>
 /// Perfil tal como está escrito en el JSON (editable a mano). ProfileCompiler lo valida y lo

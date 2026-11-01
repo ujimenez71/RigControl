@@ -1,4 +1,4 @@
-namespace RigProbe.Bindings;
+namespace RigControl.Core.Bindings;
 
 /// <summary>
 /// De dónde sale el perfil activo. El runner pregunta en cada ciclo (Poll) si hay que cambiarlo;

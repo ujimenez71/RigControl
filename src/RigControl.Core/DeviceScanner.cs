@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using HidSharp;
 using Vortice.DirectInput;
 
-namespace RigProbe;
+namespace RigControl.Core;
 
 /// <summary>Dispositivo detectado: instancia DirectInput + identidad USB + interfaz HID asociada.</summary>
 public sealed record ScannedDevice(DeviceInstance Instance, int VendorId, int ProductId, string? Serial, string? HidPath)
@@ -49,13 +49,15 @@ public static class DeviceScanner
     /// Abre un dispositivo en modo no exclusivo y en segundo plano: convive con SimAppPro,
     /// Pit House, VPC y el simulador. Lanza excepción si no se puede adquirir.
     /// </summary>
-    public static IDirectInputDevice8 OpenShared(IDirectInput8 di, Guid instanceGuid)
+    /// <param name="window">Ventana para el nivel cooperativo; si no se da, la de la consola.</param>
+    public static IDirectInputDevice8 OpenShared(IDirectInput8 di, Guid instanceGuid, IntPtr window = default)
     {
         var dev = di.CreateDevice(instanceGuid);
         dev.SetDataFormat<RawJoystickState>();
         try
         {
-            dev.SetCooperativeLevel(GetConsoleWindow(), CooperativeLevel.NonExclusive | CooperativeLevel.Background);
+            var hwnd = window != IntPtr.Zero ? window : GetConsoleWindow();
+            dev.SetCooperativeLevel(hwnd, CooperativeLevel.NonExclusive | CooperativeLevel.Background);
         }
         catch
         {

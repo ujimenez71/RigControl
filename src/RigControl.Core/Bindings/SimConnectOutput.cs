@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace RigProbe.Bindings;
+namespace RigControl.Core.Bindings;
 
 /// <summary>
 /// Salida a MSFS 2024 por SimConnect, llamando directamente a la SimConnect.dll nativa del SDK

@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace RigProbe;
+namespace RigControl.Core;
 
 public sealed class CatalogEntry
 {

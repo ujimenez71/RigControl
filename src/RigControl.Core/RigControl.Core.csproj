@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- Núcleo de RigControl: dispositivos, motor de bindings, perfiles y salidas (teclado, SimConnect).
+       Sin interfaz: lo usan la consola RigProbe y la app WPF RigControl. -->
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -21,7 +22,8 @@
     <PackageReference Include="Vortice.DirectInput" Version="3.8.3" />
   </ItemGroup>
 
-  <!-- La DLL nativa se copia junto al ejecutable; sin el SDK se compila igual y las acciones K:/B:/L: avisan. -->
+  <!-- La DLL nativa se copia junto al ejecutable (también al de los proyectos que referencian este);
+       sin el SDK se compila igual y las acciones K:/B:/L: avisan. -->
   <ItemGroup Condition="Exists('$(SimConnectDll)')">
     <None Include="$(SimConnectDll)" Link="SimConnect.dll" CopyToOutputDirectory="PreserveNewest" Visible="false" />
   </ItemGroup>
