@@ -126,8 +126,8 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
   el hilo de la interfaz usando `DeviceMonitor` (Core); se para mientras la pantalla está oculta.
 - App WPF, pantalla Ejecución (01/11/2026): automático o perfil fijo, casilla Simulación (= --dry),
   Iniciar/Detener; tarjetas Simulador / Avión / Perfil activo; registro coloreado por nivel.
-  Probado sin MSFS con UI Automation (iniciar en simulación, detener); falta probarla con MSFS y el
-  rig. Al cerrar la ventana se detiene la ejecución. Pendiente: pantalla Perfiles.
+  Probado con UI Automation (simulación) y ✅ verificada por el usuario con MSFS y el rig
+  (01/11/2026). Al cerrar la ventana se detiene la ejecución. Pendiente: pantalla Perfiles.
 - Bravo (verificado con `monitor`): HDG b1, NAV b2, APR b3, REV b4, ALT b5, VS b6, IAS b7, AP b8,
   tren arriba b31, tren abajo b32.
 - Palancas del Bravo, de izquierda a derecha (verificado con `monitor` el 01/11/2026):
