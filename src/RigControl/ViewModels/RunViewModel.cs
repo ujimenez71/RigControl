@@ -9,6 +9,16 @@ namespace RigControl.ViewModels;
 
 public sealed record LogItem(string Time, LogLevel Level, string Text);
 
+/// <summary>Una luz del Bravo en el panel: color según el tipo (autopiloto, verde, rojo, ámbar).</summary>
+public sealed class LightViewModel(BravoLed led, string label, string kind) : ObservableObject
+{
+    private bool _isOn;
+    public BravoLed Led { get; } = led;
+    public string Label { get; } = label;
+    public string Kind { get; } = kind;
+    public bool IsOn { get => _isOn; set => Set(ref _isOn, value); }
+}
+
 /// <summary>
 /// Pantalla Ejecución: lo mismo que "RigProbe run" (auto o un perfil fijo) con estado visible.
 /// El bucle va en su propio hilo (RunSession); los mensajes del núcleo llegan por una cola y se
@@ -42,6 +52,29 @@ public sealed class RunViewModel : ObservableObject, IDisposable
         Log.Sink = e => _incoming.Enqueue(e);
         RefreshTargets();
     }
+
+    /// <summary>Las 28 luces del Bravo, en el orden del panel físico.</summary>
+    public ObservableCollection<LightViewModel> Lights { get; } =
+    [
+        new(BravoLed.Hdg, "HDG", "ap"), new(BravoLed.Nav, "NAV", "ap"), new(BravoLed.Apr, "APR", "ap"),
+        new(BravoLed.Rev, "REV", "ap"), new(BravoLed.Alt, "ALT", "ap"), new(BravoLed.Vs, "VS", "ap"),
+        new(BravoLed.Ias, "IAS", "ap"), new(BravoLed.Autopilot, "AP", "ap"),
+        new(BravoLed.GearLeftGreen, "L ▼", "green"), new(BravoLed.GearNoseGreen, "N ▼", "green"),
+        new(BravoLed.GearRightGreen, "R ▼", "green"), new(BravoLed.GearLeftRed, "L", "red"),
+        new(BravoLed.GearNoseRed, "N", "red"), new(BravoLed.GearRightRed, "R", "red"),
+        new(BravoLed.MasterWarning, "MASTER WARN", "red"), new(BravoLed.EngineFire, "ENG FIRE", "red"),
+        new(BravoLed.LowOilPressure, "LOW OIL", "amber"), new(BravoLed.LowFuelPressure, "LOW FUEL", "amber"),
+        new(BravoLed.AntiIce, "ANTI ICE", "amber"), new(BravoLed.StarterEngaged, "STARTER", "amber"),
+        new(BravoLed.Apu, "APU", "amber"), new(BravoLed.MasterCaution, "MASTER CAUT", "amber"),
+        new(BravoLed.Vacuum, "VACUUM", "amber"), new(BravoLed.LowHydPressure, "LOW HYD", "amber"),
+        new(BravoLed.AuxFuelPump, "AUX FUEL", "amber"), new(BravoLed.ParkingBrake, "PARK BRAKE", "amber"),
+        new(BravoLed.LowVolts, "LOW VOLTS", "amber"), new(BravoLed.Door, "DOOR", "amber"),
+    ];
+
+    private bool _lightsActive;
+
+    /// <summary>El perfil activo define luces (si no, el panel se oculta).</summary>
+    public bool LightsActive { get => _lightsActive; private set => Set(ref _lightsActive, value); }
 
     public ObservableCollection<string> Targets { get; } = [];
     public ObservableCollection<LogItem> Entries { get; } = [];
@@ -152,6 +185,10 @@ public sealed class RunViewModel : ObservableObject, IDisposable
     private void RefreshStatus()
     {
         var s = _session;
+        var lit = s?.Lights ?? BravoLed.None;
+        foreach (var l in Lights) l.IsOn = (lit & l.Led) != 0;
+        LightsActive = s?.LightsActive ?? false;
+
         if (s is null)
         {
             SimConnected = false;

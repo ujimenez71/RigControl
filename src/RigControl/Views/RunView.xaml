@@ -4,6 +4,7 @@
              xmlns:vm="clr-namespace:RigControl.ViewModels"
              xmlns:core="clr-namespace:RigControl.Core;assembly=RigControl.Core">
     <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
         <!-- Tarjeta de estado -->
         <Style x:Key="Card" TargetType="Border">
             <Setter Property="Padding" Value="16,12" />
@@ -26,6 +27,7 @@
 
     <Grid Margin="16">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -109,8 +111,71 @@
             </Border>
         </Grid>
 
+        <!-- Luces del Bravo (solo si el perfil activo las define) -->
+        <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,0,0,16"
+                Visibility="{Binding LightsActive, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <TextBlock Text="LUCES DEL BRAVO" Style="{StaticResource CardTitle}" />
+                <ItemsControl ItemsSource="{Binding Lights}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:LightViewModel}">
+                            <Border MinWidth="56" Padding="8,4" Margin="0,4,6,0" CornerRadius="4" BorderThickness="1"
+                                    BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="Transparent" />
+                                        <Setter Property="Opacity" Value="0.45" />
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding IsOn}" Value="True" />
+                                                    <Condition Binding="{Binding Kind}" Value="ap" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Background" Value="#2E8BFF" />
+                                                <Setter Property="Opacity" Value="1" />
+                                            </MultiDataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding IsOn}" Value="True" />
+                                                    <Condition Binding="{Binding Kind}" Value="green" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Background" Value="#22A447" />
+                                                <Setter Property="Opacity" Value="1" />
+                                            </MultiDataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding IsOn}" Value="True" />
+                                                    <Condition Binding="{Binding Kind}" Value="red" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Background" Value="#D9342B" />
+                                                <Setter Property="Opacity" Value="1" />
+                                            </MultiDataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding IsOn}" Value="True" />
+                                                    <Condition Binding="{Binding Kind}" Value="amber" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Background" Value="#E8A317" />
+                                                <Setter Property="Opacity" Value="1" />
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="{Binding Label}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
         <!-- Registro -->
-        <DockPanel Grid.Row="3">
+        <DockPanel Grid.Row="4">
             <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
                 <Button DockPanel.Dock="Right" Content="Limpiar" Click="ClearLog_Click" />
                 <TextBlock Text="Acciones y mensajes (lo más reciente arriba)" FontSize="16" FontWeight="SemiBold"
