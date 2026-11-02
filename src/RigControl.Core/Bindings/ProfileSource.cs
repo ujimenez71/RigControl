@@ -157,7 +157,7 @@ public sealed class AutoProfileSource : ProfileSource
 
     private void Announce(CompiledProfile p)
     {
-        var aircraft = _aircraft ?? "(todavía sin avión: esperando a MSFS)";
+        var aircraft = _aircraft ?? "(todavía sin avión: esperando a MSFS o DCS)";
         var file = p.SourcePath is null ? "" : $" ({Path.GetFileName(p.SourcePath)})";
         Log.Info($"\n==== Avión: {aircraft}");
         Log.Info(ReferenceEquals(p, None)

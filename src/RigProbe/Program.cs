@@ -88,7 +88,7 @@ internal static class Program
 
     // ----------------------------------------------------------------- run
 
-    /// <summary>"run perfil": un archivo fijo. "run auto": la carpeta de perfiles, según el avión de MSFS.</summary>
+    /// <summary>"run perfil": un archivo fijo. "run auto": la carpeta de perfiles, según el avión cargado (MSFS o DCS).</summary>
     private static int Run(string target, bool dryRun)
     {
         using var session = RunSession.Create(target, dryRun);

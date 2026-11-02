@@ -26,7 +26,7 @@ public sealed class LightViewModel(BravoLed led, string label, string kind) : Ob
 /// </summary>
 public sealed class RunViewModel : ObservableObject, IDisposable
 {
-    public const string AutoTarget = "Automático (según el avión de MSFS o DCS)";
+    public const string AutoTarget = "Automático (según el avión cargado)";
     private const int MaxLog = 1000;
 
     private readonly ConcurrentQueue<LogEntry> _incoming = new();
