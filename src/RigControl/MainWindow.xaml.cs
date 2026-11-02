@@ -24,6 +24,7 @@ public partial class MainWindow : Window
             var hwnd = new WindowInteropHelper(this).Handle;
             _monitor.Start(hwnd);
             _run.Initialize(hwnd);
+            _profiles.Initialize(hwnd);
         };
 
         // Al cerrar: parar la ejecución (suelta teclas y dispositivos) y cerrar el monitor.

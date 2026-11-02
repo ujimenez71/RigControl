@@ -11,8 +11,8 @@ namespace RigControl.ViewModels;
 
 /// <summary>
 /// Pantalla Perfiles: lista los perfiles de la carpeta y muestra de cada uno sus bindings, luces,
-/// dispositivos y lo que dice el Conflict Guard. Solo lectura: se editan en el JSON y la pantalla
-/// se actualiza sola al guardar (vigila la carpeta mientras está visible).
+/// dispositivos y lo que dice el Conflict Guard; se actualiza sola al guardar (vigila la carpeta
+/// mientras está visible). "Editar" abre el editor gráfico (ProfileEditorViewModel).
 /// </summary>
 public sealed class ProfilesViewModel : ObservableObject, IDisposable
 {
@@ -38,6 +38,83 @@ public sealed class ProfilesViewModel : ObservableObject, IDisposable
 
     public string ProfilesDir => ProfileFile.ProfilesDir;
 
+    // ------------------------------------------------------------ editor
+
+    private IntPtr _window;
+    private ProfileEditorViewModel? _editor;
+
+    /// <summary>La ventana, para abrir los mandos (DirectInput) al capturar entradas.</summary>
+    public void Initialize(IntPtr window) => _window = window;
+
+    /// <summary>Editor abierto (null = vista normal de solo lectura).</summary>
+    public ProfileEditorViewModel? Editor
+    {
+        get => _editor;
+        private set
+        {
+            if (!Set(ref _editor, value)) return;
+            Raise(nameof(IsEditing));
+            Raise(nameof(IsViewing));
+            Raise(nameof(ShowDetail));
+        }
+    }
+
+    public bool IsEditing => _editor is not null;
+    public bool IsViewing => _editor is null;
+    public bool ShowDetail => _editor is null && _selected is not null;
+
+    /// <summary>Abre el perfil seleccionado en el editor. Devuelve un mensaje si no se puede.</summary>
+    public string? BeginEdit()
+    {
+        if (_selected is null) return null;
+        ProfileFile file;
+        try
+        {
+            file = ProfileFile.Load(_selected.Path);
+        }
+        catch (Exception ex)
+        {
+            return $"No se puede abrir en el editor porque el JSON no es válido ({ex.Message}). Corrígelo con \"Abrir en el editor\" (de texto).";
+        }
+        var editor = new ProfileEditorViewModel(_selected.Path, file, _window);
+        editor.Closed += _ =>
+        {
+            editor.Dispose();
+            Editor = null;
+            Refresh();
+        };
+        Editor = editor;
+        return null;
+    }
+
+    /// <summary>¿Tiene el JSON comentarios // que se perderían al guardar desde el editor?</summary>
+    public bool SelectedHasComments()
+    {
+        if (_selected is null || !File.Exists(_selected.Path)) return false;
+        return File.ReadLines(_selected.Path).Any(l => l.TrimStart().StartsWith("//", StringComparison.Ordinal));
+    }
+
+    /// <summary>Crea "nuevo-perfil.json" (o -2, -3...) vacío y lo abre en el editor.</summary>
+    public void NewProfile()
+    {
+        Directory.CreateDirectory(ProfilesDir);
+        var path = Path.Combine(ProfilesDir, "nuevo-perfil.json");
+        for (var n = 2; File.Exists(path); n++) path = Path.Combine(ProfilesDir, $"nuevo-perfil-{n}.json");
+        new ProfileFile { Name = "Nuevo perfil", Sim = "msfs" }.Save(path);
+        Refresh();
+        Selected = Profiles.FirstOrDefault(p => p.Path == path);
+        BeginEdit();
+    }
+
+    /// <summary>Borra el perfil seleccionado (queda una copia en .json.bak).</summary>
+    public void DeleteSelected()
+    {
+        if (_selected is null) return;
+        File.Copy(_selected.Path, _selected.Path + ".bak", overwrite: true);
+        File.Delete(_selected.Path);
+        Refresh();
+    }
+
     public ObservableCollection<ProfileReport> Profiles { get; } = [];
     public ICollectionView ProfilesView { get; }
 
@@ -50,6 +127,7 @@ public sealed class ProfilesViewModel : ObservableObject, IDisposable
             BindingsView = value is null ? null : CollectionViewSource.GetDefaultView(value.Bindings);
             if (BindingsView is not null) BindingsView.Filter = FilterBinding;
             Raise(nameof(HasSelection));
+            Raise(nameof(ShowDetail));
             Raise(nameof(AircraftText));
             Raise(nameof(ErrorsText));
             Raise(nameof(HasErrors));
@@ -57,6 +135,7 @@ public sealed class ProfilesViewModel : ObservableObject, IDisposable
             Raise(nameof(BindingsHeader));
             Raise(nameof(LightsHeader));
             Raise(nameof(DevicesHeader));
+            Raise(nameof(HasNotes));
         }
     }
 
@@ -75,6 +154,8 @@ public sealed class ProfilesViewModel : ObservableObject, IDisposable
     }
 
     public string Summary { get => _summary; private set => Set(ref _summary, value); }
+
+    public bool HasNotes => !string.IsNullOrWhiteSpace(_selected?.Notes);
 
     public string AircraftText => _selected is null ? ""
         : $"{_selected.SimName} · " + (_selected.Aircraft.Length == 0 ? "sin \"aircraft\": solo se usa eligiéndolo a mano"
@@ -167,5 +248,9 @@ public sealed class ProfilesViewModel : ObservableObject, IDisposable
         }
     }
 
-    public void Dispose() => SetVisible(false);
+    public void Dispose()
+    {
+        SetVisible(false);
+        _editor?.Dispose();
+    }
 }

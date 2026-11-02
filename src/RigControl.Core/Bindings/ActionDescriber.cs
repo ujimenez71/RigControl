@@ -36,6 +36,28 @@ public static class ActionDescriber
         ["FLAPS_UP"] = "Flaps: recoger",
         ["FLAPS_DOWN"] = "Flaps: extender del todo",
         ["PAUSE_TOGGLE"] = "Pausa: alternar",
+        ["AP_HDG_HOLD"] = "Autopiloto: modo rumbo (HDG)",
+        ["AP_NAV1_HOLD"] = "Autopiloto: modo navegación (NAV)",
+        ["AP_APR_HOLD"] = "Autopiloto: modo aproximación (APR)",
+        ["AP_ALT_HOLD"] = "Autopiloto: mantener altitud (ALT)",
+        ["AP_VS_HOLD"] = "Autopiloto: velocidad vertical (VS)",
+        ["HEADING_BUG_INC"] = "Rumbo seleccionado: +1°",
+        ["HEADING_BUG_DEC"] = "Rumbo seleccionado: -1°",
+        ["AP_ALT_VAR_INC"] = "Altitud seleccionada: subir",
+        ["AP_ALT_VAR_DEC"] = "Altitud seleccionada: bajar",
+        ["AP_VS_VAR_INC"] = "Velocidad vertical seleccionada: subir",
+        ["AP_VS_VAR_DEC"] = "Velocidad vertical seleccionada: bajar",
+        ["AILERON_TRIM_LEFT"] = "Trim de alerones: izquierda",
+        ["AILERON_TRIM_RIGHT"] = "Trim de alerones: derecha",
+        ["RUDDER_TRIM_LEFT"] = "Trim de timón: izquierda",
+        ["RUDDER_TRIM_RIGHT"] = "Trim de timón: derecha",
+        ["BRAKES"] = "Frenos",
+        ["SPOILERS_TOGGLE"] = "Aerofrenos: alternar",
+        ["MAGNETO_OFF"] = "Magnetos: OFF",
+        ["MAGNETO_RIGHT"] = "Magnetos: R (derecho)",
+        ["MAGNETO_LEFT"] = "Magnetos: L (izquierdo)",
+        ["MAGNETO_BOTH"] = "Magnetos: BOTH (ambos)",
+        ["MAGNETO_START"] = "Magnetos: START (arranque)",
         ["TOGGLE_NAV_LIGHTS"] = "Luces de navegación: alternar",
         ["TOGGLE_BEACON_LIGHTS"] = "Luz anticolisión (beacon): alternar",
         ["TOGGLE_TAXI_LIGHTS"] = "Luz de rodaje: alternar",
@@ -93,6 +115,19 @@ public static class ActionDescriber
         ["KNOB"] = "mando", ["SWITCH"] = "interruptor", ["BUTTON"] = "botón", ["PUSH"] = "pulsar", ["RESET"] = "reiniciar",
         ["PFD"] = "(PFD)", ["MFD"] = "(MFD)", ["AS1000"] = "G1000:", ["TO"] = "a",
     };
+
+    /// <summary>Eventos K: frecuentes, para las sugerencias del editor (los que tienen descripción propia).</summary>
+    public static IReadOnlyList<string> CommonSimEvents { get; } =
+    [
+        "AUTOPILOT_OFF", "AUTOPILOT_ON", "AP_MASTER", "AP_HDG_HOLD", "AP_NAV1_HOLD", "AP_APR_HOLD", "AP_ALT_HOLD",
+        "AP_VS_HOLD", "HEADING_BUG_INC", "HEADING_BUG_DEC", "AP_ALT_VAR_INC", "AP_ALT_VAR_DEC", "AP_VS_VAR_INC",
+        "AP_VS_VAR_DEC", "ELEV_TRIM_DN", "ELEV_TRIM_UP", "AILERON_TRIM_LEFT", "AILERON_TRIM_RIGHT",
+        "RUDDER_TRIM_LEFT", "RUDDER_TRIM_RIGHT", "GEAR_UP", "GEAR_DOWN", "GEAR_TOGGLE", "PARKING_BRAKES", "BRAKES",
+        "FLAPS_INCR", "FLAPS_DECR", "FLAPS_UP", "FLAPS_DOWN", "SPOILERS_TOGGLE", "TOGGLE_NAV_LIGHTS",
+        "TOGGLE_BEACON_LIGHTS", "TOGGLE_TAXI_LIGHTS", "LANDING_LIGHTS_TOGGLE", "STROBES_TOGGLE", "PANEL_LIGHTS_TOGGLE",
+        "TOGGLE_MASTER_BATTERY", "TOGGLE_MASTER_ALTERNATOR", "TOGGLE_AVIONICS_MASTER", "PITOT_HEAT_TOGGLE",
+        "MAGNETO_OFF", "MAGNETO_RIGHT", "MAGNETO_LEFT", "MAGNETO_BOTH", "MAGNETO_START", "PAUSE_TOGGLE",
+    ];
 
     public static string Describe(string action)
     {

@@ -1,0 +1,378 @@
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
+using System.Windows.Threading;
+using RigControl.Core;
+using RigControl.Core.Bindings;
+using Vortice.DirectInput;
+
+namespace RigControl.ViewModels;
+
+public sealed record ProblemItem(Severity Severity, string Text);
+
+/// <summary>
+/// Editor gráfico de un perfil: datos del perfil y bindings (añadir, duplicar, borrar, editar).
+/// Valida en vivo con el compilador y el Conflict Guard (lo mismo que "check"). Captura entradas
+/// pulsando el mando, ofrece los B: del avión cargado en MSFS y "usar el avión actual".
+/// Lo que no edita (capas, luces, timing, condiciones, secuencias) lo conserva tal cual.
+/// </summary>
+public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
+{
+    private const int CaptureTimeoutMs = 15000;
+
+    private readonly ProfileFile _original;
+    private readonly IntPtr _window;
+    private readonly Dictionary<string, string> _devices;
+    private readonly DispatcherTimer _validateTimer = new() { Interval = TimeSpan.FromMilliseconds(300) };
+    private readonly DispatcherTimer _captureTimer = new(DispatcherPriority.Input) { Interval = TimeSpan.FromMilliseconds(16) };
+    private readonly DispatcherTimer _simTimer = new() { Interval = TimeSpan.FromMilliseconds(100) };
+    private readonly Stopwatch _clock = Stopwatch.StartNew();
+    private readonly SimConnectOutput _sim = new();
+    private readonly DcsBiosOutput _dcs = new();
+    private readonly DeviceCatalog _catalog = DeviceCatalog.Load();
+
+    private IDirectInput8? _di;
+    private DeviceMonitor? _monitor;
+    private InputCapture? _capture;
+    private long _captureStart;
+    private List<string> _inputEvents = [];
+
+    private string _name;
+    private string _sim0;
+    private string _aircraftText;
+    private string _notes;
+    private BindingEditViewModel? _selected;
+    private bool _dirty;
+    private bool _isCapturing;
+    private string _captureStatus = "";
+    private string _status = "";
+    private bool _ok = true;
+    private string _simStatus = "MSFS: sin conexión";
+
+    public ProfileEditorViewModel(string path, ProfileFile file, IntPtr window)
+    {
+        Path = path;
+        _original = file;
+        _window = window;
+        _devices = new Dictionary<string, string>(file.Devices, StringComparer.OrdinalIgnoreCase);
+        _name = file.Name;
+        _sim0 = string.IsNullOrWhiteSpace(file.Sim) ? SimFromFile(file) : file.Sim.Trim().ToLowerInvariant();
+        _aircraftText = string.Join(", ", file.Aircraft);
+        _notes = file.Notes ?? "";
+
+        foreach (var b in file.Bindings) Add(BindingEditViewModel.FromFile(b));
+        Selected = Bindings.FirstOrDefault();
+
+        _validateTimer.Tick += (_, _) => { _validateTimer.Stop(); Validate(); };
+        _captureTimer.Tick += (_, _) => CaptureTick();
+        _simTimer.Tick += (_, _) => SimTick();
+        _sim.InputEventsReady += events =>
+        {
+            _inputEvents = [.. events.Keys.Order(StringComparer.OrdinalIgnoreCase)];
+            RefreshSuggestions();
+        };
+        _simTimer.Start();
+        Validate();
+        Dirty = false;
+    }
+
+    public string Path { get; }
+    public string FileName => System.IO.Path.GetFileName(Path);
+
+    public ObservableCollection<BindingEditViewModel> Bindings { get; } = [];
+    public ObservableCollection<ProblemItem> Problems { get; } = [];
+    public ObservableCollection<string> Suggestions { get; } = [];
+
+    public static string[] SimOptions { get; } = ["msfs", "dcs", "general"];
+    public static TargetOption[] Targets => BindingEditViewModel.Targets;
+    public static GestureOption[] Gestures => BindingEditViewModel.Gestures;
+
+    public string Name { get => _name; set { if (Set(ref _name, value)) Touch(); } }
+    public string Sim { get => _sim0; set { if (Set(ref _sim0, value)) Touch(); } }
+    public string AircraftText { get => _aircraftText; set { if (Set(ref _aircraftText, value)) Touch(); } }
+    public string Notes { get => _notes; set { if (Set(ref _notes, value)) Touch(); } }
+
+    public BindingEditViewModel? Selected
+    {
+        get => _selected;
+        set
+        {
+            if (_isCapturing) StopCapture("");
+            if (!Set(ref _selected, value)) return;
+            Raise(nameof(HasSelected));
+            RefreshSuggestions();
+        }
+    }
+
+    public bool HasSelected => _selected is not null;
+
+    public bool Dirty { get => _dirty; private set { if (Set(ref _dirty, value)) Raise(nameof(Title)); } }
+    public string Title => $"Editando {FileName}{(_dirty ? "  ·  cambios sin guardar" : "")}";
+
+    public bool IsCapturing { get => _isCapturing; private set { if (Set(ref _isCapturing, value)) Raise(nameof(CaptureButtonText)); } }
+    public string CaptureButtonText => _isCapturing ? "Cancelar" : "🎯 Capturar";
+    public string CaptureStatus { get => _captureStatus; private set => Set(ref _captureStatus, value); }
+
+    public string Status { get => _status; private set => Set(ref _status, value); }
+    public bool Ok { get => _ok; private set => Set(ref _ok, value); }
+    public string SimStatus { get => _simStatus; private set => Set(ref _simStatus, value); }
+
+    /// <summary>Se dispara al guardar o descartar: la pantalla Perfiles vuelve a la vista normal.</summary>
+    public event Action<bool>? Closed;
+
+    // ------------------------------------------------------------ bindings
+
+    public void AddBinding()
+    {
+        var b = BindingEditViewModel.FromFile(new BindingFile { Input = "", Gesture = "press", Action = "B:" });
+        Add(b);
+        Selected = b;
+        Touch();
+        ToggleCapture(); // lo normal es pulsar el botón que se quiere asignar
+    }
+
+    public void DuplicateSelected()
+    {
+        if (_selected is null) return;
+        var copy = _selected.Clone();
+        Add(copy, Bindings.IndexOf(_selected) + 1);
+        Selected = copy;
+        Touch();
+    }
+
+    public void DeleteSelected()
+    {
+        if (_selected is null) return;
+        var i = Bindings.IndexOf(_selected);
+        _selected.Changed -= Touch;
+        Bindings.RemoveAt(i);
+        Selected = Bindings.Count == 0 ? null : Bindings[Math.Min(i, Bindings.Count - 1)];
+        Touch();
+    }
+
+    private void Add(BindingEditViewModel b, int index = -1)
+    {
+        b.Changed += Touch;
+        b.PropertyChanged += (_, e) =>
+        {
+            if (ReferenceEquals(b, _selected) && e.PropertyName is nameof(BindingEditViewModel.Name) or nameof(BindingEditViewModel.Target))
+                RefreshSuggestions();
+        };
+        if (index < 0 || index > Bindings.Count) Bindings.Add(b);
+        else Bindings.Insert(index, b);
+    }
+
+    public void PickSuggestion(string name)
+    {
+        if (_selected is null) return;
+        _selected.Name = name;
+    }
+
+    /// <summary>Sugerencias para el nombre: B: del avión cargado o K: frecuentes, filtradas por lo escrito.</summary>
+    private void RefreshSuggestions()
+    {
+        Suggestions.Clear();
+        if (_selected is null) return;
+        IEnumerable<string> source = _selected.Target switch
+        {
+            ActionTarget.Cabin => _inputEvents,
+            ActionTarget.Event => ActionDescriber.CommonSimEvents,
+            _ => [],
+        };
+        var filter = _selected.Name;
+        foreach (var s in source.Where(s => filter.Length == 0 || s.Contains(filter, StringComparison.OrdinalIgnoreCase)).Take(200))
+            if (!s.Equals(filter, StringComparison.OrdinalIgnoreCase)) Suggestions.Add(s);
+    }
+
+    // ------------------------------------------------------------ captura de entradas
+
+    public void ToggleCapture()
+    {
+        if (_isCapturing) { StopCapture("Cancelado."); return; }
+        if (_selected is null || _selected.IsSequence) return;
+        try
+        {
+            _di ??= DInput.DirectInput8Create();
+            _monitor ??= DeviceMonitor.Open(_di, _window);
+        }
+        catch (Exception ex)
+        {
+            CaptureStatus = $"No se pueden abrir los mandos: {ex.Message}";
+            return;
+        }
+        _capture = new InputCapture(_monitor);
+        _captureStart = _clock.ElapsedMilliseconds;
+        IsCapturing = true;
+        CaptureStatus = "Preparando los mandos…";
+        _captureTimer.Start();
+    }
+
+    private void CaptureTick()
+    {
+        var now = _clock.ElapsedMilliseconds;
+        var got = _capture!.Poll(now);
+        if (_capture.Ready && CaptureStatus.StartsWith("Preparando", StringComparison.Ordinal))
+            CaptureStatus = "Pulsa el botón, mueve el hat o lleva un eje a un extremo…";
+        if (got is null)
+        {
+            if (now - _captureStart > CaptureTimeoutMs) StopCapture("No se ha pulsado nada (15 s).");
+            return;
+        }
+
+        var alias = AliasFor(got);
+        _selected!.Input = $"{alias}:{got.Part}";
+        StopCapture($"Capturado: {got.DeviceName} · {_catalog.Devices.FirstOrDefault(d => SameKey(d.Key, got.DeviceKey))?.InputLabel(got.Part) ?? got.Part}");
+    }
+
+    private void StopCapture(string message)
+    {
+        _captureTimer.Stop();
+        _capture = null;
+        IsCapturing = false;
+        CaptureStatus = message;
+    }
+
+    /// <summary>Alias del dispositivo en este perfil; si no está, lo añade con un alias corto sacado del catálogo.</summary>
+    private string AliasFor(CapturedInput got)
+    {
+        foreach (var (alias, key) in _devices)
+            if (SameKey(key, got.DeviceKey) || SameKey(got.DeviceKey, key)) return alias;
+
+        var baseName = new string(got.DeviceName.TakeWhile(c => c != ' ').Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+        if (baseName.Length == 0) baseName = "mando";
+        var name = baseName;
+        for (var n = 2; _devices.ContainsKey(name); n++) name = $"{baseName}{n}";
+        _devices[name] = got.DeviceKey;
+        Touch();
+        return name;
+    }
+
+    private static bool SameKey(string full, string key) =>
+        full.Equals(key, StringComparison.OrdinalIgnoreCase) || full.StartsWith(key + ":", StringComparison.OrdinalIgnoreCase);
+
+    // ------------------------------------------------------------ simulador
+
+    private void SimTick()
+    {
+        var now = _clock.ElapsedMilliseconds;
+        _sim.Tick(now);
+        _dcs.Tick(now);
+        SimStatus = _dcs.IsActive ? $"DCS: {_dcs.Aircraft ?? "sin avión"}"
+            : !_sim.IsConnected ? "MSFS: sin conexión (la lista de controles B: necesita MSFS con un avión cargado)"
+            : $"MSFS: {AircraftFolder(_sim.Aircraft) ?? "sin avión"} · {_inputEvents.Count} controles B:";
+    }
+
+    /// <summary>Añade el avión cargado ahora (MSFS o DCS) a la lista de aviones del perfil.</summary>
+    public void UseCurrentAircraft()
+    {
+        var current = _dcs.IsActive && _dcs.Aircraft is not null ? $"dcs:{_dcs.Aircraft.ToLowerInvariant()}"
+            : AircraftFolder(_sim.Aircraft);
+        if (current is null)
+        {
+            Status = "No hay ningún avión cargado en MSFS ni en DCS.";
+            return;
+        }
+        var list = AircraftList();
+        if (!list.Contains(current, StringComparer.OrdinalIgnoreCase)) list.Add(current);
+        AircraftText = string.Join(", ", list);
+        if (current.StartsWith("dcs:", StringComparison.Ordinal)) Sim = "dcs";
+    }
+
+    /// <summary>"simobjects\airplanes\asobo_c172sp_g1000\..." -> "asobo_c172sp_g1000".</summary>
+    private static string? AircraftFolder(string? path)
+    {
+        if (path is null) return null;
+        var parts = SimConnectOutput.NormalizeAircraft(path).Split('\\', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 3 ? parts[2] : parts.LastOrDefault();
+    }
+
+    private List<string> AircraftList() =>
+        [.. _aircraftText.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+
+    // ------------------------------------------------------------ validar y guardar
+
+    private void Touch()
+    {
+        Dirty = true;
+        _validateTimer.Stop();
+        _validateTimer.Start();
+    }
+
+    public ProfileFile BuildFile() => new()
+    {
+        Name = _name.Trim(),
+        Sim = _sim0,
+        Notes = string.IsNullOrWhiteSpace(_notes) ? null : _notes.Trim(),
+        Timing = _original.Timing,
+        Aircraft = AircraftList(),
+        AxisHysteresis = _original.AxisHysteresis,
+        Devices = UsedDevices(),
+        Layers = _original.Layers,
+        Bindings = [.. Bindings.Select(b => b.ToFile())],
+        Lights = _original.Lights,
+    };
+
+    /// <summary>Los dispositivos del perfil, menos los añadidos por captura que ya no usa nadie.</summary>
+    private Dictionary<string, string> UsedDevices()
+    {
+        var used = new Dictionary<string, string>(_devices, StringComparer.OrdinalIgnoreCase);
+        foreach (var alias in _devices.Keys.Where(a => !_original.Devices.ContainsKey(a)))
+            if (!Bindings.Any(b => b.Input.StartsWith(alias + ":", StringComparison.OrdinalIgnoreCase)))
+                used.Remove(alias);
+        return used;
+    }
+
+    /// <summary>Compila el perfil en memoria y reparte el resultado: textos de cada fila y lista de problemas.</summary>
+    public void Validate()
+    {
+        var report = ProfileInspector.Inspect(BuildFile(), Path, _catalog);
+        Problems.Clear();
+        foreach (var e in report.Errors) Problems.Add(new ProblemItem(Severity.Error, e));
+        foreach (var f in report.Findings) Problems.Add(new ProblemItem(f.Severity, f.Message));
+
+        for (var i = 0; i < Bindings.Count; i++)
+        {
+            var b = Bindings[i];
+            var row = report.Bindings.Count == Bindings.Count ? report.Bindings[i] : null;
+            b.InputText = row?.InputText ?? (b.IsSequence ? b.SequenceText : b.Input.Length == 0 ? "(sin entrada)" : b.Input);
+            b.KindText = Targets.First(t => t.Value == b.Target).Label;
+            b.ConditionText = row?.Condition ?? "";
+            var prefix = $"binding #{i + 1}:";
+            b.Error = string.Join("\n", report.Errors.Where(e => e.StartsWith(prefix, StringComparison.Ordinal))
+                                                      .Select(e => e[prefix.Length..].Trim()));
+        }
+
+        Ok = report.Ok;
+        var errors = report.Errors.Count + report.Findings.Count(f => f.Severity == Severity.Error);
+        Status = errors == 0 ? $"Sin errores · {Bindings.Count} bindings"
+            : $"{errors} error(es): se puede guardar, pero la ejecución no usará el perfil hasta corregirlos";
+    }
+
+    public void Save()
+    {
+        Validate();
+        BuildFile().Save(Path);
+        Dirty = false;
+        Closed?.Invoke(true);
+    }
+
+    public void Discard() => Closed?.Invoke(false);
+
+    private static string SimFromFile(ProfileFile f) => ProfileCompiler.ResolveSim(f, out _) switch
+    {
+        SimKind.Msfs => "msfs",
+        SimKind.Dcs => "dcs",
+        _ => "general",
+    };
+
+    public void Dispose()
+    {
+        _captureTimer.Stop();
+        _simTimer.Stop();
+        _validateTimer.Stop();
+        _monitor?.Dispose();
+        _di?.Dispose();
+        _sim.Dispose();
+        _dcs.Dispose();
+    }
+}

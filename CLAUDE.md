@@ -164,8 +164,18 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
   español por `ActionDescriber` (o `"desc"` en el binding, que manda). Entradas con nombre
   desde `devices.json` → `"Inputs": { "b13": "ALT ON", "hat1": "...", "y": "Palanca 1" }` por
   dispositivo (`CatalogEntry.InputLabel`); el Yoke y el Bravo traen los de fábrica
-  (`DeviceCatalog.DefaultInputs`, se rellenan al cargar si faltan). Pendiente: editor que capture
-  entradas. Lista agrupada por simulador (MSFS 2024 / DCS World / General).
+  (`DeviceCatalog.DefaultInputs`, se rellenan al cargar si faltan). Nuevo perfil / Editar / Borrar.
+- Editor gráfico de perfiles (02/11/2026, `ProfileEditorViewModel` + `BindingEditViewModel`,
+  vista `ProfileEditorView`): nombre, sim, aviones ("Usar el avión actual" de MSFS o DCS), notas;
+  bindings añadir/duplicar/borrar; entrada con "Capturar" (`InputCapture` en Core: primer
+  botón/hat/eje que cambia tras 1 s; añade el dispositivo al perfil con alias corto si no estaba);
+  gesto; acción por partes (destino + nombre + valor), con sugerencias de B: del avión cargado
+  (SimConnect propio del editor) y K: frecuentes (`ActionDescriber.CommonSimEvents`), tecla
+  capturada pulsándola; "desc"; repeatMs en hold. Valida en vivo (`ProfileInspector.Inspect` sobre
+  el perfil en memoria). Guarda con `ProfileFile.Save` (.bak, temporal + renombrar, un binding por
+  línea); los // comentarios se pierden: avisa antes de editar un perfil con comentarios. Conserva
+  sin editar: capas, condiciones, secuencias, luces, timing. Pendiente (2.ª versión): condiciones
+  y luces en el editor. `"notes"` en el perfil = notas libres (se ven en Perfiles). Lista agrupada por simulador (MSFS 2024 / DCS World / General).
 - `"sim"` en el perfil (02/11/2026): "msfs", "dcs" o "general"; si falta se deduce de "aircraft"
   (`ProfileCompiler.ResolveSim`; mezclar aviones de los dos = error). En `run auto` solo se eligen
   perfiles del simulador del avión actual o generales (un "*" de MSFS no se activa en DCS).

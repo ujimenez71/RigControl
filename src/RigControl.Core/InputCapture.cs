@@ -56,7 +56,7 @@ public sealed class InputCapture(DeviceMonitor monitor)
                     var dir = ((v + 4500) / 9000 % 4) switch { 0 => "up", 1 => "right", 2 => "down", _ => "left" };
                     return new(d.Key, d.Name, $"hat{p + 1}.{dir}");
                 }
-                if (v < 0) _povs[i][p] = -1;
+                if (v < 0) _povs![i][p] = -1;
             }
 
             foreach (var a in d.AxisIndices)
