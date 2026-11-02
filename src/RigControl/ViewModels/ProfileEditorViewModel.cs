@@ -62,6 +62,9 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
 
         foreach (var b in file.Bindings) Add(BindingEditViewModel.FromFile(b));
         Selected = Bindings.FirstOrDefault();
+        foreach (var (name, def) in file.Layers) AddLayer(new LayerEditViewModel(name, ConditionEditViewModel.FromFile(def, isLayer: true)));
+        foreach (var (led, value) in file.Lights) AddLight(LightFromJson(led, value));
+        RefreshLayerNames();
 
         _validateTimer.Tick += (_, _) => { _validateTimer.Stop(); Validate(); };
         _captureTimer.Tick += (_, _) => CaptureTick();
@@ -82,6 +85,111 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
     public ObservableCollection<BindingEditViewModel> Bindings { get; } = [];
     public ObservableCollection<ProblemItem> Problems { get; } = [];
     public ObservableCollection<string> Suggestions { get; } = [];
+    public ObservableCollection<LayerEditViewModel> Layers { get; } = [];
+    public ObservableCollection<LightEditViewModel> Lights { get; } = [];
+
+    /// <summary>Nombres de las capas, para los desplegables de las condiciones.</summary>
+    public ObservableCollection<string> LayerNames { get; } = [];
+
+    public string LayersHeader => $"Capas ({Layers.Count})";
+    public string LightsHeader => $"Luces del Bravo ({Lights.Count})";
+    public string BindingsHeader => $"Bindings ({Bindings.Count})";
+
+    public static ModeOption[] BindingModes => ConditionEditViewModel.BindingModes;
+    public static ModeOption[] LayerModes => ConditionEditViewModel.LayerModes;
+    public static TermKindOption[] TermKinds => ConditionEditViewModel.Kinds;
+    public static string[] LedNames => LightEditViewModel.LedNames;
+    public static CompareOption[] Compares => LightTermViewModel.Compares;
+    public static string[] CommonVars => LightTermViewModel.CommonVars;
+
+    // ------------------------------------------------------------ capas
+
+    public void NewLayer()
+    {
+        var name = "capa";
+        for (var n = 2; Layers.Any(l => l.Name == name); n++) name = $"capa{n}";
+        AddLayer(new LayerEditViewModel(name, ConditionEditViewModel.FromFile(null, isLayer: true)));
+        RefreshLayerNames();
+        Touch();
+    }
+
+    public void DeleteLayer(LayerEditViewModel layer)
+    {
+        Layers.Remove(layer);
+        RefreshLayerNames();
+        Touch();
+    }
+
+    /// <summary>¿Alguna condición (de bindings o de otras capas) usa la capa? Para avisar antes de borrarla.</summary>
+    public bool LayerInUse(LayerEditViewModel layer) =>
+        Bindings.Any(b => b.Condition.UsesLayer(layer.Name)) || Layers.Any(l => l != layer && l.Condition.UsesLayer(layer.Name));
+
+    private void AddLayer(LayerEditViewModel layer)
+    {
+        layer.Changed += Touch;
+        layer.Renamed += (from, to) =>
+        {
+            foreach (var b in Bindings) b.Condition.RenameLayer(from, to);
+            foreach (var l in Layers) l.Condition.RenameLayer(from, to);
+            RefreshLayerNames();
+        };
+        Layers.Add(layer);
+        Raise(nameof(LayersHeader));
+    }
+
+    private void RefreshLayerNames()
+    {
+        // Sin Clear: los desplegables abiertos pierden la selección si la colección se vacía.
+        var names = Layers.Select(l => l.Name).ToList();
+        for (var i = LayerNames.Count - 1; i >= 0; i--) if (!names.Contains(LayerNames[i])) LayerNames.RemoveAt(i);
+        foreach (var n in names) if (!LayerNames.Contains(n)) LayerNames.Add(n);
+        Raise(nameof(LayersHeader));
+    }
+
+    // ------------------------------------------------------------ luces
+
+    public void NewLight()
+    {
+        var led = LedNames.FirstOrDefault(n => Lights.All(l => l.Led != n)) ?? LedNames[0];
+        var light = new LightEditViewModel(led);
+        light.AddTerm();
+        AddLight(light);
+        Touch();
+    }
+
+    public void DeleteLight(LightEditViewModel light)
+    {
+        Lights.Remove(light);
+        Raise(nameof(LightsHeader));
+        Touch();
+    }
+
+    private void AddLight(LightEditViewModel light)
+    {
+        light.Changed += Touch;
+        Lights.Add(light);
+        Raise(nameof(LightsHeader));
+    }
+
+    private static LightEditViewModel LightFromJson(string led, System.Text.Json.JsonElement value)
+    {
+        var light = new LightEditViewModel(led);
+        if (value.ValueKind == System.Text.Json.JsonValueKind.String)
+            light.Terms.Add(LightTermViewModel.FromText(light, value.GetString()!));
+        else if (value.ValueKind == System.Text.Json.JsonValueKind.Array)
+            foreach (var item in value.EnumerateArray())
+                light.Terms.Add(LightTermViewModel.FromText(light, item.ValueKind == System.Text.Json.JsonValueKind.String
+                    ? item.GetString()! : item.GetRawText()));
+        return light;
+    }
+
+    private Dictionary<string, System.Text.Json.JsonElement> LightsToJson()
+    {
+        var result = new Dictionary<string, System.Text.Json.JsonElement>();
+        foreach (var l in Lights)
+            result[l.Led] = System.Text.Json.JsonSerializer.SerializeToElement(l.ToJsonValue());
+        return result;
+    }
 
     public static string[] SimOptions { get; } = ["msfs", "dcs", "general"];
     public static TargetOption[] Targets => BindingEditViewModel.Targets;
@@ -186,10 +294,27 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
 
     // ------------------------------------------------------------ captura de entradas
 
+    /// <summary>Captura la entrada del binding seleccionado (o cancela la captura en curso).</summary>
     public void ToggleCapture()
     {
         if (_isCapturing) { StopCapture("Cancelado."); return; }
         if (_selected is null || _selected.IsSequence) return;
+        var target = _selected;
+        StartCapture(v => target.Input = v);
+    }
+
+    /// <summary>Captura la entrada de una pieza de condición (un modificador, p. ej.).</summary>
+    public void CaptureInto(ConditionTermViewModel term)
+    {
+        if (_isCapturing) { StopCapture("Cancelado."); return; }
+        StartCapture(v => term.Input = v);
+    }
+
+    private Action<string>? _captureApply;
+
+    private void StartCapture(Action<string> apply)
+    {
+        _captureApply = apply;
         try
         {
             _di ??= DInput.DirectInput8Create();
@@ -220,7 +345,7 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         }
 
         var alias = AliasFor(got);
-        _selected!.Input = $"{alias}:{got.Part}";
+        _captureApply?.Invoke($"{alias}:{got.Part}");
         StopCapture($"Capturado: {got.DeviceName} · {_catalog.Devices.FirstOrDefault(d => SameKey(d.Key, got.DeviceKey))?.InputLabel(got.Part) ?? got.Part}");
     }
 
@@ -228,6 +353,7 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
     {
         _captureTimer.Stop();
         _capture = null;
+        _captureApply = null;
         IsCapturing = false;
         CaptureStatus = message;
     }
@@ -260,6 +386,7 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         SimStatus = _dcs.IsActive ? $"DCS: {_dcs.Aircraft ?? "sin avión"}"
             : !_sim.IsConnected ? "MSFS: sin conexión (la lista de controles B: necesita MSFS con un avión cargado)"
             : $"MSFS: {AircraftFolder(_sim.Aircraft) ?? "sin avión"} · {_inputEvents.Count} controles B:";
+        UpdateLiveLights();
     }
 
     /// <summary>Añade el avión cargado ahora (MSFS o DCS) a la lista de aviones del perfil.</summary>
@@ -307,26 +434,80 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         Aircraft = AircraftList(),
         AxisHysteresis = _original.AxisHysteresis,
         Devices = UsedDevices(),
-        Layers = _original.Layers,
+        Layers = Layers.Where(l => l.Name.Length > 0).GroupBy(l => l.Name)
+                       .ToDictionary(g => g.Key, g => g.First().Condition.ToFile() ?? new ConditionFile()),
         Bindings = [.. Bindings.Select(b => b.ToFile())],
-        Lights = _original.Lights,
+        Lights = LightsToJson(),
     };
 
     /// <summary>Los dispositivos del perfil, menos los añadidos por captura que ya no usa nadie.</summary>
     private Dictionary<string, string> UsedDevices()
     {
+        // Entradas usadas: las de los bindings y las de las condiciones (de bindings y de capas).
+        var inputs = Bindings.Select(b => b.Input)
+            .Concat(Bindings.SelectMany(b => b.Condition.Terms).Select(t => t.Input))
+            .Concat(Layers.SelectMany(l => l.Condition.Terms).Select(t => t.Input)).ToList();
         var used = new Dictionary<string, string>(_devices, StringComparer.OrdinalIgnoreCase);
         foreach (var alias in _devices.Keys.Where(a => !_original.Devices.ContainsKey(a)))
-            if (!Bindings.Any(b => b.Input.StartsWith(alias + ":", StringComparison.OrdinalIgnoreCase)))
+            if (!inputs.Any(i => i.StartsWith(alias + ":", StringComparison.OrdinalIgnoreCase)))
                 used.Remove(alias);
         return used;
+    }
+
+    // ------------------------------------------------------------ vista en vivo de las luces
+
+    private CompiledProfile? _liveProfile;
+    private string _liveKey = "";
+
+    /// <summary>
+    /// Con el perfil ya compilado, pide a MSFS las variables de las luces (lo mismo que hará la
+    /// ejecución) para enseñar en vivo si cada luz se encendería. Solo si cambian las reglas.
+    /// </summary>
+    private void PrepareLiveLights(ProfileFile file)
+    {
+        var key = System.Text.Json.JsonSerializer.Serialize(file.Lights);
+        if (key == _liveKey) return;
+        _liveKey = key;
+        var (profile, _) = ProfileCompiler.Compile(new ProfileFile { Name = "luces", Lights = file.Lights });
+        _liveProfile = profile;
+        if (profile is not null) _sim.Prepare(profile);
+    }
+
+    private void UpdateLiveLights()
+    {
+        var values = _sim.Values;
+        foreach (var light in Lights)
+        {
+            var rule = _liveProfile?.Lights.FirstOrDefault(r => r.Name == light.Led);
+            if (rule is null || !_sim.IsConnected || values.Length == 0)
+            {
+                light.LiveOn = null;
+                light.LiveState = _sim.IsConnected ? "" : "sin MSFS";
+                foreach (var t in light.Terms) t.Live = "";
+                continue;
+            }
+            var on = rule.Evaluate(values);
+            light.LiveOn = on;
+            light.LiveState = on ? "● encendida ahora" : "○ apagada ahora";
+            for (var i = 0; i < light.Terms.Count && i < rule.Conditions.Length; i++)
+            {
+                var c = rule.Conditions[i];
+                light.Terms[i].Live = $"ahora: {LightEditViewModel.Format(values[c.Var])} {(c.Evaluate(values) ? "✓" : "✗")}";
+            }
+        }
     }
 
     /// <summary>Compila el perfil en memoria y reparte el resultado: textos de cada fila y lista de problemas.</summary>
     public void Validate()
     {
-        var report = ProfileInspector.Inspect(BuildFile(), Path, _catalog);
+        var file = BuildFile();
+        var report = ProfileInspector.Inspect(file, Path, _catalog);
         Problems.Clear();
+        // Lo que el JSON no puede ni representar (claves repetidas): se detecta aquí.
+        foreach (var dup in Layers.GroupBy(l => l.Name).Where(g => g.Count() > 1 || g.Key.Length == 0))
+            report.Errors.Add(dup.Key.Length == 0 ? "hay una capa sin nombre." : $"capa \"{dup.Key}\" repetida.");
+        foreach (var dup in Lights.GroupBy(l => l.Led).Where(g => g.Count() > 1))
+            report.Errors.Add($"lights.{dup.Key}: la luz está dos veces; junta sus condiciones en una.");
         foreach (var e in report.Errors) Problems.Add(new ProblemItem(Severity.Error, e));
         foreach (var f in report.Findings) Problems.Add(new ProblemItem(f.Severity, f.Message));
 
@@ -341,6 +522,13 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
             b.Error = string.Join("\n", report.Errors.Where(e => e.StartsWith(prefix, StringComparison.Ordinal))
                                                       .Select(e => e[prefix.Length..].Trim()));
         }
+
+        // Errores de cada luz, junto a ella.
+        foreach (var light in Lights)
+            light.Error = string.Join("\n", report.Errors.Where(e => e.StartsWith($"lights.{light.Led}", StringComparison.OrdinalIgnoreCase))
+                                                          .Select(e => e[(e.IndexOf(':') + 1)..].Trim()));
+        if (report.Errors.Count == 0) PrepareLiveLights(file);
+        Raise(nameof(BindingsHeader));
 
         Ok = report.Ok;
         var errors = report.Errors.Count + report.Findings.Count(f => f.Severity == Severity.Error);

@@ -20,6 +20,68 @@
             <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.AccentColorBrushKey}}" />
             <Setter Property="Foreground" Value="White" />
         </Style>
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Padding" Value="14,10" />
+            <Setter Property="Margin" Value="0,0,0,10" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}" />
+        </Style>
+        <Style x:Key="SmallButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="MinWidth" Value="0" />
+        </Style>
+
+        <!-- Editor de una condición (de un binding o de una capa): todas / alguna de varias piezas -->
+        <DataTemplate x:Key="ConditionEditor" DataType="{x:Type vm:ConditionEditViewModel}">
+            <StackPanel>
+                <ComboBox ItemsSource="{Binding ModeOptions}" DisplayMemberPath="Label" SelectedValuePath="Value"
+                          SelectedValue="{Binding Mode}"
+                          Visibility="{Binding IsNotComplex, Converter={StaticResource BoolToVisibility}}" />
+                <StackPanel Visibility="{Binding IsComplex, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Style="{StaticResource Hint}" Text="Condición anidada (más compleja de lo que el editor sabe mostrar): se conserva tal cual." />
+                    <TextBlock Text="{Binding ComplexText}" FontFamily="Cascadia Mono, Consolas" FontSize="11" TextWrapping="Wrap" Margin="0,4" />
+                    <Button Content="Quitar esta condición" Click="ClearComplex_Click" HorizontalAlignment="Left"
+                            Style="{StaticResource SmallButton}" />
+                </StackPanel>
+                <StackPanel Visibility="{Binding ShowTerms, Converter={StaticResource BoolToVisibility}}" Margin="0,6,0,0">
+                    <ItemsControl ItemsSource="{Binding Terms}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:ConditionTermViewModel}">
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <CheckBox Content="NO" IsChecked="{Binding Negate}" VerticalAlignment="Center" Margin="0,0,6,0"
+                                              ToolTip="Niega la pieza: se cumple cuando la entrada NO se mantiene / la capa NO está activa" />
+                                    <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:ConditionEditViewModel.Kinds}" DisplayMemberPath="Label"
+                                              SelectedValuePath="Value" SelectedValue="{Binding Kind}" />
+                                    <DockPanel Grid.Row="1" Grid.Column="1" Margin="0,4,0,0"
+                                               Visibility="{Binding IsInput, Converter={StaticResource BoolToVisibility}}">
+                                        <Button DockPanel.Dock="Right" Content="🎯" Click="CaptureTerm_Click" Margin="4,0,0,0"
+                                                Style="{StaticResource SmallButton}" ToolTip="Capturar: pulsa el botón del mando" />
+                                        <TextBox Text="{Binding Input, UpdateSourceTrigger=PropertyChanged}" FontFamily="Cascadia Mono, Consolas"
+                                                 ToolTip="alias:b5, alias:hat1.up o alias:y&gt;90" />
+                                    </DockPanel>
+                                    <ComboBox Grid.Row="1" Grid.Column="1" Margin="0,4,0,0" SelectedItem="{Binding Layer}"
+                                              ItemsSource="{Binding DataContext.LayerNames, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                              Visibility="{Binding IsLayer, Converter={StaticResource BoolToVisibility}}" />
+                                    <Button Grid.Column="2" Content="✕" Click="RemoveTerm_Click" Margin="4,0,0,0"
+                                            Style="{StaticResource SmallButton}" ToolTip="Quitar esta pieza" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Button Content="＋ Añadir pieza" Click="AddTerm_Click" HorizontalAlignment="Left" Style="{StaticResource SmallButton}" />
+                </StackPanel>
+            </StackPanel>
+        </DataTemplate>
     </UserControl.Resources>
 
     <Grid>
@@ -85,8 +147,10 @@
             </DockPanel>
         </Grid>
 
+        <TabControl Grid.Row="2">
         <!-- Bindings + panel de edición -->
-        <Grid Grid.Row="2">
+        <TabItem Header="{Binding BindingsHeader}">
+        <Grid Margin="0,8,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="16" />
@@ -111,7 +175,7 @@
                                 <DataTemplate DataType="{x:Type vm:BindingEditViewModel}">
                                     <StackPanel Margin="0,2">
                                         <TextBlock Text="{Binding InputText}" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Text="{Binding GestureText}" FontSize="11" Opacity="0.55" />
+                                        <TextBlock Text="{Binding TriggerDetail}" FontSize="11" Opacity="0.55" TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
@@ -179,11 +243,10 @@
                             </StackPanel>
                             <TextBlock Style="{StaticResource Hint}" Visibility="{Binding IsSequence, Converter={StaticResource BoolToVisibility}}"
                                        Text="Secuencia: las entradas no se editan aquí (se conservan tal cual)." />
-                            <StackPanel Visibility="{Binding HasCondition, Converter={StaticResource BoolToVisibility}}">
-                                <TextBlock Text="Condición" Style="{StaticResource Label}" />
-                                <TextBlock Text="{Binding ConditionText}" TextWrapping="Wrap" />
-                                <TextBlock Style="{StaticResource Hint}" Text="Se conserva tal cual (las condiciones se editan en el JSON, de momento)." />
-                            </StackPanel>
+                            <TextBlock Text="Condición" Style="{StaticResource Label}" />
+                            <ContentControl Content="{Binding Condition}" ContentTemplate="{StaticResource ConditionEditor}" />
+                            <TextBlock Style="{StaticResource Hint}"
+                                       Text="Con un modificador: «Se mantiene la entrada» + el botón que harás de shift. Las capas se definen en su pestaña." />
 
                             <!-- Acción -->
                             <TextBlock Text="ACCIÓN" Style="{StaticResource Label}" Margin="0,18,0,4" />
@@ -241,6 +304,147 @@
                 </Grid>
             </Border>
         </Grid>
+        </TabItem>
+
+        <!-- Capas: condiciones con nombre -->
+        <TabItem Header="{Binding LayersHeader}">
+            <DockPanel Margin="0,8,0,0">
+                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                    <Button DockPanel.Dock="Left" Content="＋  Nueva capa" Click="NewLayer_Click" Margin="0,0,12,0" />
+                    <TextBlock Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0"
+                               Text="Una capa es una condición con nombre (p. ej. «shift» = un botón mantenido) que luego usas en las condiciones de los bindings con «Está activa la capa». Al renombrarla se actualizan los bindings que la usan." />
+                </DockPanel>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Layers}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:LayerEditViewModel}">
+                                <Border Style="{StaticResource Card}" MaxWidth="760" HorizontalAlignment="Left">
+                                    <StackPanel>
+                                        <DockPanel Margin="0,0,0,8">
+                                            <Button DockPanel.Dock="Right" Content="Borrar" Click="DeleteLayer_Click" Style="{StaticResource SmallButton}" />
+                                            <TextBlock Text="Nombre" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.7" />
+                                            <TextBox Text="{Binding Name, UpdateSourceTrigger=LostFocus}" Width="220" HorizontalAlignment="Left"
+                                                     FontWeight="SemiBold" ToolTip="Se aplica al salir del campo" />
+                                        </DockPanel>
+                                        <ContentControl Content="{Binding Condition}" ContentTemplate="{StaticResource ConditionEditor}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </TabItem>
+
+        <!-- Luces del Bravo -->
+        <TabItem Header="{Binding LightsHeader}">
+            <DockPanel Margin="0,8,0,0">
+                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                    <Button DockPanel.Dock="Left" Content="＋  Nueva luz" Click="NewLight_Click" Margin="0,0,12,0" />
+                    <TextBlock Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0"
+                               Text="Cada luz se enciende cuando se cumplen todas sus condiciones. Con MSFS abierto, cada condición enseña su valor actual y la luz si se encendería ahora. Unidades vacías = Number (p. ej. Volts, psi, percent, inHg, Amperes)." />
+                </DockPanel>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Lights}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:LightEditViewModel}">
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <DockPanel Margin="0,0,0,8">
+                                            <Button DockPanel.Dock="Right" Content="Borrar" Click="DeleteLight_Click" Style="{StaticResource SmallButton}" />
+                                            <ComboBox ItemsSource="{x:Static vm:LightEditViewModel.LedNames}" SelectedItem="{Binding Led}"
+                                                      Width="180" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding LiveState}" VerticalAlignment="Center" Margin="12,0,0,0" FontWeight="SemiBold">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Opacity" Value="0.6" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding LiveOn}" Value="True">
+                                                                <Setter Property="Foreground" Value="#22A447" />
+                                                                <Setter Property="Opacity" Value="1" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </DockPanel>
+                                        <!-- Títulos de las columnas (mismas medidas que las filas) -->
+                                        <Grid Margin="0,0,0,2" Opacity="0.6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="62" />
+                                                <ColumnDefinition Width="3*" MinWidth="200" />
+                                                <ColumnDefinition Width="90" />
+                                                <ColumnDefinition Width="170" />
+                                                <ColumnDefinition Width="152" />
+                                                <ColumnDefinition Width="1.2*" MinWidth="110" />
+                                                <ColumnDefinition Width="32" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="1" Text="Variable" FontSize="11" />
+                                            <TextBlock Grid.Column="2" Text="Unidades" FontSize="11" />
+                                            <TextBlock Grid.Column="3" Text="Se cumple si es" FontSize="11" />
+                                            <TextBlock Grid.Column="4" Text="Valor" FontSize="11" />
+                                            <TextBlock Grid.Column="5" Text="En vivo (MSFS)" FontSize="11" />
+                                        </Grid>
+                                        <ItemsControl ItemsSource="{Binding Terms}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="{x:Type vm:LightTermViewModel}">
+                                                    <Grid Margin="0,0,0,6">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="62" />
+                                                            <ColumnDefinition Width="3*" MinWidth="200" />
+                                                            <ColumnDefinition Width="90" />
+                                                            <ColumnDefinition Width="170" />
+                                                            <ColumnDefinition Width="152" />
+                                                            <ColumnDefinition Width="1.2*" MinWidth="110" />
+                                                            <ColumnDefinition Width="32" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <!-- Texto libre si el del JSON no encaja en las partes -->
+                                                        <TextBox Grid.ColumnSpan="6" Text="{Binding Raw, UpdateSourceTrigger=PropertyChanged}"
+                                                                 FontFamily="Cascadia Mono, Consolas"
+                                                                 Visibility="{Binding IsRaw, Converter={StaticResource BoolToVisibility}}" />
+                                                        <CheckBox Content="NO" IsChecked="{Binding Negate}" VerticalAlignment="Center" Margin="0,0,6,0"
+                                                                  ToolTip="Niega la condición"
+                                                                  Visibility="{Binding IsParts, Converter={StaticResource BoolToVisibility}}" />
+                                                        <ComboBox Grid.Column="1" IsEditable="True" ItemsSource="{x:Static vm:LightTermViewModel.CommonVars}"
+                                                                  Text="{Binding Variable, UpdateSourceTrigger=LostFocus}" Margin="0,0,6,0"
+                                                                  FontFamily="Cascadia Mono, Consolas" FontSize="12"
+                                                                  ToolTip="A:VARIABLE (simvar de MSFS, con :índice si hace falta) o L:Variable"
+                                                                  Visibility="{Binding IsParts, Converter={StaticResource BoolToVisibility}}" />
+                                                        <TextBox Grid.Column="2" Text="{Binding Unit, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,6,0"
+                                                                 ToolTip="Unidades: vacío = Number; Volts, psi, percent, inHg, Amperes..."
+                                                                 Visibility="{Binding IsParts, Converter={StaticResource BoolToVisibility}}" />
+                                                        <ComboBox Grid.Column="3" ItemsSource="{x:Static vm:LightTermViewModel.Compares}" DisplayMemberPath="Label"
+                                                                  SelectedValuePath="Value" SelectedValue="{Binding Compare}" Margin="0,0,6,0"
+                                                                  Visibility="{Binding IsParts, Converter={StaticResource BoolToVisibility}}" />
+                                                        <StackPanel Grid.Column="4" Orientation="Horizontal" Margin="0,0,6,0"
+                                                                    Visibility="{Binding HasValue, Converter={StaticResource BoolToVisibility}}">
+                                                            <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Width="70" />
+                                                            <TextBlock Text=" y " VerticalAlignment="Center"
+                                                                       Visibility="{Binding IsRange, Converter={StaticResource BoolToVisibility}}" />
+                                                            <TextBox Text="{Binding Value2, UpdateSourceTrigger=PropertyChanged}" Width="70"
+                                                                     Visibility="{Binding IsRange, Converter={StaticResource BoolToVisibility}}" />
+                                                        </StackPanel>
+                                                        <TextBlock Grid.Column="5" Text="{Binding Live}" VerticalAlignment="Center" FontSize="11" Opacity="0.75"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <Button Grid.Column="6" Content="✕" Click="RemoveLightTerm_Click" Style="{StaticResource SmallButton}"
+                                                                ToolTip="Quitar esta condición" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <Button Content="＋ Añadir condición" Click="AddLightTerm_Click" HorizontalAlignment="Left"
+                                                Style="{StaticResource SmallButton}" />
+                                        <TextBlock Text="{Binding Error}" Foreground="#D9342B" TextWrapping="Wrap" Margin="0,6,0,0"
+                                                   Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </TabItem>
+        </TabControl>
 
         <!-- Problemas del perfil completo -->
         <ItemsControl Grid.Row="3" ItemsSource="{Binding Problems}" Margin="0,8,0,0" MaxHeight="110">

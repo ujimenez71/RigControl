@@ -173,9 +173,18 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
   (SimConnect propio del editor) y K: frecuentes (`ActionDescriber.CommonSimEvents`), tecla
   capturada pulsándola; "desc"; repeatMs en hold. Valida en vivo (`ProfileInspector.Inspect` sobre
   el perfil en memoria). Guarda con `ProfileFile.Save` (.bak, temporal + renombrar, un binding por
-  línea); los // comentarios se pierden: avisa antes de editar un perfil con comentarios. Conserva
-  sin editar: capas, condiciones, secuencias, luces, timing. Pendiente (2.ª versión): condiciones
-  y luces en el editor. `"notes"` en el perfil = notas libres (se ven en Perfiles). Lista agrupada por simulador (MSFS 2024 / DCS World / General).
+  línea); los // comentarios se pierden: avisa antes de editar un perfil con comentarios.
+  2.ª versión (02/11/2026): pestañas Bindings / Capas / Luces del Bravo.
+  Condiciones (`ConditionEditViewModel`): ninguna, "todas" o "alguna" de piezas "se mantiene la
+  entrada" (con captura) / "está activa la capa", cada una negable; una condición anidada más
+  compleja se conserva tal cual (solo se puede quitar). Capas: crear, renombrar (se propaga a las
+  condiciones), borrar (avisa si se usa). Luces (`LightEditViewModel`): luz + condiciones por
+  partes (variable con sugerencias, unidades, operador, valor/rango, NO); texto libre si el del
+  JSON no encaja; vista en vivo con MSFS (el editor compila solo las luces y llama a
+  `SimConnectOutput.Prepare`: valor actual de cada condición y si la luz se encendería).
+  Verificado: c172 y ejemplo-ga pasan por el editor y se guardan idénticos (bindings, capas,
+  luces). Sin editar aún: secuencias (entradas), timing, axisHysteresis.
+  `"notes"` en el perfil = notas libres (se ven en Perfiles). Lista agrupada por simulador (MSFS 2024 / DCS World / General).
 - `"sim"` en el perfil (02/11/2026): "msfs", "dcs" o "general"; si falta se deduce de "aircraft"
   (`ProfileCompiler.ResolveSim`; mezclar aviones de los dos = error). En `run auto` solo se eligen
   perfiles del simulador del avión actual o generales (un "*" de MSFS no se activa en DCS).

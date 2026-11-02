@@ -43,6 +43,54 @@ public partial class ProfileEditorView : UserControl
 
     private void UseAircraft_Click(object sender, RoutedEventArgs e) => Vm.UseCurrentAircraft();
 
+    // ---- condiciones (de bindings y de capas): el DataContext del botón dice sobre qué actúa
+
+    private static T? Ctx<T>(object sender) where T : class => (sender as FrameworkElement)?.DataContext as T;
+
+    private void AddTerm_Click(object sender, RoutedEventArgs e) => Ctx<ConditionEditViewModel>(sender)?.AddTerm();
+
+    private void RemoveTerm_Click(object sender, RoutedEventArgs e)
+    {
+        if (Ctx<ConditionTermViewModel>(sender) is { } t) t.Owner.RemoveTerm(t);
+    }
+
+    private void CaptureTerm_Click(object sender, RoutedEventArgs e)
+    {
+        if (Ctx<ConditionTermViewModel>(sender) is { } t) Vm.CaptureInto(t);
+    }
+
+    private void ClearComplex_Click(object sender, RoutedEventArgs e) => Ctx<ConditionEditViewModel>(sender)?.ClearComplex();
+
+    // ---- capas
+
+    private void NewLayer_Click(object sender, RoutedEventArgs e) => Vm.NewLayer();
+
+    private void DeleteLayer_Click(object sender, RoutedEventArgs e)
+    {
+        if (Ctx<LayerEditViewModel>(sender) is not { } layer) return;
+        if (Vm.LayerInUse(layer) && MessageBox.Show(Window.GetWindow(this)!,
+                $"La capa \"{layer.Name}\" se usa en alguna condición; si la borras, esas condiciones darán error.\n\n¿Borrarla?",
+                "RigControl", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            return;
+        Vm.DeleteLayer(layer);
+    }
+
+    // ---- luces
+
+    private void NewLight_Click(object sender, RoutedEventArgs e) => Vm.NewLight();
+
+    private void DeleteLight_Click(object sender, RoutedEventArgs e)
+    {
+        if (Ctx<LightEditViewModel>(sender) is { } light) Vm.DeleteLight(light);
+    }
+
+    private void AddLightTerm_Click(object sender, RoutedEventArgs e) => Ctx<LightEditViewModel>(sender)?.AddTerm();
+
+    private void RemoveLightTerm_Click(object sender, RoutedEventArgs e)
+    {
+        if (Ctx<LightTermViewModel>(sender) is { } t) t.Owner.RemoveTerm(t);
+    }
+
     private void Suggestion_Click(object sender, MouseButtonEventArgs e)
     {
         if (sender is ListBox { SelectedItem: string name }) Vm.PickSuggestion(name);

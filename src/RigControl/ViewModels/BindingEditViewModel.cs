@@ -46,13 +46,14 @@ public sealed class BindingEditViewModel : ObservableObject
     public event Action? Changed;
 
     public List<string>? Sequence { get; private init; }
-    public ConditionFile? When { get; private init; }
+    /// <summary>Condición del binding (editable: ninguna, todas o alguna de varias piezas).</summary>
+    public ConditionEditViewModel Condition { get; private set; } = ConditionEditViewModel.FromFile(null);
     private string _conditionText = "";
-    public string ConditionText { get => _conditionText; set => Set(ref _conditionText, value); }
+    public string ConditionText { get => _conditionText; set { if (Set(ref _conditionText, value)) Raise(nameof(TriggerDetail)); } }
 
     public bool IsSequence => Sequence is not null;
     public bool IsNotSequence => Sequence is null;
-    public bool HasCondition => When is not null;
+    public bool HasCondition => Condition.ToFile() is not null;
     public string SequenceText => Sequence is null ? "" : string.Join("  >  ", Sequence);
 
     public string Input { get => _input; set { if (Set(ref _input, value.Trim())) OnChanged(); } }
@@ -60,7 +61,7 @@ public sealed class BindingEditViewModel : ObservableObject
     public string Gesture
     {
         get => _gesture;
-        set { if (Set(ref _gesture, value)) { Raise(nameof(GestureText)); Raise(nameof(ShowRepeat)); OnChanged(); } }
+        set { if (Set(ref _gesture, value)) { Raise(nameof(GestureText)); Raise(nameof(TriggerDetail)); Raise(nameof(ShowRepeat)); OnChanged(); } }
     }
 
     public ActionTarget Target
@@ -125,6 +126,9 @@ public sealed class BindingEditViewModel : ObservableObject
     public string Description => string.IsNullOrWhiteSpace(_desc) ? AutoDescription : _desc;
     public string GestureText => IsSequence ? "secuencia" : ProfileInspector.GestureName(ParseGesture(_gesture));
 
+    /// <summary>Segunda línea de la columna Entrada: gesto y, si la hay, la condición.</summary>
+    public string TriggerDetail => _conditionText.Length == 0 ? GestureText : $"{GestureText}  ·  si {_conditionText}";
+
     // Lo que calcula la validación del perfil completo (nombres del catálogo, destino, errores).
     public string InputText { get => _inputText; set => Set(ref _inputText, value); }
     public string KindText { get => _kindText; set => Set(ref _kindText, value); }
@@ -138,12 +142,13 @@ public sealed class BindingEditViewModel : ObservableObject
             _input = f.Input ?? "",
             _gesture = f.Gesture?.ToLowerInvariant() ?? "press",
             Sequence = f.Sequence is null ? null : [.. f.Sequence],
-            When = f.When,
+            Condition = ConditionEditViewModel.FromFile(f.When),
             _desc = f.Desc ?? "",
             _repeatMs = f.RepeatMs?.ToString() ?? "",
         };
         vm.SplitAction(f.Action);
         vm._inputText = vm.IsSequence ? vm.SequenceText : vm._input;
+        vm.Condition.Changed += () => { vm.Raise(nameof(HasCondition)); vm.OnChanged(); };
         return vm;
     }
 
@@ -152,7 +157,7 @@ public sealed class BindingEditViewModel : ObservableObject
         Input = IsSequence ? null : _input,
         Gesture = IsSequence ? null : _gesture,
         Sequence = Sequence is null ? null : [.. Sequence],
-        When = When,
+        When = Condition.ToFile(),
         Action = Action,
         Desc = string.IsNullOrWhiteSpace(_desc) ? null : _desc.Trim(),
         RepeatMs = int.TryParse(_repeatMs, out var r) && ShowRepeat ? r : null,
