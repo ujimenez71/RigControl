@@ -5,6 +5,7 @@
 {
   "name": "Cessna 172 G1000",
   "sim": "msfs",
+  "notes": "Cessna 172 G1000 de MSFS 2024 (asobo_c172sp_g1000) con Yoke Alpha + Bravo. Nombres B: sacados con \"RigProbe sim eventos\" con el avión cargado. Magnetos: OFF=0, R=1, L=2, BOTH=3, START=4 (verificado). Trim con la rueda del Bravo: un pulso (~16 ms) por clic. Alternativa con el hat del Yoke: hold + \"repeatMs\": 50. Luces: en este avión ELECTRICAL MAIN BUS VOLTAGE vale siempre 0, por eso los avisos usan MASTER BATTERY.",
   "aircraft": [ "c172" ],
   "timing": { "longMs": 500, "doubleMs": 300, "sequenceMs": 1000 },
 

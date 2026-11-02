@@ -23,6 +23,7 @@ public sealed class ProfileReport
     public string Name { get; init; } = "";
     public string[] Aircraft { get; init; } = [];
     public SimKind Sim { get; init; }
+    public string Notes { get; init; } = "";
     public string SimName => AutoProfileSource.SimLabel(Sim);
     /// <summary>Para ordenar los grupos: MSFS, DCS, general.</summary>
     public int SimOrder => Sim switch { SimKind.Msfs => 0, SimKind.Dcs => 1, _ => 2 };
@@ -53,6 +54,13 @@ public static class ProfileInspector
             return bad;
         }
 
+        return Inspect(file, path, catalog, connectedKeys);
+    }
+
+    /// <summary>Revisa un perfil en memoria (el editor de la app, antes de guardarlo).</summary>
+    public static ProfileReport Inspect(ProfileFile file, string path, DeviceCatalog? catalog = null,
+                                        ISet<string>? connectedKeys = null)
+    {
         var (profile, errors) = ProfileCompiler.Compile(file);
         var report = new ProfileReport
         {
@@ -60,6 +68,7 @@ public static class ProfileInspector
             Name = string.IsNullOrWhiteSpace(file.Name) ? System.IO.Path.GetFileNameWithoutExtension(path) : file.Name,
             Aircraft = [.. file.Aircraft],
             Sim = ProfileCompiler.ResolveSim(file, out _), // el error, si lo hay, ya viene en errors
+            Notes = file.Notes ?? "",
         };
         report.Errors.AddRange(errors);
 

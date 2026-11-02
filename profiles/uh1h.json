@@ -1,0 +1,20 @@
+// UH-1H (MSFS 2024): interruptores del Yoke (ON = impar) y botón NAV del Bravo.
+{
+  "name": "UH-1H",
+  "sim": "msfs",
+  "notes": "UH-1H de MSFS 2024: interruptores del Yoke (ON = impar) y botón NAV del Bravo.",
+  "aircraft": [ "uh1h" ],
+  "devices": {
+    "yoke": "294B:1900",
+    "bravo": "294B:1901:E0E92F0F191E2B00"
+  },
+  "bindings": [
+    { "input": "yoke:b15", "gesture": "press", "action": "B:ELECTRICAL_BATTERY_1=1" },
+    { "input": "yoke:b16", "gesture": "press", "action": "B:ELECTRICAL_BATTERY_1=0" },
+    { "input": "yoke:b21", "gesture": "press", "action": "B:LIGHTING_BEACON_1=1" },
+    { "input": "yoke:b22", "gesture": "press", "action": "B:LIGHTING_BEACON_1=0" },
+    { "input": "yoke:b23", "gesture": "press", "action": "B:LIGHTING_LANDING_1=1" },
+    { "input": "yoke:b24", "gesture": "press", "action": "B:LIGHTING_LANDING_1=0" },
+    { "input": "bravo:b2", "gesture": "short", "action": "K:TOGGLE_NAV_LIGHTS" }
+  ]
+}

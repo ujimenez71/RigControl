@@ -25,6 +25,7 @@ internal static class Program
                      ("DCS-BIOS", DcsTests.Run),
                      ("Descripciones", DescribeTests.Run),
                      ("Simulador del perfil", SimTests.Run),
+                     ("Guardar perfiles", SaveTests.Run),
                  })
         {
             Console.WriteLine($"\n===== {name} =====");

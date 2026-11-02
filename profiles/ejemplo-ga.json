@@ -11,6 +11,7 @@
 {
   "name": "Ejemplo GA",
   "sim": "msfs",
+  "notes": "Demostración de las funciones del motor, no es para un avión concreto (el real del C172 es c172.json). Capas: shift = basculante izquierdo del Yoke hacia abajo (b5) mantenido; trenAbajo / trenArriba = palanca del tren del Bravo. Zonas de eje: palancas del Bravo de izquierda a derecha Y, X, RZ, RY, RX, Z (abajo = 0 %, arriba = 100 %); pasado el tope de abajo la palanca 1 da el botón 24.",
 
   // Perfil de demostración de las funciones del motor (no es para un avión concreto: el real del
   // C172 es c172.json). Para "run auto", "aircraft": [ "trozo de ruta" ] lo asocia a aviones
