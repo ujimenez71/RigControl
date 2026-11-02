@@ -3,9 +3,9 @@ namespace RigControl.Core.Bindings;
 /// <summary>Un dispositivo del perfil, cruzado con el catálogo y con lo que hay conectado.</summary>
 public sealed record DeviceReport(string Alias, string Key, string? CatalogName, bool? Connected);
 
-/// <summary>Una fila de la tabla de bindings, ya en texto.</summary>
+/// <summary>Una fila de la tabla de bindings, ya en texto. Description = "desc" del perfil o la automática.</summary>
 public sealed record BindingReport(int Number, string Trigger, string Gesture, string Condition, string Action,
-                                   string Kind, int RepeatMs);
+                                   string Description, bool CustomDescription, string Kind, int RepeatMs);
 
 /// <summary>Una regla de luz del Bravo.</summary>
 public sealed record LightReport(string Light, string Rule);
@@ -73,7 +73,8 @@ public static class ProfileInspector
         report.Findings.AddRange(ConflictGuard.Check(profile));
         foreach (var b in profile.Bindings)
             report.Bindings.Add(new BindingReport(b.Number, b.Trigger, b.Gesture.ToString().ToLowerInvariant(),
-                b.When?.Describe() ?? "", b.Action, KindName(b.Output.Kind), b.RepeatMs));
+                b.When?.Describe() ?? "", b.Action, b.Description ?? ActionDescriber.Describe(b.Action),
+                b.Description is not null, KindName(b.Output.Kind), b.RepeatMs));
         foreach (var r in profile.Lights)
             report.Lights.Add(new LightReport(r.Name, r.Text));
         return report;

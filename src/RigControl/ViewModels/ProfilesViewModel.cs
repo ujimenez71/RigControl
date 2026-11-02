@@ -140,6 +140,7 @@ public sealed class ProfilesViewModel : ObservableObject, IDisposable
         var f = _filter.Trim();
         return b.Trigger.Contains(f, StringComparison.OrdinalIgnoreCase)
             || b.Action.Contains(f, StringComparison.OrdinalIgnoreCase)
+            || b.Description.Contains(f, StringComparison.OrdinalIgnoreCase)
             || b.Condition.Contains(f, StringComparison.OrdinalIgnoreCase)
             || b.Gesture.Contains(f, StringComparison.OrdinalIgnoreCase);
     }

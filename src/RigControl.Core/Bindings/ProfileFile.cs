@@ -87,6 +87,9 @@ public sealed class BindingFile
     public ConditionFile? When { get; set; }
     public string Action { get; set; } = "";
 
+    /// <summary>Descripción para mostrar (opcional; si falta, se genera a partir de la acción).</summary>
+    public string? Desc { get; set; }
+
     /// <summary>Solo en "hold" con K:/B:/L:: reenvía la acción cada tantos ms mientras se mantiene (p. ej. trim).</summary>
     public int? RepeatMs { get; set; }
 }

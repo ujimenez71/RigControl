@@ -142,6 +142,7 @@ public sealed class ProfileCompiler
         {
             Number = number, Gesture = gesture, Inputs = inputs, When = when,
             Action = f.Action, Output = output!, Trigger = trigger, RepeatMs = f.RepeatMs ?? 0,
+            Description = string.IsNullOrWhiteSpace(f.Desc) ? null : f.Desc.Trim(),
         };
     }
 

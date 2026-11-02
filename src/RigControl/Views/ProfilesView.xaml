@@ -120,8 +120,18 @@
                                 <DataGridTextColumn Header="#" Binding="{Binding Number}" Width="40" />
                                 <DataGridTextColumn Header="Entrada" Binding="{Binding Trigger}" Width="2*" />
                                 <DataGridTextColumn Header="Condición" Binding="{Binding Condition}" Width="1.2*" />
-                                <DataGridTextColumn Header="Acción" Binding="{Binding Action}" Width="3*"
-                                                    FontFamily="Cascadia Mono, Consolas" />
+                                <DataGridTemplateColumn Header="Acción" Width="3*" SortMemberPath="Description">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="0,2">
+                                                <TextBlock Text="{Binding Description}" TextTrimming="CharacterEllipsis"
+                                                           ToolTip="{Binding Description}" />
+                                                <TextBlock Text="{Binding Action}" FontFamily="Cascadia Mono, Consolas"
+                                                           FontSize="11" Opacity="0.55" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
                                 <DataGridTextColumn Header="Destino" Binding="{Binding Kind}" Width="90" />
                                 <DataGridTextColumn Header="Repetir (ms)" Width="90">
                                     <DataGridTextColumn.Binding>

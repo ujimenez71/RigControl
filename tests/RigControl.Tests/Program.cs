@@ -23,6 +23,7 @@ internal static class Program
                      ("Repetición", RepeatTests.Run),
                      ("Luces", LightTests.Run),
                      ("DCS-BIOS", DcsTests.Run),
+                     ("Descripciones", DescribeTests.Run),
                  })
         {
             Console.WriteLine($"\n===== {name} =====");

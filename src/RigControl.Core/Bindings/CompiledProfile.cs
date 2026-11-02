@@ -50,6 +50,9 @@ public sealed class Binding
     /// <summary>Texto de la acción tal como está en el JSON (para mostrarla).</summary>
     public required string Action { get; init; }
 
+    /// <summary>"desc" del perfil (null si no tiene).</summary>
+    public string? Description { get; init; }
+
     /// <summary>La acción ya interpretada: qué se envía (SimConnect, teclado) o si solo se imprime.</summary>
     public required ActionSpec Output { get; init; }
 
