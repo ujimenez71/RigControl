@@ -47,6 +47,17 @@ internal static class DescribeTests
                       && r.Bindings[1] is { Description: "Tren: bajar", CustomDescription: false };
         Console.WriteLine($"{(ok ? "OK  " : "FALLO")} \"desc\" del perfil y descripción automática en el informe");
         if (!ok) fails++;
+
+        // Nombres de entradas del catálogo: botón, hat con flecha, zona de eje, sin nombre
+        var e = new RigControl.Core.CatalogEntry { Key = "294B:1901", Alias = "Bravo", ProductName = "x",
+            Inputs = new() { ["b8"] = "AP", ["hat1"] = "Hat", ["y"] = "Palanca 1" } };
+        foreach (var (part, want) in new[] { ("b8", "AP"), ("hat1.up", "Hat ↑"), ("y>95", "Palanca 1 >95 %"), ("b9", null) })
+        {
+            var got = e.InputLabel(part);
+            var good = got == want;
+            Console.WriteLine($"{(good ? "OK  " : "FALLO")} entrada {part} -> {got ?? "(sin nombre)"}");
+            if (!good) fails++;
+        }
         return fails;
     }
 }

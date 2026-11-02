@@ -139,6 +139,8 @@ public sealed class ProfilesViewModel : ObservableObject, IDisposable
         if (string.IsNullOrWhiteSpace(_filter) || o is not BindingReport b) return true;
         var f = _filter.Trim();
         return b.Trigger.Contains(f, StringComparison.OrdinalIgnoreCase)
+            || b.InputText.Contains(f, StringComparison.OrdinalIgnoreCase)
+            || b.GestureText.Contains(f, StringComparison.OrdinalIgnoreCase)
             || b.Action.Contains(f, StringComparison.OrdinalIgnoreCase)
             || b.Description.Contains(f, StringComparison.OrdinalIgnoreCase)
             || b.Condition.Contains(f, StringComparison.OrdinalIgnoreCase)

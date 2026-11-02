@@ -157,7 +157,15 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
 - App WPF, pantalla Ejecución (01/11/2026): automático o perfil fijo, casilla Simulación (= --dry),
   Iniciar/Detener; tarjetas Simulador / Avión / Perfil activo; registro coloreado por nivel.
   Probado con UI Automation (simulación) y ✅ verificada por el usuario con MSFS y el rig
-  (01/11/2026). Al cerrar la ventana se detiene la ejecución. Pendiente: pantalla Perfiles.
+  (01/11/2026). Al cerrar la ventana se detiene la ejecución.
+- App WPF, pantalla Perfiles (02/11/2026, solo lectura): lista de la carpeta con punto verde/rojo,
+  pestañas Bindings (con buscador), Luces, Dispositivos (catálogo / conectado) y Conflict Guard;
+  se actualiza al guardar. `ProfileInspector` (Core) = "check" sin log. Acciones descritas en
+  español por `ActionDescriber` (o `"desc"` en el binding, que manda). Entradas con nombre
+  desde `devices.json` → `"Inputs": { "b13": "ALT ON", "hat1": "...", "y": "Palanca 1" }` por
+  dispositivo (`CatalogEntry.InputLabel`); el Yoke y el Bravo traen los de fábrica
+  (`DeviceCatalog.DefaultInputs`, se rellenan al cargar si faltan). Pendiente: editor que capture
+  entradas.
 - Bravo (verificado con `monitor`): HDG b1, NAV b2, APR b3, REV b4, ALT b5, VS b6, IAS b7, AP b8,
   tren arriba b31, tren abajo b32.
 - Palancas del Bravo, de izquierda a derecha (verificado con `monitor` el 01/11/2026):

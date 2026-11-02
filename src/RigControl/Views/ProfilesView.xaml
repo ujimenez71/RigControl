@@ -118,7 +118,19 @@
                         <DataGrid ItemsSource="{Binding BindingsView}" Style="{StaticResource Grid}">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="#" Binding="{Binding Number}" Width="40" />
-                                <DataGridTextColumn Header="Entrada" Binding="{Binding Trigger}" Width="2*" />
+                                <DataGridTemplateColumn Header="Entrada" Width="2.2*" SortMemberPath="InputText">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="0,2">
+                                                <TextBlock Text="{Binding InputText}" TextTrimming="CharacterEllipsis"
+                                                           ToolTip="{Binding InputText}" />
+                                                <TextBlock FontSize="11" Opacity="0.55" TextTrimming="CharacterEllipsis">
+                                                    <Run Text="{Binding GestureText, Mode=OneWay}" FontWeight="SemiBold" /><Run Text="  ·  " /><Run Text="{Binding Trigger, Mode=OneWay}" FontFamily="Cascadia Mono, Consolas" />
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
                                 <DataGridTextColumn Header="Condición" Binding="{Binding Condition}" Width="1.2*" />
                                 <DataGridTemplateColumn Header="Acción" Width="3*" SortMemberPath="Description">
                                     <DataGridTemplateColumn.CellTemplate>
