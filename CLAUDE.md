@@ -136,7 +136,7 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
     y luces, magnetos `B:ENGINE_MAGNETO_1` OFF=0 R=1 L=2 BOTH=3 START=4, autopiloto del G1000 en el
     Bravo (`B:AS1000_AUTOPILOT_*_PFD`, HDG largo = sync, AP doble = `K:AUTOPILOT_OFF`), trim con la
     rueda del Bravo (b22 → `K:ELEV_TRIM_DN`, b23 → `K:ELEV_TRIM_UP`, un evento por clic).
-    `uh1h.json` (B: de batería/luces). `ejemplo-ga.json` = demo de funciones, sin "aircraft".
+    `uh1h.json` (B: de batería/luces). `ah64d.json` (DCS, hecho con el editor: colectivo b18 -> ANTICOL WHT, b20 -> OFF). `ejemplo-ga.json` = demo de funciones, sin "aircraft".
   - `"repeatMs"` en un hold con K:/B:/L: lo reenvía mientras se mantiene (`ActionDispatcher`, sin
     asignaciones). Probado con un simulador falso; ya no lo usa ningún perfil (el trim pasó a la rueda).
   - En pruebas que envían teclas, comprobar SIEMPRE que la ventana destino tiene el foco antes de enviar.

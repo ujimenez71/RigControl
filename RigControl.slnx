@@ -10,6 +10,8 @@
   <Folder Name="/profiles/">
     <File Path="profiles/c172.json" />
     <File Path="profiles/ejemplo-ga.json" />
+    <File Path="profiles/uh1h.json" />
+    <File Path="profiles/ah64d.json" />
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path="CLAUDE.md" />
