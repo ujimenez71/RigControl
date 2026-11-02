@@ -71,9 +71,16 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
     PERIOD_SIM_FRAME + FLAG_CHANGED (definiciones desde 10000) y guarda `Values`;
     `BravoLightsOutput` evalúa y escribe solo al cambiar. Si el perfil no tiene luces NO toca el
     Bravo (no pelear con otros programas). Funciona también en simulación (--dry).
-    `c172.json` tiene 18 luces (AP, avisos con bus > 1 V, tres verdes): nombres de simvars según
-    la documentación, PENDIENTE de que MSFS los acepte (si no, avisa "nombre no reconocido").
-    Probado con valores simulados y escribiendo en el Bravo real (prueba `--hardware`).
+    `c172.json` tiene 18 luces (AP, avisos con la batería conectada, tres verdes), ✅ verificadas
+    en vuelo con MSFS 2024 (02/11/2026). En este C172 `ELECTRICAL MAIN BUS VOLTAGE` vale siempre 0:
+    los avisos usan `ELECTRICAL MASTER BATTERY` y LOW VOLTS = `ELECTRICAL BATTERY LOAD` > 1 A.
+    El AP se desconecta solo en tierra (normal). `RigProbe sim vars <perfil> [segundos]` muestra
+    cada segundo los valores que llegan de las variables de luces (para diagnosticar).
+    MUY IMPORTANTE: MSFS 2024 trae un perfil de controles propio para el Bravo (y el Yoke) que
+    también actúa sobre los botones y escribe en sus luces. Si un botón está asignado en los dos,
+    las órdenes de tipo interruptor se anulan (el AP se conectaba y desconectaba) y el trim va
+    doble. El usuario quitó en MSFS las asignaciones de los botones del AP y del trim (02/11/2026);
+    los ejes de las palancas siguen en MSFS. Ante un "se activa y se desactiva", mirar esto primero.
     Pantalla Ejecución: panel "Luces del Bravo" con las 28 luces y sus colores.
   - DCS-BIOS (`DcsBiosOutput`): escucha 239.255.50.10:5010 (multicast compartido) y manda órdenes
     de texto a 127.0.0.1:7778. Acción `D:CONTROL` = pulsador (1 al pulsar, 0 al soltar; toque = 0
