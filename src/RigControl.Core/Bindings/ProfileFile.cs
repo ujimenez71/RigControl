@@ -22,6 +22,12 @@ public sealed class ProfileFile
     /// </summary>
     public List<string> Aircraft { get; set; } = [];
 
+    /// <summary>
+    /// "msfs", "dcs" o "general". Opcional: si falta, se deduce de "aircraft" (todos "dcs:..." = DCS,
+    /// alguno de MSFS = MSFS, ninguno o solo "*" = general).
+    /// </summary>
+    public string? Sim { get; set; }
+
     /// <summary>Histéresis de las zonas de eje, en % del recorrido.</summary>
     public double AxisHysteresis { get; set; } = 2;
 

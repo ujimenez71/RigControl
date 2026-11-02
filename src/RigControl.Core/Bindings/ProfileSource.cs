@@ -130,19 +130,30 @@ public sealed class AutoProfileSource : ProfileSource
         foreach (var (path, p) in _profiles)
         {
             var aircraft = p.Aircraft.Length == 0 ? "sin \"aircraft\": solo uso manual" : string.Join(", ", p.Aircraft);
-            Log.Info($"  {Path.GetFileName(path),-24} \"{p.Name}\"  aviones: {aircraft}");
+            Log.Info($"  {Path.GetFileName(path),-24} \"{p.Name}\"  [{SimLabel(p.Sim)}]  aviones: {aircraft}");
         }
     }
 
     private CompiledProfile Select(bool announce)
     {
+        // Solo perfiles del simulador del avión actual (o generales): un "*" de MSFS no se activa en DCS.
+        var sim = _aircraft is null ? (SimKind?)null
+            : _aircraft.StartsWith("dcs:", StringComparison.Ordinal) ? SimKind.Dcs : SimKind.Msfs;
+        bool Fits(CompiledProfile p) => p.Sim == SimKind.General || p.Sim == sim;
         var chosen =
-            (_aircraft is null ? null : _profiles.Values.FirstOrDefault(p => p.Aircraft.Any(a => a != "*" && _aircraft.Contains(a))))
-            ?? _profiles.Values.FirstOrDefault(p => p.Aircraft.Contains("*"))
+            (_aircraft is null ? null : _profiles.Values.FirstOrDefault(p => Fits(p) && p.Aircraft.Any(a => a != "*" && _aircraft.Contains(a))))
+            ?? _profiles.Values.FirstOrDefault(p => p.Aircraft.Contains("*") && (sim is null ? p.Sim != SimKind.Dcs : Fits(p)))
             ?? None;
         if (announce) Announce(chosen);
         return chosen;
     }
+
+    public static string SimLabel(SimKind sim) => sim switch
+    {
+        SimKind.Msfs => "MSFS 2024",
+        SimKind.Dcs => "DCS World",
+        _ => "General",
+    };
 
     private void Announce(CompiledProfile p)
     {

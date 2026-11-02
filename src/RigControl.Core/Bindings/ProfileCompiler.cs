@@ -26,6 +26,46 @@ public sealed class ProfileCompiler
         return (c._errors.Count == 0 ? profile : null, c._errors);
     }
 
+    /// <summary>
+    /// Simulador del perfil: "sim" si lo tiene (comprobando que encaja con "aircraft"), o deducido.
+    /// Público para la pantalla Perfiles, que lo muestra aunque el perfil tenga otros errores.
+    /// </summary>
+    public static SimKind ResolveSim(ProfileFile file, out string? error)
+    {
+        error = null;
+        var patterns = file.Aircraft.Where(a => !string.IsNullOrWhiteSpace(a) && a.Trim() != "*").Select(a => a.Trim()).ToList();
+        var dcs = patterns.Where(IsDcs).ToList();
+        var msfs = patterns.Where(a => !IsDcs(a)).ToList();
+
+        if (string.IsNullOrWhiteSpace(file.Sim))
+        {
+            if (dcs.Count > 0 && msfs.Count > 0)
+                error = $"aircraft: mezcla aviones de DCS ({string.Join(", ", dcs)}) y de MSFS ({string.Join(", ", msfs)}); " +
+                        "haz un perfil para cada simulador.";
+            return dcs.Count > 0 ? SimKind.Dcs : msfs.Count > 0 ? SimKind.Msfs : SimKind.General;
+        }
+
+        switch (file.Sim.Trim().ToLowerInvariant())
+        {
+            case "msfs" or "msfs2024":
+                if (dcs.Count > 0) error = $"sim es \"msfs\" pero aircraft tiene aviones de DCS: {string.Join(", ", dcs)}.";
+                return SimKind.Msfs;
+            case "dcs":
+                if (msfs.Count > 0)
+                    error = $"sim es \"dcs\": los aviones van con el prefijo \"dcs:\" (p. ej. \"dcs:{msfs[0]}\"), no \"{msfs[0]}\".";
+                return SimKind.Dcs;
+            case "general" or "any" or "*":
+                if (patterns.Count > 0)
+                    error = "sim es \"general\": no puede llevar aviones concretos en aircraft (solo \"*\" o nada).";
+                return SimKind.General;
+            default:
+                error = $"sim \"{file.Sim}\" desconocido: usa \"msfs\", \"dcs\" o \"general\".";
+                return SimKind.General;
+        }
+
+        static bool IsDcs(string a) => a.StartsWith("dcs:", StringComparison.OrdinalIgnoreCase);
+    }
+
     private CompiledProfile Run()
     {
         var t = _file.Timing;
@@ -34,6 +74,9 @@ public sealed class ProfileCompiler
 
         if (_file.Aircraft.Any(string.IsNullOrWhiteSpace))
             _errors.Add("aircraft: no puede haber nombres vacíos (usa \"*\" como comodín).");
+
+        var sim = ResolveSim(_file, out var simError);
+        if (simError is not null) _errors.Add(simError);
 
         if (_file.AxisHysteresis is < 0 or > 20)
             _errors.Add("axisHysteresis: debe estar entre 0 y 20 (% del recorrido).");
@@ -68,6 +111,7 @@ public sealed class ProfileCompiler
             Name = string.IsNullOrWhiteSpace(_file.Name) ? "(sin nombre)" : _file.Name,
             Timing = t,
             AxisHysteresis = _hysteresis,
+            Sim = sim,
             Aircraft = [.. _file.Aircraft.Select(a => a.Trim().Replace('/', '\\').ToLowerInvariant())],
             Lights = lights,
             WatchedVars = watched,

@@ -25,6 +25,11 @@ public sealed class ProfilesViewModel : ObservableObject, IDisposable
 
     public ProfilesViewModel()
     {
+        // Lista agrupada por simulador (MSFS, DCS, general) y por nombre de archivo dentro de cada uno.
+        ProfilesView = CollectionViewSource.GetDefaultView(Profiles);
+        ProfilesView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ProfileReport.SimName)));
+        ProfilesView.SortDescriptions.Add(new SortDescription(nameof(ProfileReport.SimOrder), ListSortDirection.Ascending));
+        ProfilesView.SortDescriptions.Add(new SortDescription(nameof(ProfileReport.FileName), ListSortDirection.Ascending));
         _timer.Tick += (_, _) =>
         {
             if (_watch?.Due(0) == true) Refresh();
@@ -34,6 +39,7 @@ public sealed class ProfilesViewModel : ObservableObject, IDisposable
     public string ProfilesDir => ProfileFile.ProfilesDir;
 
     public ObservableCollection<ProfileReport> Profiles { get; } = [];
+    public ICollectionView ProfilesView { get; }
 
     public ProfileReport? Selected
     {
@@ -71,8 +77,8 @@ public sealed class ProfilesViewModel : ObservableObject, IDisposable
     public string Summary { get => _summary; private set => Set(ref _summary, value); }
 
     public string AircraftText => _selected is null ? ""
-        : _selected.Aircraft.Length == 0 ? "Sin \"aircraft\": solo se usa eligiéndolo a mano."
-        : $"Se activa con: {string.Join(", ", _selected.Aircraft)}";
+        : $"{_selected.SimName} · " + (_selected.Aircraft.Length == 0 ? "sin \"aircraft\": solo se usa eligiéndolo a mano"
+        : $"se activa con: {string.Join(", ", _selected.Aircraft)}");
 
     public bool HasErrors => _selected?.Errors.Count > 0;
     public string ErrorsText => _selected is null ? "" : string.Join("\n", _selected.Errors);
@@ -112,7 +118,7 @@ public sealed class ProfilesViewModel : ObservableObject, IDisposable
         foreach (var path in Directory.EnumerateFiles(ProfilesDir, "*.json").Order(StringComparer.OrdinalIgnoreCase))
             Profiles.Add(ProfileInspector.Inspect(path, catalog, connected));
 
-        Selected = Profiles.FirstOrDefault(p => p.Path == keep) ?? Profiles.FirstOrDefault();
+        Selected = Profiles.FirstOrDefault(p => p.Path == keep) ?? ProfilesView.Cast<ProfileReport>().FirstOrDefault();
         var bad = Profiles.Count(p => !p.Ok);
         Summary = $"{Profiles.Count} perfil(es)" + (bad > 0 ? $", {bad} con errores (run los ignora)" : "");
     }

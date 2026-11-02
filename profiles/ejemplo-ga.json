@@ -10,6 +10,7 @@
 // Gestos: press, release, short, long, hold, double; o "sequence": [...] sin gesto.
 {
   "name": "Ejemplo GA",
+  "sim": "msfs",
 
   // Perfil de demostración de las funciones del motor (no es para un avión concreto: el real del
   // C172 es c172.json). Para "run auto", "aircraft": [ "trozo de ruta" ] lo asocia a aviones

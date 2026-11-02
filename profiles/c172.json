@@ -4,6 +4,7 @@
 // Bravo: HDG b1, NAV b2, APR b3, REV b4, ALT b5, VS b6, IAS b7, AP b8.
 {
   "name": "Cessna 172 G1000",
+  "sim": "msfs",
   "aircraft": [ "c172" ],
   "timing": { "longMs": 500, "doubleMs": 300, "sequenceMs": 1000 },
 

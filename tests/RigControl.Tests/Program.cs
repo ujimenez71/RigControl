@@ -24,6 +24,7 @@ internal static class Program
                      ("Luces", LightTests.Run),
                      ("DCS-BIOS", DcsTests.Run),
                      ("Descripciones", DescribeTests.Run),
+                     ("Simulador del perfil", SimTests.Run),
                  })
         {
             Console.WriteLine($"\n===== {name} =====");

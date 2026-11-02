@@ -165,7 +165,11 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
   desde `devices.json` → `"Inputs": { "b13": "ALT ON", "hat1": "...", "y": "Palanca 1" }` por
   dispositivo (`CatalogEntry.InputLabel`); el Yoke y el Bravo traen los de fábrica
   (`DeviceCatalog.DefaultInputs`, se rellenan al cargar si faltan). Pendiente: editor que capture
-  entradas.
+  entradas. Lista agrupada por simulador (MSFS 2024 / DCS World / General).
+- `"sim"` en el perfil (02/11/2026): "msfs", "dcs" o "general"; si falta se deduce de "aircraft"
+  (`ProfileCompiler.ResolveSim`; mezclar aviones de los dos = error). En `run auto` solo se eligen
+  perfiles del simulador del avión actual o generales (un "*" de MSFS no se activa en DCS).
+  c172, uh1h y ejemplo-ga llevan "sim": "msfs".
 - Bravo (verificado con `monitor`): HDG b1, NAV b2, APR b3, REV b4, ALT b5, VS b6, IAS b7, AP b8,
   tren arriba b31, tren abajo b32.
 - Palancas del Bravo, de izquierda a derecha (verificado con `monitor` el 01/11/2026):

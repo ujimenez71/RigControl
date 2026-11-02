@@ -22,6 +22,10 @@ public sealed class ProfileReport
     public string FileName => System.IO.Path.GetFileName(Path);
     public string Name { get; init; } = "";
     public string[] Aircraft { get; init; } = [];
+    public SimKind Sim { get; init; }
+    public string SimName => AutoProfileSource.SimLabel(Sim);
+    /// <summary>Para ordenar los grupos: MSFS, DCS, general.</summary>
+    public int SimOrder => Sim switch { SimKind.Msfs => 0, SimKind.Dcs => 1, _ => 2 };
     public List<string> Errors { get; } = [];
     public List<Finding> Findings { get; } = [];
     public List<DeviceReport> Devices { get; } = [];
@@ -55,6 +59,7 @@ public static class ProfileInspector
             Path = path,
             Name = string.IsNullOrWhiteSpace(file.Name) ? System.IO.Path.GetFileNameWithoutExtension(path) : file.Name,
             Aircraft = [.. file.Aircraft],
+            Sim = ProfileCompiler.ResolveSim(file, out _), // el error, si lo hay, ya viene en errors
         };
         report.Errors.AddRange(errors);
 

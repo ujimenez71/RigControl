@@ -3,6 +3,9 @@ namespace RigControl.Core.Bindings;
 public enum Gesture { Press, Release, Short, Long, Hold, Double, Sequence }
 
 /// <summary>Trigger = una vez; Start/End = inicio y fin de una pulsación mantenida (hold).</summary>
+/// <summary>Simulador al que pertenece un perfil. General = cualquiera (o uso manual).</summary>
+public enum SimKind { General, Msfs, Dcs }
+
 public enum ActionPhase { Trigger, Start, End }
 
 public enum InputKind : byte { Button, HatUp, HatRight, HatDown, HatLeft, AxisZone }
@@ -74,6 +77,9 @@ public sealed class CompiledProfile
 {
     public required string Name { get; init; }
     public required TimingFile Timing { get; init; }
+
+    /// <summary>Simulador del perfil ("sim" o deducido de "aircraft"). En automático solo se activa con ese.</summary>
+    public SimKind Sim { get; init; }
 
     /// <summary>Trozos de ruta de avión en minúsculas ("*" = comodín). Vacío = solo para uso manual.</summary>
     public string[] Aircraft { get; init; } = [];
