@@ -85,7 +85,11 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
   - DCS-BIOS (`DcsBiosOutput`): escucha 239.255.50.10:5010 (multicast compartido) y manda órdenes
     de texto a 127.0.0.1:7778. Acción `D:CONTROL` = pulsador (1 al pulsar, 0 al soltar; toque = 0
     a los 50 ms), `D:CONTROL VALOR` (INC, DEC, TOGGLE, números). Avión en la dirección 0x0000
-    (24 car.) -> `"aircraft": ["dcs:f-15e"]` en `run auto`. Probado con un DCS falso por UDP.
+    (24 car.) -> `"aircraft": ["dcs:f-15e"]` en `run auto`. Probado con un DCS falso por UDP y ✅ verificado con DCS y el AH-64D (02/11/2026): avión detectado
+    ("AH-64D_BLK_II"), órdenes D: (ANTICOL RED/OFF/WHT), estado leído, y perfil hecho con el editor
+    (botones del colectivo VPC -> D:PLT_EXTL_ACOL_L_SW 2 / 1) activado solo en `run auto`. DCS-BIOS
+    manda los cambios al momento pero repite el estado completo poco a poco (~16 s el AH-64D).
+    `DcsBiosCatalog` lee las definiciones (sugerencias y descripciones en el editor).
     OJO, carpeta de DCS: DCS se ejecuta como **openbeta** (`G:\Eagle Dynamics\DCS World OpenBeta`,
     `dcs_variant.txt` = openbeta), así que la carpeta ACTIVA es `Saved Games\DCS.openbeta` (su
     dcs.log es el que se actualiza). `Saved Games\DCS` está en desuso (log de 2023). Comprobarlo
@@ -242,8 +246,8 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
    Falta: escribir A: (simvars).
 4. (en curso) DCS por UDP (Export.lua / DCS-BIOS), bidireccional; feedback a LEDs WinWing (requiere
    capturar el protocolo con Wireshark + USBPcap) y al Bravo. Hecho: luces del Bravo desde MSFS
-   y cliente DCS-BIOS (ver "Fase 4" arriba). Falta: instalar DCS-BIOS (con el usuario), luces y
-   condiciones desde el estado de DCS (necesita los JSON de DCS-BIOS), LEDs WinWing.
+   y cliente DCS-BIOS, ✅ verificado con DCS y el AH-64D (ver "Fase 4" arriba). Falta: luces y
+   condiciones desde el estado de DCS (los JSON ya se leen con `DcsBiosCatalog`), LEDs WinWing.
 5. App Hangar (lanzar apps en secuencia), gestor de ventanas, mods por symlinks, snapshots,
    prioridad de CPU
 
