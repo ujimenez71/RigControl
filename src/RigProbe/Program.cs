@@ -58,6 +58,9 @@ internal static class Program
                 return ProfileLoader.LoadAndCheck(ProfileFile.Resolve(args[1])) is null ? 1 : 0;
             case "run" when args.Length > 1:
                 return Run(args[1], args.Skip(2).Any(a => a.Equals("--dry", StringComparison.OrdinalIgnoreCase)));
+            case "sim" when args.Length > 2 && args[1].Equals("vars", StringComparison.OrdinalIgnoreCase):
+                SimVars(args[2], args.Length > 3 && int.TryParse(args[3], out var secs) ? secs : 10);
+                return 0;
             case "sim":
                 var listEvents = args.Length > 1 && args[1].Equals("eventos", StringComparison.OrdinalIgnoreCase);
                 SimStatus(listEvents, listEvents && args.Length > 2 ? args[2] : null);
@@ -97,6 +100,30 @@ internal static class Program
     }
 
     // ----------------------------------------------------------------- sim
+
+    /// <summary>Muestra cada segundo los valores que llegan de MSFS para las variables de luces del perfil.</summary>
+    private static void SimVars(string profileName, int seconds)
+    {
+        var profile = ProfileLoader.LoadAndCheck(ProfileFile.Resolve(profileName), verbose: false);
+        if (profile is null) return;
+        using var sim = new SimConnectOutput();
+        sim.Prepare(profile);
+        var vars = profile.WatchedVars;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        long next = 1000;
+        while (clock.ElapsedMilliseconds < seconds * 1000L)
+        {
+            sim.Tick(clock.ElapsedMilliseconds);
+            if (clock.ElapsedMilliseconds >= next)
+            {
+                next += 1000;
+                Console.WriteLine($"--- {clock.ElapsedMilliseconds / 1000} s  conectado={sim.IsConnected}");
+                for (var i = 0; i < vars.Length; i++)
+                    Console.WriteLine($"  {vars[i].Name,-40} {vars[i].Unit,-8} {sim.Values[i]}");
+            }
+            Thread.Sleep(20);
+        }
+    }
 
     /// <summary>Conecta con MSFS, muestra el avión y, si se pide, sus InputEvents (B:) filtrados.</summary>
     private static void SimStatus(bool listEvents, string? filter)
