@@ -251,6 +251,20 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
 5. App Hangar (lanzar apps en secuencia), gestor de ventanas, mods por symlinks, snapshots,
    prioridad de CPU
 
+Idea pendiente (propuesta el 02/11/2026, a decidir con el usuario): **generar perfiles con IA**
+(Claude por la API de Anthropic). Botón "Generar con IA" en Perfiles: se envían los mandos con sus
+nombres de entrada (devices.json `Inputs`), los controles del avión (B: enumerados por SimConnect o
+`DcsBiosCatalog` con descripciones/posiciones) y las preferencias escritas por el usuario; se pide
+un ProfileFile en JSON, se valida con ProfileCompiler + ConflictGuard (devolviendo los errores para
+que los corrija) y se abre como borrador en el editor (nunca se guarda solo). Necesita clave de API
+(guardarla cifrada, DPAPI). Antes de escribir código con la API, cargar la skill claude-api.
+Alternativa sin integración: pedírselo a Claude Code en la sesión.
+
+Otros pendientes (02/11/2026): condiciones según el estado de DCS; renombrar archivo de perfil en
+el editor; editar secuencias/timing/histéresis; escribir A:; perfil F-15E; limpiar la instalación
+errónea de DCS-BIOS en `Saved Games\DCS` (inactiva); comprobar que el Yoke y el Bravo vuelven a
+detectarse (no aparecían en Windows el 02/11/2026).
+
 ## Convenciones
 
 - Comentarios y mensajes de consola en español
