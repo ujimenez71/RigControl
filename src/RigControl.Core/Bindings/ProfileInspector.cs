@@ -7,7 +7,7 @@ public sealed record DeviceReport(string Alias, string Key, string? CatalogName,
 /// InputText = entradas con su nombre del catálogo ("Yoke Alpha · ALT ON"); Trigger = lo del JSON.
 public sealed record BindingReport(int Number, string Trigger, string Gesture, string Condition, string Action,
                                    string Description, bool CustomDescription, string Kind, int RepeatMs,
-                                   string InputText = "", string GestureText = "");
+                                   string InputText = "", string GestureText = "", string KindHelp = "");
 
 /// <summary>Una regla de luz del Bravo.</summary>
 public sealed record LightReport(string Light, string Rule);
@@ -91,7 +91,7 @@ public static class ProfileInspector
                 b.When is null ? "" : Labelled(b.When.Describe()), b.Action,
                 b.Description ?? ActionDescriber.Describe(b.Action), b.Description is not null,
                 KindName(b.Output.Kind), b.RepeatMs,
-                string.Join("  >  ", b.Inputs.Select(i => labels[i])), GestureName(b.Gesture)));
+                string.Join("  >  ", b.Inputs.Select(i => labels[i])), GestureName(b.Gesture), KindHelp(b.Output.Kind)));
         foreach (var r in profile.Lights)
             report.Lights.Add(new LightReport(r.Name, r.Text));
         return report;
@@ -119,11 +119,22 @@ public static class ProfileInspector
 
     public static string KindName(ActionKind kind) => kind switch
     {
-        ActionKind.SimEvent => "MSFS K:",
-        ActionKind.InputEvent => "MSFS B:",
-        ActionKind.LVar => "MSFS L:",
+        ActionKind.SimEvent => "MSFS (evento general)",
+        ActionKind.InputEvent => "MSFS (cabina del avión)",
+        ActionKind.LVar => "MSFS (variable del avión)",
         ActionKind.Key => "Teclado",
-        ActionKind.DcsBios => "DCS-BIOS",
-        _ => "Solo texto",
+        ActionKind.DcsBios => "DCS (cabina)",
+        _ => "Nada (solo registro)",
+    };
+
+    /// <summary>Explicación para la ayuda emergente de la columna "Se envía a".</summary>
+    public static string KindHelp(ActionKind kind) => kind switch
+    {
+        ActionKind.SimEvent => "K: evento de MSFS válido para cualquier avión (p. ej. trim, tren, autopiloto).",
+        ActionKind.InputEvent => "B: control de la cabina del avión cargado (interruptores, botones, mandos).",
+        ActionKind.LVar => "L: variable local del avión; la usan aviones con sistemas propios.",
+        ActionKind.Key => "key: simula una tecla en la ventana que tiene el foco.",
+        ActionKind.DcsBios => "D: control de la cabina de DCS a través de DCS-BIOS.",
+        _ => "Sin prefijo: no se envía nada, solo aparece en el registro.",
     };
 }

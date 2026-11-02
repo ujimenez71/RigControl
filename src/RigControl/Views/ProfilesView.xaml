@@ -144,7 +144,14 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="Destino" Binding="{Binding Kind}" Width="90" />
+                                <DataGridTemplateColumn Header="Se envía a" Width="1.3*" SortMemberPath="Kind">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Kind}" ToolTip="{Binding KindHelp}"
+                                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
                                 <DataGridTextColumn Header="Repetir (ms)" Width="90">
                                     <DataGridTextColumn.Binding>
                                         <Binding Path="RepeatMs" TargetNullValue="" StringFormat="{}{0;;''}" />
