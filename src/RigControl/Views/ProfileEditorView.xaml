@@ -280,6 +280,8 @@
                                 <TextBlock Text="Valor" Style="{StaticResource Label}" />
                                 <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" FontFamily="Cascadia Mono, Consolas" />
                                 <TextBlock Text="{Binding ValueHint}" Style="{StaticResource Hint}" />
+                                <TextBlock Text="{Binding DataContext.DcsValueHelp, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                           Style="{StaticResource Hint}" FontWeight="SemiBold" />
                             </StackPanel>
 
                             <StackPanel Visibility="{Binding ShowRepeat, Converter={StaticResource BoolToVisibility}}">

@@ -101,6 +101,19 @@ internal static class DcsTests
         for (var i = 0; i < 80 && got is null; i++) { t += 10; dcs2.Tick(t); got = auto.Poll(t); Thread.Sleep(10); }
         Check(got?.Name == "F-15E", $"run auto: al cambiar al F-15E activa \"{got?.Name}\"");
 
+        // Definiciones de DCS-BIOS (solo si está instalado en este equipo)
+        if (DcsBiosCatalog.JsonDir() is { } jsonDir)
+        {
+            var apache = DcsBiosCatalog.ForAircraft("dcs:ah-64d");
+            var acol = apache.FirstOrDefault(c => c.Name == "PLT_EXTL_ACOL_L_SW");
+            Check(apache.Count > 100 && acol is { Positions: ["RED", "OFF", "WHT"], Address: 0x801C, Mask: 0xC0, Shift: 6 },
+                  $"catálogo: {apache.Count} controles del AH-64D en {jsonDir}; ANTICOL = {acol}");
+            Check(ActionDescriber.Describe("D:PLT_EXTL_ACOL_L_SW 2", apache) == "DCS: Pilot Anti-Collision Lights Switch → WHT",
+                  $"descripción con el catálogo: {ActionDescriber.Describe("D:PLT_EXTL_ACOL_L_SW 2", apache)}");
+            Check(DcsBiosCatalog.ForAircraft("AH-64D_BLK_II").Count == apache.Count, "el nombre de DCS y el trozo del perfil dan lo mismo");
+        }
+        else Console.WriteLine("(DCS-BIOS no instalado: se omite la prueba del catálogo)");
+
         // Sin datos 2 s -> inactivo y sin avión
         for (var i = 0; i < 5; i++) { t += 500; dcs.Tick(t); }
         Check(!dcs.IsActive && dcs.Aircraft is null, "sin datos 2 s: inactivo y sin avión");

@@ -261,6 +261,7 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
     private void Add(BindingEditViewModel b, int index = -1)
     {
         b.Changed += Touch;
+        b.DcsControls = _dcsControls;
         b.PropertyChanged += (_, e) =>
         {
             if (ReferenceEquals(b, _selected) && e.PropertyName is nameof(BindingEditViewModel.Name) or nameof(BindingEditViewModel.Target))
@@ -270,26 +271,73 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         else Bindings.Insert(index, b);
     }
 
-    public void PickSuggestion(string name)
+    /// <summary>Elige una sugerencia: en las de DCS va "NOMBRE · descripción" y se queda solo el nombre.</summary>
+    public void PickSuggestion(string text)
     {
         if (_selected is null) return;
-        _selected.Name = name;
+        var dot = text.IndexOf(" · ", StringComparison.Ordinal);
+        _selected.Name = dot > 0 ? text[..dot] : text;
     }
 
-    /// <summary>Sugerencias para el nombre: B: del avión cargado o K: frecuentes, filtradas por lo escrito.</summary>
+    // ------------------------------------------------------------ controles de DCS-BIOS
+
+    private IReadOnlyList<DcsControl> _dcsControls = [];
+    private string? _dcsControlsFor;
+
+    /// <summary>
+    /// Avión de DCS cuyos controles se sugieren: el primero "dcs:..." del perfil o, si no hay, el
+    /// cargado ahora en DCS. Se recarga al cambiar.
+    /// </summary>
+    private void RefreshDcsControls()
+    {
+        var aircraft = AircraftList().FirstOrDefault(a => a.StartsWith("dcs:", StringComparison.OrdinalIgnoreCase))
+                       ?? (_dcs.Aircraft is { } live ? "dcs:" + live : null);
+        if (string.Equals(aircraft, _dcsControlsFor, StringComparison.OrdinalIgnoreCase)) return;
+        _dcsControlsFor = aircraft;
+        _dcsControls = aircraft is null ? [] : DcsBiosCatalog.ForAircraft(aircraft);
+        foreach (var b in Bindings) b.DcsControls = _dcsControls;
+        RefreshSuggestions();
+    }
+
+    /// <summary>Sugerencias para el nombre: B: del avión cargado, K: frecuentes o controles de DCS-BIOS, filtradas por lo escrito.</summary>
     private void RefreshSuggestions()
     {
+        Raise(nameof(DcsValueHelp));
         Suggestions.Clear();
         if (_selected is null) return;
+        var filter = _selected.Name;
+        if (_selected.Target == ActionTarget.Dcs)
+        {
+            // Busca en el nombre y en la descripción ("anti-col" encuentra PLT_EXTL_ACOL_L_SW).
+            foreach (var c in _dcsControls.Where(c => c.Inputs.Length > 0 && (filter.Length == 0
+                         || c.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)
+                         || c.Description.Contains(filter, StringComparison.OrdinalIgnoreCase))).Take(200))
+                if (!c.Name.Equals(filter, StringComparison.OrdinalIgnoreCase)) Suggestions.Add(c.ToString());
+            return;
+        }
         IEnumerable<string> source = _selected.Target switch
         {
             ActionTarget.Cabin => _inputEvents,
             ActionTarget.Event => ActionDescriber.CommonSimEvents,
             _ => [],
         };
-        var filter = _selected.Name;
         foreach (var s in source.Where(s => filter.Length == 0 || s.Contains(filter, StringComparison.OrdinalIgnoreCase)).Take(200))
             if (!s.Equals(filter, StringComparison.OrdinalIgnoreCase)) Suggestions.Add(s);
+    }
+
+    /// <summary>Posiciones del control de DCS elegido ("0 = RED, 1 = OFF, 2 = WHT"), para la ayuda del valor.</summary>
+    public string DcsValueHelp
+    {
+        get
+        {
+            if (_selected is not { Target: ActionTarget.Dcs }) return "";
+            var c = _dcsControls.FirstOrDefault(c => c.Name.Equals(_selected.Name, StringComparison.OrdinalIgnoreCase));
+            if (c is null) return _dcsControls.Count == 0 ? "Sin definiciones de DCS-BIOS para este avión (añade \"dcs:avión\" en Aviones o carga el avión en DCS)." : "";
+            var positions = c.Positions.Length > 0
+                ? "Posiciones: " + string.Join(", ", c.Positions.Select((p, i) => $"{i} = {p}"))
+                : c.MaxValue > 0 ? $"Valores de 0 a {c.MaxValue}." : "";
+            return $"{c.Description}. {positions} Admite: {string.Join(", ", c.Inputs)}.";
+        }
     }
 
     // ------------------------------------------------------------ captura de entradas
@@ -386,6 +434,8 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         SimStatus = _dcs.IsActive ? $"DCS: {_dcs.Aircraft ?? "sin avión"}"
             : !_sim.IsConnected ? "MSFS: sin conexión (la lista de controles B: necesita MSFS con un avión cargado)"
             : $"MSFS: {AircraftFolder(_sim.Aircraft) ?? "sin avión"} · {_inputEvents.Count} controles B:";
+        if (_dcs.IsActive) SimStatus += $" · {_dcsControls.Count} controles de DCS-BIOS";
+        RefreshDcsControls();
         UpdateLiveLights();
     }
 

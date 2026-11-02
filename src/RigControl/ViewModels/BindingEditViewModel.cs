@@ -122,7 +122,16 @@ public sealed class BindingEditViewModel : ObservableObject
         _ => _name,
     };
 
-    public string AutoDescription => ActionDescriber.Describe(Action);
+    public string AutoDescription => ActionDescriber.Describe(Action, _dcsControls);
+
+    private IReadOnlyList<DcsControl>? _dcsControls;
+
+    /// <summary>Controles de DCS-BIOS del avión del perfil (los pone el editor), para describir las acciones D:.</summary>
+    public IReadOnlyList<DcsControl>? DcsControls
+    {
+        get => _dcsControls;
+        set { _dcsControls = value; Raise(nameof(AutoDescription)); Raise(nameof(Description)); }
+    }
     public string Description => string.IsNullOrWhiteSpace(_desc) ? AutoDescription : _desc;
     public string GestureText => IsSequence ? "secuencia" : ProfileInspector.GestureName(ParseGesture(_gesture));
 

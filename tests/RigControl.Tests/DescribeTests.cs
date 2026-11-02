@@ -31,7 +31,7 @@ internal static class DescribeTests
         Check("B:FOO_BAR_2=1", "Foo bar 2: encender");
         Check("key:CTRL+SHIFT+G", "Tecla CTRL+SHIFT+G");
         Check("D:UFC_1", "DCS: UFC_1 (pulsar)");
-        Check("D:HDG_KNOB INC", "DCS: HDG_KNOB, subir un paso");
+        Check("D:HDG_KNOB INC", "DCS: HDG_KNOB, siguiente posición");
         Check("L:Mi_Var=3", "Variable local Mi_Var = 3");
         Check("Tren abajo", "Tren abajo");
 

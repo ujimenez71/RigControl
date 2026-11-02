@@ -129,7 +129,9 @@ public static class ActionDescriber
         "MAGNETO_OFF", "MAGNETO_RIGHT", "MAGNETO_LEFT", "MAGNETO_BOTH", "MAGNETO_START", "PAUSE_TOGGLE",
     ];
 
-    public static string Describe(string action)
+    /// <param name="dcsControls">Controles de DCS-BIOS del avión del perfil (DcsBiosCatalog), para
+    /// describir las acciones D: con la descripción del control y el nombre de la posición.</param>
+    public static string Describe(string action, IReadOnlyList<DcsControl>? dcsControls = null)
     {
         var text = action.Trim();
         if (text.Length == 0) return "";
@@ -156,12 +158,18 @@ public static class ActionDescriber
                 var parts = text[(colon + 1)..].Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length == 0) return text;
                 var control = parts[0].ToUpperInvariant(); // nombres de cada avión: mejor tal cual
-                if (parts.Length == 1) return $"DCS: {control} (pulsar)";
-                var v = parts[1].ToUpperInvariant() switch
+                var known = dcsControls?.FirstOrDefault(c => c.Name.Equals(control, StringComparison.OrdinalIgnoreCase));
+                var label = known is { Description.Length: > 0 } ? known.Description : control;
+                if (parts.Length == 1) return $"DCS: {label} (pulsar)";
+                var raw = parts[1].ToUpperInvariant();
+                var v = raw switch
                 {
-                    "INC" => "subir un paso", "DEC" => "bajar un paso", "TOGGLE" => "alternar", var x => $"= {x}",
+                    "INC" => "siguiente posición", "DEC" => "posición anterior", "TOGGLE" => "alternar",
+                    _ when known is { Positions.Length: > 0 } && int.TryParse(raw, out var n) && n >= 0 && n < known.Positions.Length
+                        => $"→ {known.Positions[n]}",
+                    _ => $"= {raw}",
                 };
-                return $"DCS: {control}, {v}";
+                return v.StartsWith('→') ? $"DCS: {label} {v}" : $"DCS: {label}, {v}";
             }
             default:
                 return text; // sin prefijo: el texto ya es la descripción

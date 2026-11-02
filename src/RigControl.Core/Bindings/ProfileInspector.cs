@@ -100,10 +100,14 @@ public static class ProfileInspector
             return text;
         }
 
+        // Perfil de DCS: descripciones de las acciones D: con las definiciones de DCS-BIOS de su avión.
+        var dcsAircraft = profile.Sim == SimKind.Dcs ? profile.Aircraft.FirstOrDefault(a => a.StartsWith("dcs:")) : null;
+        var dcsControls = dcsAircraft is null ? null : DcsBiosCatalog.ForAircraft(dcsAircraft);
+
         foreach (var b in profile.Bindings)
             report.Bindings.Add(new BindingReport(b.Number, b.Trigger, b.Gesture.ToString().ToLowerInvariant(),
                 b.When is null ? "" : Labelled(b.When.Describe()), b.Action,
-                b.Description ?? ActionDescriber.Describe(b.Action), b.Description is not null,
+                b.Description ?? ActionDescriber.Describe(b.Action, dcsControls), b.Description is not null,
                 KindName(b.Output.Kind), b.RepeatMs,
                 string.Join("  >  ", b.Inputs.Select(i => labels[i])), GestureName(b.Gesture), KindHelp(b.Output.Kind)));
         foreach (var r in profile.Lights)
