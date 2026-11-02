@@ -47,11 +47,15 @@ internal static class DcsTests
         void Pump(int ms) { for (var i = 0; i < ms / 10; i++) { t += 10; dcs.Tick(t); Thread.Sleep(10); } }
 
         Pump(50); // abre los sockets
+        // Como DCS de verdad (visto con el AH-64D): el nombre llega a trozos en paquetes distintos.
+        fakeDcsOut.Send(Frame(0, Name("F-")), group);
+        Pump(60);
+        Check(dcs.Aircraft is null && changes.Count == 0, "nombre a medias (\"F-\"): todavía no se anuncia");
         fakeDcsOut.Send(Frame(0, Name("F-15ESE")), group);
-        Pump(200);
+        Pump(500);
         Check(dcs.IsActive, "recibe el flujo de DCS-BIOS por multicast");
         Check(dcs.Aircraft == "F-15ESE" && changes.SequenceEqual(["dcs:f-15ese"]), $"avión detectado: {dcs.Aircraft} -> {string.Join(",", changes)}");
-        fakeDcsOut.Send(Frame(0, Name("F-15ESE")), group); Pump(100);
+        fakeDcsOut.Send(Frame(0, Name("F-15ESE")), group); Pump(500);
         Check(changes.Count == 1, "el mismo avión no vuelve a avisar");
         fakeDcsOut.Send(Frame(0x1000, [0x34, 0x12]), group); Pump(100);
         Check(dcs.Image[0x1000] == 0x34 && dcs.Image[0x1001] == 0x12, "actualiza la imagen de la cabina en otras direcciones");
@@ -59,6 +63,10 @@ internal static class DcsTests
         Check(dcs.IsActive, "paquete malformado (longitud imposible): se ignora sin romper nada");
 
         string Recv() { try { var ep = new IPEndPoint(IPAddress.Any, 0); return Encoding.ASCII.GetString(fakeDcsIn.Receive(ref ep)).Replace("\n", "\n"); } catch { return "(nada)"; } }
+
+        // Enviar sin haber llamado nunca a Tick (fallo real del 02/11/2026: la orden se perdía sin avisar)
+        using (var fresh = new DcsBiosOutput(ExportPort + 2, CommandPort))
+            Check(fresh.Send(a2!, tap: false) && Recv() == "HDG_KNOB INC\n", "envía aunque todavía no se haya llamado a Tick");
 
         // Toque de pulsador: 1 ahora y 0 a los 50 ms
         dcs.Send(a1!, tap: true);
@@ -86,11 +94,11 @@ internal static class DcsTests
         t = 0; for (var i = 0; i < 5; i++) { t += 10; dcs2.Tick(t); Thread.Sleep(10); }
         fakeDcsOut.Send(Frame(0, Name("AH-64D_BLK_II")), group);
         CompiledProfile? got = null;
-        for (var i = 0; i < 30 && got is null; i++) { t += 10; dcs2.Tick(t); got = auto.Poll(t); Thread.Sleep(10); }
+        for (var i = 0; i < 80 && got is null; i++) { t += 10; dcs2.Tick(t); got = auto.Poll(t); Thread.Sleep(10); }
         Check(got?.Name == "AH-64D", $"run auto: con el AH-64D de DCS activa \"{got?.Name}\"");
         fakeDcsOut.Send(Frame(0, Name("F-15ESE")), group);
         got = null;
-        for (var i = 0; i < 30 && got is null; i++) { t += 10; dcs2.Tick(t); got = auto.Poll(t); Thread.Sleep(10); }
+        for (var i = 0; i < 80 && got is null; i++) { t += 10; dcs2.Tick(t); got = auto.Poll(t); Thread.Sleep(10); }
         Check(got?.Name == "F-15E", $"run auto: al cambiar al F-15E activa \"{got?.Name}\"");
 
         // Sin datos 2 s -> inactivo y sin avión

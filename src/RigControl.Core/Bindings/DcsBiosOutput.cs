@@ -84,9 +84,13 @@ public sealed class DcsBiosOutput : IDisposable
             CloseSockets();
         }
 
+        SettleAircraft();
+
         if (!IsActive && Aircraft is not null)
         {
             Aircraft = null;
+            _candidate = null;
+            _candidateAt = -1;
             Array.Clear(_lastName);
             Log.Info("DCS-BIOS: sin datos (¿DCS cerrado o fuera de misión?).");
         }
@@ -120,6 +124,7 @@ public sealed class DcsBiosOutput : IDisposable
     public void Apply(ReadOnlySpan<byte> p)
     {
         var i = 0;
+        var nameTouched = false;
         while (i + 4 <= p.Length)
         {
             // Inicio de fotograma: 55 55 55 55 (puede aparecer al principio de un paquete).
@@ -136,8 +141,10 @@ public sealed class DcsBiosOutput : IDisposable
             p.Slice(i, length).CopyTo(_image.AsSpan(address));
             i += length;
 
-            if (address < AircraftNameLength) CheckAircraft();
+            if (address < AircraftNameLength) nameTouched = true;
         }
+        // Una vez por paquete (el nombre puede llegar en varios trozos dentro del mismo paquete).
+        if (nameTouched) CheckAircraft();
     }
 
     private void CheckAircraft()
@@ -146,9 +153,26 @@ public sealed class DcsBiosOutput : IDisposable
         if (name.SequenceEqual(_lastName)) return;
         name.CopyTo(_lastName);
 
+        // Se compara el texto, no los bytes: el relleno tras el nombre cambia sin que cambie el avión.
+        // El nombre puede llegar a trozos en paquetes distintos ("AH" y luego "AH-64D_BLK_II"):
+        // solo se da por bueno cuando lleva NameStableMs sin cambiar (ver Tick).
         var end = name.IndexOf((byte)0);
         var text = Encoding.ASCII.GetString(end < 0 ? name : name[..end]).Trim();
-        Aircraft = text.Length == 0 ? null : text;
+        _candidate = text.Length == 0 ? null : text;
+        _candidateAt = _now;
+    }
+
+    private const int NameStableMs = 300;
+    private string? _candidate;
+    private long _candidateAt = -1;
+
+    /// <summary>Anuncia el avión cuando el nombre lleva NameStableMs sin cambiar.</summary>
+    private void SettleAircraft()
+    {
+        if (_candidateAt < 0 || _now - _candidateAt < NameStableMs) return;
+        _candidateAt = -1;
+        if (_candidate == Aircraft) return;
+        Aircraft = _candidate;
         if (Aircraft is null) return;
 
         Log.Info($"DCS-BIOS: avión cargado: {Aircraft}");
@@ -186,9 +210,10 @@ public sealed class DcsBiosOutput : IDisposable
 
     private bool SendRaw(byte[] message)
     {
-        if (_send is null) return false;
         try
         {
+            // El envío no depende de la escucha: si aún no se ha abierto (o falló), se abre aquí.
+            _send ??= new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             _send.SendTo(message, _commandEndpoint);
             return true;
         }

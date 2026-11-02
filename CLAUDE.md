@@ -86,10 +86,20 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
     de texto a 127.0.0.1:7778. Acción `D:CONTROL` = pulsador (1 al pulsar, 0 al soltar; toque = 0
     a los 50 ms), `D:CONTROL VALOR` (INC, DEC, TOGGLE, números). Avión en la dirección 0x0000
     (24 car.) -> `"aircraft": ["dcs:f-15e"]` en `run auto`. Probado con un DCS falso por UDP.
-    DCS-BIOS NO está instalado (01/11/2026): el Export.lua activo (`Saved Games\DCS\Scripts\
-    export.lua`) carga Volanta y HFSExport; en Hooks hay SimHub, bHaptics y PassthroughForge. El
-    export de SimAppPro (wwt) y MOZA solo están en el antiguo `DCS.openbeta`. No tocar Export.lua
-    sin el usuario.
+    OJO, carpeta de DCS: DCS se ejecuta como **openbeta** (`G:\Eagle Dynamics\DCS World OpenBeta`,
+    `dcs_variant.txt` = openbeta), así que la carpeta ACTIVA es `Saved Games\DCS.openbeta` (su
+    dcs.log es el que se actualiza). `Saved Games\DCS` está en desuso (log de 2023). Comprobarlo
+    siempre por la fecha de `Logs\dcs.log`.
+    Export.lua activo (`DCS.openbeta\Scripts\Export.lua`): carga SimAppPro (`wwt\wwtExport.lua`,
+    UDP 16535-16537) y MOZA (`MOZA\MOZA.lua`); los dos encadenan las funciones LuaExport* previas.
+    Hooks: SimHub, bHaptics, PassthroughForge, OpenKneeboard. DCS-BIOS v0.11.8 (GitHub
+    DCS-Skunkworks, 18/10/2026) va en `Scripts\DCS-BIOS` + la línea
+    `dofile(lfs.writedir() .. [[Scripts\DCS-BIOS\BIOS.lua]])` al final (también encadena con pcall).
+    Claude NO puede modificar Export.lua ni Scripts de DCS (lo bloquea el sistema de permisos): se
+    le da al usuario el comando para que lo ejecute con "!". El 02/11/2026 se instaló primero por
+    error en `Saved Games\DCS` (inactiva; copia en export.lua.antes-de-dcs-bios).
+    Definiciones de controles: `Scripts\DCS-BIOS\doc\json\<avión>.json`. `RigProbe dcs [s]` escucha
+    y muestra el avión; `RigProbe dcs enviar CONTROL [VALOR]` manda una orden.
 - Fase 3 (✅ completa). Acciones con prefijo, interpretadas al compilar (`Bindings/ActionSpec.cs`):
   `K:EVENTO[=entero]`, `B:INPUT_EVENT[=valor, 1 por defecto]`, `L:Var=valor`, `key:CTRL+SHIFT+G`;
   sin prefijo = solo se imprime (INFO en Conflict Guard). `ActionDispatcher` las reparte;

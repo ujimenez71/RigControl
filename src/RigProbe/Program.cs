@@ -58,6 +58,19 @@ internal static class Program
                 return ProfileLoader.LoadAndCheck(ProfileFile.Resolve(args[1])) is null ? 1 : 0;
             case "run" when args.Length > 1:
                 return Run(args[1], args.Skip(2).Any(a => a.Equals("--dry", StringComparison.OrdinalIgnoreCase)));
+            case "dcs":
+                // dcs [segundos] | dcs enviar "CONTROL [VALOR]"
+                if (args.Length > 2 && args[1].Equals("enviar", StringComparison.OrdinalIgnoreCase))
+                    return DcsSend(string.Join(' ', args.Skip(2)));
+                if (args.Length > 2 && args[1].Equals("crudo", StringComparison.OrdinalIgnoreCase))
+                {
+                    DcsRaw(Convert.ToInt32(args[2], 16), args.Length > 3 ? int.Parse(args[3]) : 10);
+                    return 0;
+                }
+                if (args.Length > 2 && args[1].Equals("leer", StringComparison.OrdinalIgnoreCase))
+                    return DcsSend(args[2], readOnly: true);
+                DcsWatch(args.Length > 1 && int.TryParse(args[1], out var dsecs) ? dsecs : 15);
+                return 0;
             case "sim" when args.Length > 2 && args[1].Equals("vars", StringComparison.OrdinalIgnoreCase):
                 SimVars(args[2], args.Length > 3 && int.TryParse(args[3], out var secs) ? secs : 10);
                 return 0;
@@ -67,7 +80,7 @@ internal static class Program
                 return 0;
             default:
                 Console.WriteLine("Uso: RigProbe list [all] | monitor | catalog | bravo-test | check <perfil> | run <perfil>|auto [--dry]");
-                Console.WriteLine("            | sim | sim eventos [filtro]");
+                Console.WriteLine("            | sim | sim eventos [filtro] | sim vars <perfil> [s] | dcs [s] | dcs enviar CONTROL [VALOR] | dcs leer CONTROL");
                 Console.WriteLine($"  <perfil> es una ruta a un .json o un nombre en {ProfileFile.ProfilesDir}");
                 return 1;
         }
@@ -100,6 +113,134 @@ internal static class Program
     }
 
     // ----------------------------------------------------------------- sim
+
+    /// <summary>Escucha DCS-BIOS: avión cargado y paquetes por segundo (para comprobar la instalación).</summary>
+    private static void DcsWatch(int seconds)
+    {
+        using var dcs = new DcsBiosOutput();
+        dcs.AircraftChanged += name => Console.WriteLine($"  avión: {dcs.Aircraft} (perfiles: \"aircraft\": [\"{name}\"])");
+        Console.WriteLine($"Escuchando DCS-BIOS en {DcsBiosOutput.MulticastGroup}:{DcsBiosOutput.ExportPort} durante {seconds} s...");
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        long next = 1000;
+        while (clock.ElapsedMilliseconds < seconds * 1000L)
+        {
+            dcs.Tick(clock.ElapsedMilliseconds);
+            if (clock.ElapsedMilliseconds >= next)
+            {
+                next += 1000;
+                Console.WriteLine($"--- {clock.ElapsedMilliseconds / 1000} s  {(dcs.IsActive ? "llegan datos" : "sin datos")}  avión={dcs.Aircraft ?? "-"}");
+            }
+            Thread.Sleep(10);
+        }
+    }
+
+    /// <summary>Envía una orden a DCS-BIOS ("UFC_1" = pulsar y soltar; "CONTROL VALOR" = ese valor).</summary>
+    private static int DcsSend(string text, bool readOnly = false)
+    {
+        var action = ActionSpec.Parse("D:" + text, out var error);
+        if (action is null) { Console.WriteLine(error); return 1; }
+        using var dcs = new DcsBiosOutput();
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        void Pump(long untilMs) { while (clock.ElapsedMilliseconds < untilMs) { dcs.Tick(clock.ElapsedMilliseconds); Thread.Sleep(10); } }
+
+        // Estado del control antes y después (si está en las definiciones JSON de DCS-BIOS).
+        var output = FindDcsOutput(action.Name);
+        string Read() => output is { } o && dcs.IsActive
+            ? ((dcs.Image[o.Address] | dcs.Image[o.Address + 1] << 8) & o.Mask) >> o.Shift is var v ? $"{v} (de 0 a {o.Max})" : ""
+            : "(sin datos de DCS)";
+        // DCS-BIOS manda los cambios al momento, pero el estado completo lo repite poco a poco (2 palabras
+        // por envío, ~30 envíos/s: el AH-64D tarda ~16 s en dar la vuelta). Al arrancar, una dirección
+        // vale 0 hasta que llega su turno o cambia. Por eso "enviar" no enseña el "antes".
+        if (readOnly)
+        {
+            const int SyncMs = 18000;
+            Console.WriteLine($"Esperando {SyncMs / 1000} s a tener el estado completo de la cabina...");
+            Pump(SyncMs);
+            Console.WriteLine($"Ahora:   {action.Name} = {Read()}");
+            Console.WriteLine("Vigilando 20 s: mueve el control en la cabina...");
+            var last = Read();
+            while (clock.ElapsedMilliseconds < SyncMs + 20000)
+            {
+                Pump(clock.ElapsedMilliseconds + 50);
+                var now = Read();
+                if (now != last) Console.WriteLine($"  {clock.ElapsedMilliseconds / 1000.0:0.0} s  {action.Name} = {now}");
+                last = now;
+            }
+            return 0;
+        }
+        if (!dcs.Send(action, tap: true)) { Console.WriteLine("ERROR: no se ha podido enviar la orden."); return 1; }
+        Console.WriteLine($"Enviado: {System.Text.Encoding.ASCII.GetString(action.DcsMessage!).Trim()}");
+        Pump(1200); // suelta el pulsador y deja llegar el estado nuevo (un cambio llega al momento)
+        if (output is not null) Console.WriteLine($"Después: {action.Name} = {Read()}  (si no ha cambiado nada, puede ser 0 sin más: ver \"dcs leer\")");
+        else Console.WriteLine("(no encuentro el control en las definiciones JSON de DCS-BIOS: no puedo leer su estado)");
+        return 0;
+    }
+
+    /// <summary>Diagnóstico: muestra cada escritura del flujo de DCS-BIOS que toca una dirección.</summary>
+    private static void DcsRaw(int address, int seconds)
+    {
+        using var s = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork,
+            System.Net.Sockets.SocketType.Dgram, System.Net.Sockets.ProtocolType.Udp);
+        s.SetSocketOption(System.Net.Sockets.SocketOptionLevel.Socket, System.Net.Sockets.SocketOptionName.ReuseAddress, true);
+        s.Bind(new System.Net.IPEndPoint(System.Net.IPAddress.Any, DcsBiosOutput.ExportPort));
+        s.SetSocketOption(System.Net.Sockets.SocketOptionLevel.IP, System.Net.Sockets.SocketOptionName.AddMembership,
+            new System.Net.Sockets.MulticastOption(DcsBiosOutput.MulticastGroup, System.Net.IPAddress.Any));
+        s.ReceiveTimeout = 500;
+        var buf = new byte[65536];
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        int packets = 0, bytes = 0, maxLen = 0;
+        Console.WriteLine($"Escrituras que tocan 0x{address:X4} durante {seconds} s:");
+        while (clock.ElapsedMilliseconds < seconds * 1000L)
+        {
+            int n;
+            try { n = s.Receive(buf); } catch (System.Net.Sockets.SocketException) { continue; }
+            packets++; bytes += n; maxLen = Math.Max(maxLen, n);
+            var i = 0;
+            while (i + 4 <= n)
+            {
+                if (buf[i] == 0x55 && buf[i + 1] == 0x55 && buf[i + 2] == 0x55 && buf[i + 3] == 0x55) { i += 4; continue; }
+                var a = buf[i] | buf[i + 1] << 8; var len = buf[i + 2] | buf[i + 3] << 8; i += 4;
+                if (i + len > n) { Console.WriteLine($"  paquete {packets}: escritura cortada en {a:X4} len {len} (n={n})"); break; }
+                if (address >= a && address < a + len)
+                {
+                    var off = address - a;
+                    var word = buf[i + off] | (off + 1 < len ? buf[i + off + 1] << 8 : 0);
+                    Console.WriteLine($"  {clock.ElapsedMilliseconds / 1000.0:0.00} s  bloque {a:X4}+{len}  palabra={word:X4}");
+                }
+                i += len;
+            }
+        }
+        Console.WriteLine($"{packets} paquetes, {bytes} bytes, el mayor de {maxLen} bytes.");
+    }
+
+    private sealed record DcsOutput(int Address, int Mask, int Shift, int Max);
+
+    /// <summary>Busca la salida entera de un control en Saved Games\DCS*\Scripts\DCS-BIOS\doc\json\*.json.</summary>
+    private static DcsOutput? FindDcsOutput(string control)
+    {
+        var savedGames = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Saved Games");
+        foreach (var dir in Directory.EnumerateDirectories(savedGames, "DCS*"))
+        {
+            var json = Path.Combine(dir, "Scripts", "DCS-BIOS", "doc", "json");
+            if (!Directory.Exists(json)) continue;
+            foreach (var file in Directory.EnumerateFiles(json, "*.json"))
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(file));
+                if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object) continue;
+                foreach (var category in doc.RootElement.EnumerateObject())
+                {
+                    if (category.Value.ValueKind != System.Text.Json.JsonValueKind.Object ||
+                        !category.Value.TryGetProperty(control, out var c) ||
+                        !c.TryGetProperty("outputs", out var outputs)) continue;
+                    foreach (var o in outputs.EnumerateArray())
+                        if (o.TryGetProperty("type", out var t) && t.GetString() == "integer")
+                            return new DcsOutput(o.GetProperty("address").GetInt32(), o.GetProperty("mask").GetInt32(),
+                                                 o.GetProperty("shift_by").GetInt32(), o.GetProperty("max_value").GetInt32());
+                }
+            }
+        }
+        return null;
+    }
 
     /// <summary>Muestra cada segundo los valores que llegan de MSFS para las variables de luces del perfil.</summary>
     private static void SimVars(string profileName, int seconds)
