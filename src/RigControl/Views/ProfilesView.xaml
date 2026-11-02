@@ -1,0 +1,258 @@
+<UserControl x:Class="RigControl.Views.ProfilesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:b="clr-namespace:RigControl.Core.Bindings;assembly=RigControl.Core">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <Style x:Key="Small" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Opacity" Value="0.65" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <Style x:Key="Grid" TargetType="DataGrid" BasedOn="{StaticResource {x:Type DataGrid}}">
+            <Setter Property="AutoGenerateColumns" Value="False" />
+            <Setter Property="IsReadOnly" Value="True" />
+            <Setter Property="HeadersVisibility" Value="Column" />
+            <Setter Property="GridLinesVisibility" Value="None" />
+            <Setter Property="CanUserReorderColumns" Value="False" />
+            <Setter Property="SelectionMode" Value="Single" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="280" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Cabecera -->
+        <DockPanel Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,12">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                <Button Content="Abrir carpeta" Click="OpenFolder_Click" Margin="0,0,8,0" />
+                <Button Content="Recargar" Click="Refresh_Click" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="Perfiles" FontSize="24" FontWeight="SemiBold" />
+                <TextBlock Opacity="0.7" TextWrapping="Wrap">
+                    <Run Text="{Binding ProfilesDir, Mode=OneWay}" FontFamily="Cascadia Mono, Consolas" />
+                    <Run Text="· " /><Run Text="{Binding Summary, Mode=OneWay}" />
+                    <Run Text="· se actualiza al guardar." />
+                </TextBlock>
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Lista de perfiles -->
+        <ListBox Grid.Row="1" Grid.Column="0" ItemsSource="{Binding Profiles}" SelectedItem="{Binding Selected}"
+                 Margin="0,0,16,0" BorderThickness="0" Background="Transparent"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ItemTemplate>
+                <DataTemplate DataType="{x:Type b:ProfileReport}">
+                    <DockPanel Margin="0,4">
+                        <Ellipse DockPanel.Dock="Left" Width="10" Height="10" Margin="0,5,10,0" VerticalAlignment="Top">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Setter Property="Fill" Value="#22A447" />
+                                    <Setter Property="ToolTip" Value="Correcto" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Ok}" Value="False">
+                                            <Setter Property="Fill" Value="#D9342B" />
+                                            <Setter Property="ToolTip" Value="Tiene errores: run no lo usará" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
+                        <StackPanel>
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Style="{StaticResource Small}">
+                                <Run Text="{Binding FileName, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Bindings.Count, Mode=OneWay}" /><Run Text=" bindings" />
+                            </TextBlock>
+                        </StackPanel>
+                    </DockPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- Detalle -->
+        <Grid Grid.Row="1" Grid.Column="1" Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                <Button DockPanel.Dock="Right" Content="Abrir en el editor" Click="OpenSelected_Click" VerticalAlignment="Top"
+                        ToolTip="Abre el JSON con el programa asociado; al guardar, esta pantalla y la ejecución se actualizan" />
+                <StackPanel>
+                    <TextBlock Text="{Binding Selected.Name}" FontSize="20" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding AircraftText}" Style="{StaticResource Small}" />
+                </StackPanel>
+            </DockPanel>
+
+            <!-- Errores de compilación -->
+            <Border Grid.Row="1" Margin="0,0,0,8" Padding="12,8" CornerRadius="6" Background="#33D9342B"
+                    BorderBrush="#D9342B" BorderThickness="1"
+                    Visibility="{Binding HasErrors, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text="El perfil tiene errores y no se puede usar:" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding ErrorsText}" TextWrapping="Wrap" FontFamily="Cascadia Mono, Consolas" FontSize="12" />
+                </StackPanel>
+            </Border>
+
+            <TabControl Grid.Row="2">
+                <TabItem Header="{Binding BindingsHeader}">
+                    <DockPanel Margin="0,8,0,0">
+                        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                            <TextBlock Text="Buscar" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <TextBox Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged}" MaxWidth="360"
+                                     HorizontalAlignment="Left" MinWidth="240"
+                                     ToolTip="Filtra por entrada (bravo:b8), gesto, condición o acción" />
+                        </DockPanel>
+                        <DataGrid ItemsSource="{Binding BindingsView}" Style="{StaticResource Grid}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="#" Binding="{Binding Number}" Width="40" />
+                                <DataGridTextColumn Header="Entrada" Binding="{Binding Trigger}" Width="2*" />
+                                <DataGridTextColumn Header="Condición" Binding="{Binding Condition}" Width="1.2*" />
+                                <DataGridTextColumn Header="Acción" Binding="{Binding Action}" Width="3*"
+                                                    FontFamily="Cascadia Mono, Consolas" />
+                                <DataGridTextColumn Header="Destino" Binding="{Binding Kind}" Width="90" />
+                                <DataGridTextColumn Header="Repetir (ms)" Width="90">
+                                    <DataGridTextColumn.Binding>
+                                        <Binding Path="RepeatMs" TargetNullValue="" StringFormat="{}{0;;''}" />
+                                    </DataGridTextColumn.Binding>
+                                </DataGridTextColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </DockPanel>
+                </TabItem>
+
+                <TabItem Header="{Binding LightsHeader}">
+                    <Grid Margin="0,8,0,0">
+                        <TextBlock Text="Este perfil no define luces: RigControl no toca las luces del Bravo."
+                                   Opacity="0.65" Margin="4">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Selected.Lights.Count}" Value="0">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <DataGrid ItemsSource="{Binding Selected.Lights}" Style="{StaticResource Grid}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Luz" Binding="{Binding Light}" Width="160" />
+                                <DataGridTextColumn Header="Se enciende si (todas)" Binding="{Binding Rule}" Width="*"
+                                                    FontFamily="Cascadia Mono, Consolas" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </TabItem>
+
+                <TabItem Header="{Binding DevicesHeader}">
+                    <DataGrid ItemsSource="{Binding Selected.Devices}" Style="{StaticResource Grid}" Margin="0,8,0,0">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Alias en el perfil" Binding="{Binding Alias}" Width="140" />
+                            <DataGridTextColumn Header="Clave" Binding="{Binding Key}" Width="140"
+                                                FontFamily="Cascadia Mono, Consolas" />
+                            <DataGridTextColumn Header="En el catálogo" Width="*">
+                                <DataGridTextColumn.Binding>
+                                    <Binding Path="CatalogName" TargetNullValue="NO está en el catálogo (revisa la clave)" />
+                                </DataGridTextColumn.Binding>
+                            </DataGridTextColumn>
+                            <DataGridTemplateColumn Header="Conectado" Width="100">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock>
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Text" Value="?" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Connected}" Value="True">
+                                                            <Setter Property="Text" Value="● sí" />
+                                                            <Setter Property="Foreground" Value="#22A447" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Connected}" Value="False">
+                                                            <Setter Property="Text" Value="● no" />
+                                                            <Setter Property="Foreground" Value="#D9342B" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </TabItem>
+
+                <TabItem Header="{Binding FindingsHeader}">
+                    <Grid Margin="0,8,0,0">
+                        <TextBlock Text="Sin incidencias." Opacity="0.65" Margin="4">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Selected.Findings.Count}" Value="0">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <ItemsControl ItemsSource="{Binding Selected.Findings}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type b:Finding}">
+                                    <DockPanel Margin="0,0,0,8">
+                                        <Border DockPanel.Dock="Left" CornerRadius="4" Padding="6,1" Margin="0,0,10,0"
+                                                VerticalAlignment="Top" MinWidth="64">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="#555E6A" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Severity}" Value="{x:Static b:Severity.Error}">
+                                                            <Setter Property="Background" Value="#D9342B" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Severity}" Value="{x:Static b:Severity.Warning}">
+                                                            <Setter Property="Background" Value="#C27C0E" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock Foreground="White" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Text" Value="INFO" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Severity}" Value="{x:Static b:Severity.Error}">
+                                                                <Setter Property="Text" Value="ERROR" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Severity}" Value="{x:Static b:Severity.Warning}">
+                                                                <Setter Property="Text" Value="AVISO" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Border>
+                                        <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+                                    </DockPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+                </TabItem>
+            </TabControl>
+        </Grid>
+    </Grid>
+</UserControl>
