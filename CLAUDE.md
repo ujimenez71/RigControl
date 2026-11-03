@@ -156,10 +156,11 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
     así que DCS no asigna botones del colectivo: no hay órdenes dobles. Si el usuario vuelve a
     asignarlos en DCS, chocarán). Interruptores con muelle = press -> posición, release -> 1 (Off);
     pulsadores = hold. (b18 alternaba ANTICOL con `state`, verificado; se quitó porque b18 es el
-    Cursor Display del colectivo real.) ✅ Probado en DCS el 03/11/2026 ("todo
-    bien"): b3-b6, b8-b11, b14-b16, b20, b26-b29, b35, b37, b38, b42. Sin probar: b2, b12,
-    b17, b31-b34, b39-b41, b43, b44, y los añadidos con `monitor` el 03/11/2026: b18 Cursor
-    Display, b23 FCR Scan C, b24 Missile Advance, b27 = B/S (b26 = PLRT). Duda: fundas de CHOP/jettison.
+    Cursor Display del colectivo real.) ✅ Probado en DCS (03/11/2026), muchos leyendo
+    el estado de vuelta con `sim vars` y un perfil de capas "state" (las órdenes no se ven en
+    cabina en frío): b3-b6, b8-b11, b14-b16, b18, b20, b23, b24, b26-b29, b31-b35, b37, b38,
+    b40-b42, b44 (B/S=0, PLRT=2, FCR Scan C=0, estabilizador NU=0/ND=2, foco UD/LR, rueda de
+    cola y Missile Advance 1->0; todos vuelven a Off=1). Sin probar: b2, b12, b17, b39, b43. Duda: fundas de CHOP/jettison.
     DCS-BIOS deja de emitir de vez en cuando ("sin datos") con DCS abierto (¿pausa/menú?).
     MFD WinWing en el Apache: se quedan asignados en DCS (decisión del usuario, 03/11/2026; no
     duplicarlos en RigControl). Curioso: R4 da b48 en `monitor` en los DOS MFD, pero las
