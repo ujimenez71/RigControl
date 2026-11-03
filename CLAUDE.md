@@ -149,7 +149,17 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
     y luces, magnetos `B:ENGINE_MAGNETO_1` OFF=0 R=1 L=2 BOTH=3 START=4, autopiloto del G1000 en el
     Bravo (`B:AS1000_AUTOPILOT_*_PFD`, HDG largo = sync, AP doble = `K:AUTOPILOT_OFF`), trim con la
     rueda del Bravo (b22 → `K:ELEV_TRIM_DN`, b23 → `K:ELEV_TRIM_UP`, un evento por clic).
-    `uh1h.json` (B: de batería/luces). `ah64d.json` (DCS, hecho con el editor: colectivo b18 alterna ANTICOL OFF <-> WHT con `state` (✅ 03/11/2026), b20 -> OFF). `ejemplo-ga.json` = demo de funciones, sin "aircraft".
+    `uh1h.json` (B: de batería/luces). `ah64d.json` (DCS, 03/11/2026): colectivo VPC completo
+    (réplica del real, puesto del piloto): 59 bindings a `PLT_COLLECTIVE_*`, botones sacados de las
+    asignaciones de DCS de abril de 2025 (`Config\Input\AH-64D_BLK_II_PLT\joystick\LEFT VPC Rotor
+    TCS PLUS {8D807C20...}.diff.lua`; el archivo activo, `L-VPC ... {8D80CA40...}`, solo tiene ejes,
+    así que DCS no asigna botones del colectivo: no hay órdenes dobles. Si el usuario vuelve a
+    asignarlos en DCS, chocarán). Interruptores con muelle = press -> posición, release -> 1 (Off);
+    pulsadores = hold. b18 alterna ANTICOL con `state`. ✅ Probado en DCS el 03/11/2026 ("todo
+    bien"): b3-b6, b8-b11, b14-b16, b18, b20, b26-b29, b35, b37, b38, b42. Sin probar: b2, b12,
+    b17, b31-b34, b39-b41, b43, b44. Dudas: b26 y b27 = PLRT los dos (¿uno es B/S?); sin botón
+    conocido: Missile Advance, Cursor Display, FCR Scan Continuous; fundas de CHOP/jettison.
+    DCS-BIOS deja de emitir de vez en cuando ("sin datos") con DCS abierto (¿pausa/menú?). `ejemplo-ga.json` = demo de funciones, sin "aircraft".
   - `"repeatMs"` en un hold con K:/B:/L: lo reenvía mientras se mantiene (`ActionDispatcher`, sin
     asignaciones). Probado con un simulador falso; ya no lo usa ningún perfil (el trim pasó a la rueda).
   - En pruebas que envían teclas, comprobar SIEMPRE que la ventana destino tiene el foco antes de enviar.
@@ -274,7 +284,7 @@ que los corrija) y se abre como borrador en el editor (nunca se guarda solo). Ne
 Alternativa sin integración: pedírselo a Claude Code en la sesión.
 
 Otros pendientes (02/11/2026): probar en DCS las luces `D:` del Bravo (cuando vuelva a detectarse); renombrar archivo de perfil en
-el editor; editar secuencias/timing/histéresis; escribir A:; perfil F-15E; limpiar la instalación
+el editor; editar secuencias/timing/histéresis; escribir A:; perfil de jet (el usuario NO tiene el F-15E aunque su carpeta está en `Mods\aircraft`); limpiar la instalación
 errónea de DCS-BIOS en `Saved Games\DCS` (inactiva); comprobar que el Yoke y el Bravo vuelven a
 detectarse (no aparecían en Windows el 02/11/2026 ni el 03/11/2026).
 
