@@ -150,16 +150,22 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
     Bravo (`B:AS1000_AUTOPILOT_*_PFD`, HDG largo = sync, AP doble = `K:AUTOPILOT_OFF`), trim con la
     rueda del Bravo (b22 → `K:ELEV_TRIM_DN`, b23 → `K:ELEV_TRIM_UP`, un evento por clic).
     `uh1h.json` (B: de batería/luces). `ah64d.json` (DCS, 03/11/2026): colectivo VPC completo
-    (réplica del real, puesto del piloto): 59 bindings a `PLT_COLLECTIVE_*`, botones sacados de las
+    (réplica del real, puesto del piloto): 61 bindings a `PLT_COLLECTIVE_*`, botones sacados de las
     asignaciones de DCS de abril de 2025 (`Config\Input\AH-64D_BLK_II_PLT\joystick\LEFT VPC Rotor
     TCS PLUS {8D807C20...}.diff.lua`; el archivo activo, `L-VPC ... {8D80CA40...}`, solo tiene ejes,
     así que DCS no asigna botones del colectivo: no hay órdenes dobles. Si el usuario vuelve a
     asignarlos en DCS, chocarán). Interruptores con muelle = press -> posición, release -> 1 (Off);
-    pulsadores = hold. b18 alterna ANTICOL con `state`. ✅ Probado en DCS el 03/11/2026 ("todo
-    bien"): b3-b6, b8-b11, b14-b16, b18, b20, b26-b29, b35, b37, b38, b42. Sin probar: b2, b12,
-    b17, b31-b34, b39-b41, b43, b44. Dudas: b26 y b27 = PLRT los dos (¿uno es B/S?); sin botón
-    conocido: Missile Advance, Cursor Display, FCR Scan Continuous; fundas de CHOP/jettison.
-    DCS-BIOS deja de emitir de vez en cuando ("sin datos") con DCS abierto (¿pausa/menú?). `ejemplo-ga.json` = demo de funciones, sin "aircraft".
+    pulsadores = hold. (b18 alternaba ANTICOL con `state`, verificado; se quitó porque b18 es el
+    Cursor Display del colectivo real.) ✅ Probado en DCS el 03/11/2026 ("todo
+    bien"): b3-b6, b8-b11, b14-b16, b20, b26-b29, b35, b37, b38, b42. Sin probar: b2, b12,
+    b17, b31-b34, b39-b41, b43, b44, y los añadidos con `monitor` el 03/11/2026: b18 Cursor
+    Display, b23 FCR Scan C, b24 Missile Advance, b27 = B/S (b26 = PLRT). Duda: fundas de CHOP/jettison.
+    DCS-BIOS deja de emitir de vez en cuando ("sin datos") con DCS abierto (¿pausa/menú?).
+    MFD WinWing en el Apache: se quedan asignados en DCS (decisión del usuario, 03/11/2026; no
+    duplicarlos en RigControl). Curioso: R4 da b48 en `monitor` en los DOS MFD, pero las
+    asignaciones de DCS dicen R4 = b27 (izq.) / b26 (der.) y no tienen b48, y aun así R4 funciona
+    en DCS. Hipótesis sin comprobar: SimAppPro hace la acción por su Export (wwtExport.lua), o la
+    numeración de DCS no es la de DirectInput en estos MFD. `ejemplo-ga.json` = demo de funciones, sin "aircraft".
   - `"repeatMs"` en un hold con K:/B:/L: lo reenvía mientras se mantiene (`ActionDispatcher`, sin
     asignaciones). Probado con un simulador falso; ya no lo usa ningún perfil (el trim pasó a la rueda).
   - En pruebas que envían teclas, comprobar SIEMPRE que la ventana destino tiene el foco antes de enviar.

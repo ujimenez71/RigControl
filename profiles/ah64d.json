@@ -4,7 +4,7 @@
   "timing": {"longMs":500,"doubleMs":300,"sequenceMs":1000},
   "aircraft": ["dcs:ah-64d_blk_ii"],
   "axisHysteresis": 2,
-  "notes": "Colectivo VPC con puño AH-64D, puesto del piloto. Botones según las asignaciones de DCS de abril de 2025 (LEFT VPC Rotor TCS PLUS .diff.lua). Interruptores con muelle: posición al pulsar, Off al soltar. Ejes (colectivo y cursor) siguen en DCS.",
+  "notes": "Colectivo VPC con puño AH-64D, puesto del piloto. Botones según las asignaciones de DCS de abril de 2025 (LEFT VPC Rotor TCS PLUS .diff.lua). Interruptores con muelle: posición al pulsar, Off al soltar. Ejes (colectivo y cursor) siguen en DCS. Completado con monitor el 03/11/2026: b18 Cursor Display, b23 FCR Scan C, b24 Missile Advance, b26 PLRT, b27 B/S.",
   "devices": {
     "colectivo": "3344:832E:080B2200"
   },
@@ -32,7 +32,7 @@
     {"input":"colectivo:b38","gesture":"release","action":"D:PLT_COLLECTIVE_NVS_SELECT 1","desc":"NVS Select: Off"},
     {"input":"colectivo:b26","gesture":"press","action":"D:PLT_COLLECTIVE_BS_PLRT 2","desc":"Boresight/Polaridad: PLRT"},
     {"input":"colectivo:b26","gesture":"release","action":"D:PLT_COLLECTIVE_BS_PLRT 1","desc":"Boresight/Polaridad: Off"},
-    {"input":"colectivo:b27","gesture":"press","action":"D:PLT_COLLECTIVE_BS_PLRT 2","desc":"Boresight/Polaridad: PLRT (b27, como en DCS)"},
+    {"input":"colectivo:b27","gesture":"press","action":"D:PLT_COLLECTIVE_BS_PLRT 0","desc":"Boresight/Polaridad: B/S"},
     {"input":"colectivo:b27","gesture":"release","action":"D:PLT_COLLECTIVE_BS_PLRT 1","desc":"Boresight/Polaridad: Off"},
     {"input":"colectivo:b44","gesture":"hold","action":"D:PLT_COLLECTIVE_TAIL_WHEEL","desc":"Bloqueo de la rueda de cola"},
     {"input":"colectivo:b42","gesture":"hold","action":"D:PLT_COLLECTIVE_BUCS","desc":"Gatillo BUCS"},
@@ -66,7 +66,9 @@
     {"input":"colectivo:b2","gesture":"release","action":"D:PLT_COLLECTIVE_FCR_SCAN 1","desc":"FCR Scan: Off"},
     {"input":"colectivo:b12","gesture":"hold","action":"D:PLT_COLLECTIVE_CURSOR_ENTER","desc":"Cursor Enter"},
     {"input":"colectivo:b20","gesture":"hold","action":"D:PLT_COLLECTIVE_CUED_SEARCH","desc":"CUED Search"},
-    {"input":"colectivo:b18","gesture":"press","when":{"state":"D:PLT_EXTL_ACOL_L_SW=1"},"action":"D:PLT_EXTL_ACOL_L_SW 2","desc":"Anticolisión: si está en OFF, a WHT"},
-    {"input":"colectivo:b18","gesture":"press","action":"D:PLT_EXTL_ACOL_L_SW 1","desc":"Anticolisión: si no está en OFF, a OFF"}
+    {"input":"colectivo:b23","gesture":"press","action":"D:PLT_COLLECTIVE_FCR_SCAN 0","desc":"FCR Scan: C (continuous)"},
+    {"input":"colectivo:b23","gesture":"release","action":"D:PLT_COLLECTIVE_FCR_SCAN 1","desc":"FCR Scan: Off"},
+    {"input":"colectivo:b24","gesture":"hold","action":"D:PLT_COLLECTIVE_MISSILE_ADVANCE","desc":"Missile Advance"},
+    {"input":"colectivo:b18","gesture":"hold","action":"D:PLT_COLLECTIVE_CURSOR_DISPLAY","desc":"Cursor Display Select"}
   ]
 }
