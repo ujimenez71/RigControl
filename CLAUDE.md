@@ -104,8 +104,8 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
     error en `Saved Games\DCS` (inactiva; copia en export.lua.antes-de-dcs-bios).
     Definiciones de controles: `Scripts\DCS-BIOS\doc\json\<avión>.json`. `RigProbe dcs [s]` escucha
     y muestra el avión; `RigProbe dcs enviar CONTROL [VALOR]` manda una orden.
-  - Estado del simulador en condiciones y luces (03/11/2026, probado con escenarios y el DCS falso;
-    NO probado aún con DCS real): variables `D:CONTROL` (valor entero del control en la imagen de
+  - Estado del simulador en condiciones y luces (03/11/2026, probado con escenarios y el DCS falso, y
+    ✅ verificado con DCS y el AH-64D el 03/11/2026: b18 alterna ANTICOL OFF <-> WHT, 11 de 11): variables `D:CONTROL` (valor entero del control en la imagen de
     DCS-BIOS: dirección/máscara/desplazamiento de `DcsBiosCatalog`, sin unidades) valen en `"lights"`
     y en la nueva condición `{"state": "D:PLT_EXTL_ACOL_L_SW=1"}` (misma sintaxis que las luces;
     también `A:`/`L:` de MSFS). Se evalúa al pulsar, como el resto. Ejemplo: un botón que alterna
@@ -149,7 +149,7 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
     y luces, magnetos `B:ENGINE_MAGNETO_1` OFF=0 R=1 L=2 BOTH=3 START=4, autopiloto del G1000 en el
     Bravo (`B:AS1000_AUTOPILOT_*_PFD`, HDG largo = sync, AP doble = `K:AUTOPILOT_OFF`), trim con la
     rueda del Bravo (b22 → `K:ELEV_TRIM_DN`, b23 → `K:ELEV_TRIM_UP`, un evento por clic).
-    `uh1h.json` (B: de batería/luces). `ah64d.json` (DCS, hecho con el editor: colectivo b18 alterna ANTICOL OFF <-> WHT con `state` (03/11/2026, sin probar en DCS), b20 -> OFF). `ejemplo-ga.json` = demo de funciones, sin "aircraft".
+    `uh1h.json` (B: de batería/luces). `ah64d.json` (DCS, hecho con el editor: colectivo b18 alterna ANTICOL OFF <-> WHT con `state` (✅ 03/11/2026), b20 -> OFF). `ejemplo-ga.json` = demo de funciones, sin "aircraft".
   - `"repeatMs"` en un hold con K:/B:/L: lo reenvía mientras se mantiene (`ActionDispatcher`, sin
     asignaciones). Probado con un simulador falso; ya no lo usa ningún perfil (el trim pasó a la rueda).
   - En pruebas que envían teclas, comprobar SIEMPRE que la ventana destino tiene el foco antes de enviar.
@@ -260,7 +260,7 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
 4. (en curso) DCS por UDP (Export.lua / DCS-BIOS), bidireccional; feedback a LEDs WinWing (requiere
    capturar el protocolo con Wireshark + USBPcap) y al Bravo. Hecho: luces del Bravo desde MSFS
    y cliente DCS-BIOS, ✅ verificado con DCS y el AH-64D (ver "Fase 4" arriba); luces y
-   condiciones desde el estado de DCS (`D:`, falta probarlo en DCS real). Falta: LEDs WinWing.
+   condiciones desde el estado de DCS (`D:`, ✅ verificado con el AH-64D). Falta: LEDs WinWing.
 5. App Hangar (lanzar apps en secuencia), gestor de ventanas, mods por symlinks, snapshots,
    prioridad de CPU
 
@@ -273,7 +273,7 @@ que los corrija) y se abre como borrador en el editor (nunca se guarda solo). Ne
 (guardarla cifrada, DPAPI). Antes de escribir código con la API, cargar la skill claude-api.
 Alternativa sin integración: pedírselo a Claude Code en la sesión.
 
-Otros pendientes (02/11/2026): probar en DCS real las condiciones `state`/luces `D:` (03/11/2026); renombrar archivo de perfil en
+Otros pendientes (02/11/2026): probar en DCS las luces `D:` del Bravo (cuando vuelva a detectarse); renombrar archivo de perfil en
 el editor; editar secuencias/timing/histéresis; escribir A:; perfil F-15E; limpiar la instalación
 errónea de DCS-BIOS en `Saved Games\DCS` (inactiva); comprobar que el Yoke y el Bravo vuelven a
 detectarse (no aparecían en Windows el 02/11/2026 ni el 03/11/2026).
