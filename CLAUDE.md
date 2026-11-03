@@ -63,7 +63,9 @@ Simuladores: DCS World (jets y helicópteros) y MSFS 2024 (aviación general). V
 ## Estado actual
 
 Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <perfil>`, `run <perfil>|auto [--dry]`,
-`sim [eventos [filtro]]`, `sim vars <perfil> [s]`, `dcs [s]`, `dcs enviar CONTROL [VALOR]`.
+`sim [eventos [filtro]]`, `sim vars <perfil> [s]`, `dcs [s]`, `dcs enviar CONTROL [VALOR]`, `dcs leer CONTROL`,
+`dcs vigilar [filtro]` (cada cambio de los mandos de la cabina con su posición y descripción: para
+comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez).
 - Fase 4 (en curso, hecho sin el usuario el 01/11/2026; NADA de esto probado aún en vuelo):
   - Luces del Bravo desde MSFS: sección `"lights"` del perfil: nombre de `BravoLed` -> condición o
     lista (AND) sobre `A:VAR[, unidades]` o `L:Var` con `> >= < <= =`, rango `=a..b`, `!` niega;
@@ -160,7 +162,9 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
     el estado de vuelta con `sim vars` y un perfil de capas "state" (las órdenes no se ven en
     cabina en frío): b3-b6, b8-b11, b14-b16, b18, b20, b23, b24, b26-b29, b31-b35, b37, b38,
     b40-b42, b44 (B/S=0, PLRT=2, FCR Scan C=0, estabilizador NU=0/ND=2, foco UD/LR, rueda de
-    cola y Missile Advance 1->0; todos vuelven a Off=1). Sin probar: b2, b12, b17, b39, b43. Duda: fundas de CHOP/jettison.
+    cola y Missile Advance 1->0; todos vuelven a Off=1), y con `dcs vigilar` b12, b17, b22, b39, b43.
+    ✅ COLECTIVO COMPLETO VERIFICADO. FCR Scan S es b22 (las asignaciones viejas de DCS decían b2).
+    CHOP funciona con la funda cerrada; el jettison (b35) envía bien, sin comprobar con la funda.
     Cortes de DCS-BIOS (investigado el 03/11/2026): con DCS a pantalla completa, al cambiar a otra
     ventana DCS se minimiza (dcs.log: "resize main window to [0, 0]") y sigue exportando; al
     VOLVER ("resize ... [3840, 2160]" + "ModelTimeQuantizer: ANTIFREEZE ENABLED") se congela y deja

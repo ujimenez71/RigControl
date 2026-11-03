@@ -118,7 +118,7 @@ public sealed class DcsBiosOutput : IDisposable
         for (var i = 0; i < n; i++)
         {
             if (!vars[i].IsDcs) continue;
-            values[i] = HasState && _watched[i] is { Address: { } a } c && _seen[a] && _seen[a + 1] && c.Read(_image) is { } v
+            values[i] = HasState && _watched[i] is { } c && Read(c) is { } v
                 ? v : double.NaN;
         }
     }
@@ -139,6 +139,13 @@ public sealed class DcsBiosOutput : IDisposable
 
     /// <summary>Imagen de la cabina (direcciones de DCS-BIOS), para leer estados.</summary>
     public ReadOnlySpan<byte> Image => _image;
+
+    /// <summary>Ya ha llegado el valor de esa dirección (y de la siguiente: los controles son palabras de 16 bits).</summary>
+    public bool HasArrived(int address) => (uint)address + 1 < (uint)_seen.Length && _seen[address] && _seen[address + 1];
+
+    /// <summary>Valor actual de un control, o null si no tiene salida numérica o aún no ha llegado.</summary>
+    public int? Read(DcsControl control) =>
+        control.Address is { } a && HasArrived(a) ? control.Read(_image) : null;
 
     public void Tick(long timeMs)
     {

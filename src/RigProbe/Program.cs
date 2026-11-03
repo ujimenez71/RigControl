@@ -67,6 +67,11 @@ internal static class Program
                     DcsRaw(Convert.ToInt32(args[2], 16), args.Length > 3 ? int.Parse(args[3]) : 10);
                     return 0;
                 }
+                if (args.Length > 1 && args[1].Equals("vigilar", StringComparison.OrdinalIgnoreCase))
+                {
+                    DcsWatchControls(args.Length > 2 ? string.Join(' ', args.Skip(2)) : null);
+                    return 0;
+                }
                 if (args.Length > 2 && args[1].Equals("leer", StringComparison.OrdinalIgnoreCase))
                     return DcsSend(args[2], readOnly: true);
                 DcsWatch(args.Length > 1 && int.TryParse(args[1], out var dsecs) ? dsecs : 15);
@@ -81,6 +86,7 @@ internal static class Program
             default:
                 Console.WriteLine("Uso: RigProbe list [all] | monitor | catalog | bravo-test | check <perfil> | run <perfil>|auto [--dry]");
                 Console.WriteLine("            | sim | sim eventos [filtro] | sim vars <perfil> [s] | dcs [s] | dcs enviar CONTROL [VALOR] | dcs leer CONTROL");
+                Console.WriteLine("            | dcs vigilar [filtro]");
                 Console.WriteLine($"  <perfil> es una ruta a un .json o un nombre en {ProfileFile.ProfilesDir}");
                 return 1;
         }
@@ -129,6 +135,55 @@ internal static class Program
             {
                 next += 1000;
                 Console.WriteLine($"--- {clock.ElapsedMilliseconds / 1000} s  {(dcs.IsActive ? "llegan datos" : "sin datos")}  avión={dcs.Aircraft ?? "-"}");
+            }
+            Thread.Sleep(10);
+        }
+    }
+
+    /// <summary>
+    /// Muestra al momento cada cambio de los mandos de la cabina (controles de DCS-BIOS con entrada y
+    /// valor numérico; sin indicadores ni agujas), con su posición y descripción. Sirve para comprobar
+    /// un perfil o averiguar qué control es cada interruptor. Filtro opcional por nombre o descripción.
+    /// Hasta ESC (o hasta detener el proceso si no hay consola).
+    /// </summary>
+    private static void DcsWatchControls(string? filter)
+    {
+        using var dcs = new DcsBiosOutput();
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        Console.WriteLine($"Escuchando DCS-BIOS{(filter is null ? "" : $" (filtro \"{filter}\")")}. ESC para salir.");
+
+        IReadOnlyList<DcsControl> controls = [];
+        int?[] last = [];
+        string? aircraft = null;
+        var baseline = 0;
+        while (!ConsoleInput.EscapePressed())
+        {
+            dcs.Tick(clock.ElapsedMilliseconds);
+            if (dcs.Aircraft is { } a && a != aircraft)
+            {
+                aircraft = a;
+                controls = [.. DcsBiosCatalog.ForAircraft(a).Where(c => c.Address is not null && c.Inputs.Length > 0 &&
+                    (filter is null || c.Name.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
+                     c.Description.Contains(filter, StringComparison.OrdinalIgnoreCase)))];
+                last = new int?[controls.Count];
+                baseline = 0;
+                Console.WriteLine($"Avión: {a}. Vigilando {controls.Count} mandos; los cambios salen en cuanto llega el estado de cada uno.");
+            }
+
+            for (var i = 0; i < controls.Count; i++)
+            {
+                if (dcs.Read(controls[i]) is not { } v || v == last[i]) continue;
+                var first = last[i] is null;
+                last[i] = v;
+                if (first)
+                {
+                    // Primer valor: es el estado de partida, no un cambio.
+                    if (++baseline == controls.Count) Console.WriteLine("(ya ha llegado el estado de todos los mandos)");
+                    continue;
+                }
+                var c = controls[i];
+                var pos = v < c.Positions.Length ? $" {c.Positions[v]}" : "";
+                Console.WriteLine($"{DateTime.Now:HH:mm:ss.fff}  {c.Name,-34} = {v}{pos,-10}  {c.Description}");
             }
             Thread.Sleep(10);
         }
