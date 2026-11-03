@@ -547,7 +547,7 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         var fromSim = _sim.Values;
         for (var i = 0; i < values.Length; i++) values[i] = i < fromSim.Length ? fromSim[i] : double.NaN;
         _dcs.Fill(values);
-        var connected = _sim.IsConnected || _dcs.IsActive;
+        var connected = _sim.IsConnected || _dcs.HasState;
         foreach (var light in Lights)
         {
             var rule = _liveProfile?.Lights.FirstOrDefault(r => r.Name == light.Led);

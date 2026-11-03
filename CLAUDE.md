@@ -161,7 +161,17 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
     cabina en frío): b3-b6, b8-b11, b14-b16, b18, b20, b23, b24, b26-b29, b31-b35, b37, b38,
     b40-b42, b44 (B/S=0, PLRT=2, FCR Scan C=0, estabilizador NU=0/ND=2, foco UD/LR, rueda de
     cola y Missile Advance 1->0; todos vuelven a Off=1). Sin probar: b2, b12, b17, b39, b43. Duda: fundas de CHOP/jettison.
-    DCS-BIOS deja de emitir de vez en cuando ("sin datos") con DCS abierto (¿pausa/menú?).
+    Cortes de DCS-BIOS (investigado el 03/11/2026): con DCS a pantalla completa, al cambiar a otra
+    ventana DCS se minimiza (dcs.log: "resize main window to [0, 0]") y sigue exportando; al
+    VOLVER ("resize ... [3840, 2160]" + "ModelTimeQuantizer: ANTIFREEZE ENABLED") se congela y deja
+    de exportar decenas de segundos. Coincide con los "sin datos" de la tarde (vistos a la vez por
+    dos procesos). TAMBIÉN el menú de ESC (pausa): ✅ comprobado, corte de 9-11 s mientras se está en el menú. En vuelo normal no debería pasar. Desde entonces
+    `DcsBiosOutput`: `IsActive` = datos de < 2 s (avisa "sin datos" una vez y "vuelven los datos
+    tras N s"), `HasState` = < 30 s (`StaleMs`): mantiene avión y valores D: en cortes cortos; a los
+    30 s descarta todo. Además cada dirección de la imagen vale solo cuando ha llegado (`_seen`):
+    antes, al arrancar, los D: leían 0 durante el primer ciclo completo (~16-40 s) y no NaN. Las
+    órdenes D: se envían igual durante un corte (DCS-BIOS las aplica al volver; sin comprobar).
+    ✅ Verificado con DCS (03/11/2026): con ESC 11 s, los valores D: se mantienen todo el corte.
     MFD WinWing en el Apache: se quedan asignados en DCS (decisión del usuario, 03/11/2026; no
     duplicarlos en RigControl). Curioso: R4 da b48 en `monitor` en los DOS MFD, pero las
     asignaciones de DCS dicen R4 = b27 (izq.) / b26 (der.) y no tienen b48, y aun así R4 funciona

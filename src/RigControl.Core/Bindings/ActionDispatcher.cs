@@ -68,7 +68,7 @@ public sealed class ActionDispatcher(KeyboardOutput? keyboard, ISimOutput? sim, 
             }
             else if (a.Kind == ActionKind.DcsBios)
             {
-                if (dcs is null || !dcs.IsActive) result = "(sin datos de DCS-BIOS)";
+                if (dcs is null || !dcs.IsActive) result = "(enviado, pero DCS-BIOS no manda datos)";
                 var ok = phase switch
                 {
                     ActionPhase.Trigger => dcs?.Send(a, tap: true) ?? false,

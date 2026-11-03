@@ -23,12 +23,21 @@ public sealed class DcsBiosOutput : IDisposable
     public const int CommandPort = 7778;
     private const int AircraftNameLength = 24;
     private const int ActiveMs = 2000;
+    /// <summary>
+    /// Sin datos durante menos de esto se mantiene el último estado (y el avión): DCS se congela unos
+    /// segundos al volver a su ventana tras minimizarla ("ANTIFREEZE" en dcs.log) y deja de exportar,
+    /// pero la cabina no ha cambiado. Pasado este tiempo se descarta todo.
+    /// </summary>
+    public const int StaleMs = 30_000;
     private const int TapMs = 50;
     private const int RetryMs = 5000;
 
     private readonly IPEndPoint _commandEndpoint;
     private readonly byte[] _image = new byte[65536];
     private readonly byte[] _packet = new byte[65536];
+    /// <summary>Direcciones de la imagen que ya han llegado (las demás aún no valen: estarían a 0).</summary>
+    private readonly bool[] _seen = new bool[65536];
+    private bool _lost;
     private readonly byte[] _lastName = new byte[AircraftNameLength];
     private Socket? _listen;
     private Socket? _send;
@@ -98,7 +107,8 @@ public sealed class DcsBiosOutput : IDisposable
 
     /// <summary>
     /// Escribe en <paramref name="values"/> (índices de WatchedVars) el valor actual de cada variable D:.
-    /// Sin datos de DCS-BIOS, NaN. No toca las demás. Sin asignaciones.
+    /// NaN si el control no existe, si su dirección aún no ha llegado o si llevamos más de StaleMs
+    /// sin datos (en un corte más corto, el último valor). No toca las demás. Sin asignaciones.
     /// </summary>
     public void Fill(double[] values)
     {
@@ -108,7 +118,8 @@ public sealed class DcsBiosOutput : IDisposable
         for (var i = 0; i < n; i++)
         {
             if (!vars[i].IsDcs) continue;
-            values[i] = IsActive && _watched[i] is { } c && c.Read(_image) is { } v ? v : double.NaN;
+            values[i] = HasState && _watched[i] is { Address: { } a } c && _seen[a] && _seen[a + 1] && c.Read(_image) is { } v
+                ? v : double.NaN;
         }
     }
 
@@ -116,6 +127,9 @@ public sealed class DcsBiosOutput : IDisposable
 
     /// <summary>Llegan datos de DCS-BIOS (hubo un paquete hace menos de 2 s).</summary>
     public bool IsActive => _now - _lastPacket < ActiveMs;
+
+    /// <summary>Hay un estado de la cabina utilizable: datos de hace menos de StaleMs.</summary>
+    public bool HasState => _now - _lastPacket < StaleMs;
 
     /// <summary>Nombre del avión según DCS-BIOS (p. ej. "F-15ESE"), o null.</summary>
     public string? Aircraft { get; private set; }
@@ -138,6 +152,11 @@ public sealed class DcsBiosOutput : IDisposable
             {
                 var n = _listen.Receive(_packet);
                 if (n <= 0) break;
+                if (_lost)
+                {
+                    _lost = false;
+                    Log.Info($"DCS-BIOS: vuelven los datos tras {(timeMs - _lastPacket) / 1000.0:0.0} s.");
+                }
                 Apply(_packet.AsSpan(0, n));
                 _lastPacket = timeMs;
             }
@@ -150,13 +169,19 @@ public sealed class DcsBiosOutput : IDisposable
 
         SettleAircraft();
 
-        if (!IsActive && Aircraft is not null)
+        if (!IsActive && !_lost && _lastPacket > long.MinValue / 2)
+        {
+            _lost = true;
+            Log.Info($"DCS-BIOS: sin datos (¿DCS congelado, cerrado o fuera de misión?); se mantiene el último estado {StaleMs / 1000} s.");
+        }
+        if (!HasState && (Aircraft is not null || _candidate is not null))
         {
             Aircraft = null;
             _candidate = null;
             _candidateAt = -1;
             Array.Clear(_lastName);
-            Log.Info("DCS-BIOS: sin datos (¿DCS cerrado o fuera de misión?).");
+            Array.Clear(_seen);
+            Log.Info($"DCS-BIOS: {StaleMs / 1000} s sin datos: se descarta el estado de la cabina.");
         }
 
         for (var i = 0; i < MaxPending; i++)
@@ -203,6 +228,7 @@ public sealed class DcsBiosOutput : IDisposable
             i += 4;
             if (length == 0 || i + length > p.Length || address + length > _image.Length) break; // paquete raro: se descarta el resto
             p.Slice(i, length).CopyTo(_image.AsSpan(address));
+            _seen.AsSpan(address, length).Fill(true);
             i += length;
 
             if (address < AircraftNameLength) nameTouched = true;

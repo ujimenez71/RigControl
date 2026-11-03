@@ -114,9 +114,17 @@ internal static class DcsTests
         }
         else Console.WriteLine("(DCS-BIOS no instalado: se omite la prueba del catálogo)");
 
-        // Sin datos 2 s -> inactivo y sin avión
+        // Corte corto (DCS congelado al volver a su ventana): inactivo, pero se mantiene el avión
+        log.Clear();
         for (var i = 0; i < 5; i++) { t += 500; dcs.Tick(t); }
-        Check(!dcs.IsActive && dcs.Aircraft is null, "sin datos 2 s: inactivo y sin avión");
+        Check(!dcs.IsActive && dcs.HasState && dcs.Aircraft == "F-15ESE", "sin datos 2,5 s: inactivo pero mantiene el avión y el estado");
+        Check(log.Count(l => l.Contains("sin datos")) == 1, $"avisa una vez del corte: {string.Join(" | ", log)}");
+        fakeDcsOut.Send(Frame(0x1000, [0x35, 0x12]), group); Pump(50);
+        Check(dcs.IsActive && log.Any(l => l.Contains("vuelven los datos tras")), $"al volver los datos lo dice: {log.LastOrDefault()}");
+        Check(changes.Count == 1, "tras el corte no vuelve a anunciar el avión");
+        // Corte largo (30 s): se descarta todo
+        for (var i = 0; i < 62; i++) { t += 500; dcs.Tick(t); }
+        Check(!dcs.HasState && dcs.Aircraft is null, "sin datos 31 s: sin estado y sin avión");
 
         return fails;
     }

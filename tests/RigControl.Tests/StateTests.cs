@@ -117,8 +117,10 @@ internal static class StateTests
         void Pump(int ms) { for (var i = 0; i < ms / 10; i++) { t += 10; disp.Tick(t); Thread.Sleep(10); } }
         Pump(50);
         fakeOut.Send(Frame(0, Name("AH-64D_BLK_II")), group);
-        fakeOut.Send(Frame(0x801C, [0x40, 0x00]), group); // 0x40 >> 6 = 1 = OFF
         Pump(500);
+        Check(double.IsNaN(disp.Values[0]), "con datos de DCS pero sin haber llegado aún esa dirección: NaN (no 0)");
+        fakeOut.Send(Frame(0x801C, [0x40, 0x00]), group); // 0x40 >> 6 = 1 = OFF
+        Pump(100);
         Check(asked.Count == 2 && asked[1] == "AH-64D_BLK_II", $"al detectar el avión vuelve a buscar sus controles: {string.Join(",", asked)}");
         Check(disp.Values[0] == 1, $"ANTICOL leído de la imagen: {disp.Values[0]} (OFF)");
 
@@ -139,10 +141,15 @@ internal static class StateTests
         Pump(50);
         Check(p2!.WatchedVars.Select((_, i) => disp.Values[i]).All(double.IsNaN), "y quedan sin valor (NaN)");
 
-        // Sin datos 2 s -> NaN otra vez
+        // Corte corto: se mantiene el último valor; largo (30 s): NaN
         disp.ProfileLoaded(p);
+        fakeOut.Send(Frame(0x801C, [0x80, 0x00]), group); Pump(100);
         for (var i = 0; i < 5; i++) { t += 500; disp.Tick(t); }
-        Check(double.IsNaN(disp.Values[0]), "DCS-BIOS sin datos: el valor vuelve a NaN");
+        Check(disp.Values[0] == 2, $"DCS-BIOS 2,5 s sin datos: mantiene el último valor ({disp.Values[0]})");
+        for (var i = 0; i < 60; i++) { t += 500; disp.Tick(t); }
+        Check(double.IsNaN(disp.Values[0]), "DCS-BIOS 30 s sin datos: el valor vuelve a NaN");
+        fakeOut.Send(Frame(0, Name("AH-64D_BLK_II")), group); Pump(500);
+        Check(double.IsNaN(disp.Values[0]), "al volver DCS, la dirección vieja no vale hasta que llegue de nuevo");
         return fails;
     }
 }
