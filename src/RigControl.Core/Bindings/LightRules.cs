@@ -2,9 +2,15 @@ using System.Globalization;
 
 namespace RigControl.Core.Bindings;
 
-/// <summary>Variable del simulador que se vigila: "A:NOMBRE" o "L:Nombre", con sus unidades.</summary>
+/// <summary>
+/// Variable del simulador que se vigila: "A:NOMBRE" o "L:Nombre" (MSFS, con sus unidades) o
+/// "D:CONTROL" (DCS-BIOS: valor entero del control en la imagen de la cabina, sin unidades).
+/// </summary>
 public sealed record SimVarSpec(string Name, string Unit)
 {
+    /// <summary>Viene de DCS-BIOS, no de SimConnect.</summary>
+    public bool IsDcs => Name.StartsWith("D:", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Texto para SimConnect_AddToDataDefinition, p. ej. "A:AUTOPILOT MASTER" -> "AUTOPILOT MASTER".</summary>
     public string DatumName => Name.StartsWith("A:", StringComparison.OrdinalIgnoreCase) ? Name[2..] : Name;
     public override string ToString() => $"{Name}, {Unit}";
@@ -17,6 +23,7 @@ public readonly record struct LightCondition(int Var, LightOp Op, double A, doub
 {
     public bool Evaluate(double[] values)
     {
+        if ((uint)Var >= (uint)values.Length) return false; // sin valores (p. ej. sin simulador)
         var v = values[Var];
         if (double.IsNaN(v)) return false; // todavía sin dato: apagada (también si está negada)
         var r = Op switch
@@ -46,11 +53,12 @@ public sealed record LightRule(BravoLed Led, string Name, LightCondition[] Condi
 }
 
 /// <summary>
-/// Interpreta las condiciones de luces del perfil:
+/// Interpreta las condiciones sobre el estado del simulador (luces y "state" de los bindings):
 ///   "A:AUTOPILOT MASTER"                           -> encendida si el valor no es 0
 ///   "A:ELECTRICAL MAIN BUS VOLTAGE, Volts&lt;24.5"  -> unidades tras la coma ("Number" por defecto)
 ///   "A:GEAR CENTER POSITION=0.01..0.99"            -> rango (ambos incluidos)
 ///   operadores: &gt; &gt;= &lt; &lt;= = ; "!" delante niega; también "L:Variable".
+///   "D:PLT_EXTL_ACOL_L_SW=2"                       -> DCS-BIOS: valor entero del control (sin unidades)
 /// </summary>
 public static class LightParser
 {
@@ -63,9 +71,10 @@ public static class LightParser
         var negate = t.StartsWith('!');
         if (negate) t = t[1..].TrimStart();
 
-        if (t.Length < 3 || t[1] != ':' || char.ToUpperInvariant(t[0]) is not ('A' or 'L'))
+        var prefix = t.Length >= 3 && t[1] == ':' ? char.ToUpperInvariant(t[0]) : ' ';
+        if (prefix is not ('A' or 'L' or 'D'))
         {
-            error = $"luz \"{text}\": se espera una variable \"A:NOMBRE\" o \"L:Nombre\".";
+            error = $"\"{text}\": se espera una variable \"A:NOMBRE\" o \"L:Nombre\" (MSFS) o \"D:CONTROL\" (DCS-BIOS).";
             return false;
         }
 
@@ -78,11 +87,25 @@ public static class LightParser
         var unit = comma < 0 ? "Number" : left[(comma + 1)..].Trim();
         if (name.Length <= 2 || unit.Length == 0)
         {
-            error = $"luz \"{text}\": falta el nombre de la variable o las unidades.";
+            error = $"\"{text}\": falta el nombre de la variable o las unidades.";
             return false;
         }
-        // Las A: (simvars) van en mayúsculas; las L: respetan el nombre.
-        name = char.ToUpperInvariant(name[0]) == 'A' ? name.ToUpperInvariant() : "L:" + name[2..];
+        if (prefix == 'D')
+        {
+            if (comma >= 0)
+            {
+                error = $"\"{text}\": los controles de DCS-BIOS (D:) no llevan unidades.";
+                return false;
+            }
+            name = name.ToUpperInvariant();
+            if (name.AsSpan(2).ContainsAnyExcept(DcsNameChars))
+            {
+                error = $"\"{text}\": nombre de control de DCS-BIOS no válido (letras, números y _).";
+                return false;
+            }
+        }
+        // Las A: (simvars) y D: (controles) van en mayúsculas; las L: respetan el nombre.
+        else name = prefix == 'A' ? name.ToUpperInvariant() : "L:" + name[2..];
 
         LightOp op;
         double a = 0, b = 0;
@@ -100,7 +123,7 @@ public static class LightParser
             {
                 op = LightOp.Range;
                 if (!Num(body[..dots], out a) || !Num(body[(dots + 2)..], out b)) return Bad(text, out error);
-                if (a > b) { error = $"luz \"{text}\": el rango está al revés."; return false; }
+                if (a > b) { error = $"\"{text}\": el rango está al revés."; return false; }
             }
         }
 
@@ -108,12 +131,15 @@ public static class LightParser
         return true;
     }
 
+    private static readonly System.Buffers.SearchValues<char> DcsNameChars =
+        System.Buffers.SearchValues.Create("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_");
+
     private static bool Num(string s, out double v) =>
         double.TryParse(s.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out v);
 
     private static bool Bad(string text, out string? error)
     {
-        error = $"luz \"{text}\": valor no válido (operadores > >= < <= = y rangos \"=a..b\", con punto decimal).";
+        error = $"\"{text}\": valor no válido (operadores > >= < <= = y rangos \"=a..b\", con punto decimal).";
         return false;
     }
 }

@@ -11,6 +11,9 @@ public interface ISimOutput
 
     /// <summary>Conecta/reintenta y procesa mensajes. Se llama en cada ciclo; no debe bloquear.</summary>
     void Tick(long timeMs);
+
+    /// <summary>Valores de CompiledProfile.WatchedVars que da este simulador (NaN = sin dato; vacío = ninguno).</summary>
+    double[] Values => [];
 }
 
 /// <summary>
@@ -30,6 +33,13 @@ public sealed class ActionDispatcher(KeyboardOutput? keyboard, ISimOutput? sim, 
     private const int MaxRepeats = 16;
     private readonly Binding?[] _repeating = new Binding?[MaxRepeats];
     private readonly long[] _nextRepeat = new long[MaxRepeats];
+    private double[] _values = [];
+
+    /// <summary>
+    /// Estado actual de las variables vigiladas del perfil: A:/L: de SimConnect y D: de DCS-BIOS
+    /// juntas, por el índice de CompiledProfile.WatchedVars. Se actualiza en cada Tick.
+    /// </summary>
+    public double[] Values => _values;
 
     public void OnAction(Binding binding, ActionPhase phase, long timeMs)
     {
@@ -85,6 +95,7 @@ public sealed class ActionDispatcher(KeyboardOutput? keyboard, ISimOutput? sim, 
         keyboard?.Tick(timeMs);
         sim?.Tick(timeMs); // también en --dry: hace falta para saber qué avión hay ("run auto")
         dcs?.Tick(timeMs);
+        MergeValues();
 
         for (var i = 0; i < MaxRepeats; i++)
         {
@@ -103,6 +114,17 @@ public sealed class ActionDispatcher(KeyboardOutput? keyboard, ISimOutput? sim, 
         // EndHolds ya ha cerrado los hold del perfil anterior; esto es solo por seguridad.
         Array.Clear(_repeating);
         sim?.Prepare(profile);
+        dcs?.Prepare(profile);
+        _values = new double[profile.WatchedVars.Length];
+        MergeValues();
+    }
+
+    private void MergeValues()
+    {
+        var fromSim = sim?.Values ?? [];
+        for (var i = 0; i < _values.Length; i++)
+            _values[i] = i < fromSim.Length ? fromSim[i] : double.NaN;
+        dcs?.Fill(_values);
     }
 
     public void Dispose() => keyboard?.ReleaseAll();

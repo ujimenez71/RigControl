@@ -167,6 +167,10 @@ public sealed class ConditionFile
     public string? Input { get; set; }
 
     public string? Layer { get; set; }
+
+    /// <summary>Estado del simulador, con la misma sintaxis que las luces: "D:CONTROL=2", "A:VAR, unidades>5", "!L:Var".</summary>
+    public string? State { get; set; }
+
     public List<ConditionFile>? All { get; set; }
     public List<ConditionFile>? Any { get; set; }
     public ConditionFile? Not { get; set; }

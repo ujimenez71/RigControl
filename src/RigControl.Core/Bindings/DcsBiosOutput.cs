@@ -42,10 +42,74 @@ public sealed class DcsBiosOutput : IDisposable
     private readonly long[] _pendingAt = new long[MaxPending];
 
     /// <param name="exportPort">Puertos configurables solo para pruebas.</param>
-    public DcsBiosOutput(int exportPort = ExportPort, int commandPort = CommandPort)
+    /// <param name="catalog">Controles de un avión (por defecto, DcsBiosCatalog); configurable para pruebas.</param>
+    public DcsBiosOutput(int exportPort = ExportPort, int commandPort = CommandPort,
+                         Func<string, IReadOnlyList<DcsControl>>? catalog = null)
     {
         _exportPort = exportPort;
         _commandEndpoint = new IPEndPoint(IPAddress.Loopback, commandPort);
+        _catalog = catalog ?? DcsBiosCatalog.ForAircraft;
+    }
+
+    // ------------------------------------------------------------ variables vigiladas (D:)
+
+    private readonly Func<string, IReadOnlyList<DcsControl>> _catalog;
+    private CompiledProfile? _profile;
+    /// <summary>Por variable vigilada: control de DCS-BIOS con salida entera, o null (no es D: o no se encontró).</summary>
+    private DcsControl?[] _watched = [];
+    private string? _resolvedFor;
+
+    /// <summary>
+    /// Prepara las variables D: del perfil (luces y condiciones): busca cada control en las
+    /// definiciones de DCS-BIOS del avión cargado o, si aún no hay, del primero "dcs:" del perfil.
+    /// Se vuelve a hacer al cambiar de avión.
+    /// </summary>
+    public void Prepare(CompiledProfile profile)
+    {
+        _profile = profile;
+        _resolvedFor = null;
+        _watched = new DcsControl?[profile.WatchedVars.Length];
+        ResolveWatched();
+    }
+
+    private void ResolveWatched()
+    {
+        if (_profile is null || !_profile.WatchedVars.Any(v => v.IsDcs)) return;
+        var aircraft = Aircraft ?? _profile.Aircraft.FirstOrDefault(a => a.StartsWith("dcs:", StringComparison.Ordinal));
+        if (aircraft is null || aircraft == _resolvedFor) return;
+        _resolvedFor = aircraft;
+
+        var controls = _catalog(aircraft);
+        var missing = new List<string>();
+        var vars = _profile.WatchedVars;
+        for (var i = 0; i < vars.Length; i++)
+        {
+            if (!vars[i].IsDcs) continue;
+            var name = vars[i].Name[2..];
+            var c = controls.FirstOrDefault(x => x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            _watched[i] = c is { Address: not null } ? c : null;
+            if (_watched[i] is null) missing.Add(c is null ? vars[i].Name : $"{vars[i].Name} (sin valor numérico)");
+        }
+        if (controls.Count == 0)
+            Log.Warning($"DCS-BIOS: no hay definiciones de controles para {aircraft}; las condiciones D: no tendrán valor.");
+        else if (missing.Count > 0)
+            Log.Warning($"DCS-BIOS: {aircraft} no tiene {string.Join(", ", missing)}; esas condiciones no se cumplirán.");
+    }
+
+    /// <summary>
+    /// Escribe en <paramref name="values"/> (índices de WatchedVars) el valor actual de cada variable D:.
+    /// Sin datos de DCS-BIOS, NaN. No toca las demás. Sin asignaciones.
+    /// </summary>
+    public void Fill(double[] values)
+    {
+        var vars = _profile?.WatchedVars;
+        if (vars is null) return;
+        var n = Math.Min(values.Length, _watched.Length);
+        for (var i = 0; i < n; i++)
+        {
+            if (!vars[i].IsDcs) continue;
+            values[i] = IsActive && _watched[i] is { } c && c.Read(_image) is { } v ? v : double.NaN;
+        }
     }
 
     private readonly int _exportPort;
@@ -176,6 +240,7 @@ public sealed class DcsBiosOutput : IDisposable
         if (Aircraft is null) return;
 
         Log.Info($"DCS-BIOS: avión cargado: {Aircraft}");
+        ResolveWatched();
         AircraftChanged?.Invoke("dcs:" + Aircraft.ToLowerInvariant());
     }
 

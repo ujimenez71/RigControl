@@ -129,10 +129,12 @@ public sealed class RunSession : IDisposable
     {
         public void OnAction(Binding binding, ActionPhase phase, long timeMs) => inner.OnAction(binding, phase, timeMs);
 
+        public double[] Values => inner.Values; // para las condiciones "state"
+
         public void Tick(long timeMs)
         {
-            inner.Tick(timeMs); // incluye SimConnect: aquí llegan los valores nuevos
-            lights.Update(session._sim.Values, session._sim.IsConnected, timeMs);
+            inner.Tick(timeMs); // incluye SimConnect y DCS-BIOS: aquí llegan los valores nuevos
+            lights.Update(inner.Values, session._sim.IsConnected || session._dcs.IsActive, timeMs);
         }
 
         public void ProfileLoaded(CompiledProfile profile)

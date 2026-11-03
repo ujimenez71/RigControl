@@ -59,7 +59,7 @@
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
                                     <CheckBox Content="NO" IsChecked="{Binding Negate}" VerticalAlignment="Center" Margin="0,0,6,0"
-                                              ToolTip="Niega la pieza: se cumple cuando la entrada NO se mantiene / la capa NO está activa" />
+                                              ToolTip="Niega la pieza: se cumple cuando la entrada NO se mantiene / la capa NO está activa / el estado NO se da" />
                                     <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:ConditionEditViewModel.Kinds}" DisplayMemberPath="Label"
                                               SelectedValuePath="Value" SelectedValue="{Binding Kind}" />
                                     <DockPanel Grid.Row="1" Grid.Column="1" Margin="0,4,0,0"
@@ -72,6 +72,10 @@
                                     <ComboBox Grid.Row="1" Grid.Column="1" Margin="0,4,0,0" SelectedItem="{Binding Layer}"
                                               ItemsSource="{Binding DataContext.LayerNames, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                               Visibility="{Binding IsLayer, Converter={StaticResource BoolToVisibility}}" />
+                                    <TextBox Grid.Row="1" Grid.Column="1" Margin="0,4,0,0" FontFamily="Cascadia Mono, Consolas"
+                                             Text="{Binding State, UpdateSourceTrigger=PropertyChanged}"
+                                             Visibility="{Binding IsState, Converter={StaticResource BoolToVisibility}}"
+                                             ToolTip="Valor que lee el simulador al pulsar. DCS: D:PLT_EXTL_ACOL_L_SW=2 (posición 0, 1, 2...). MSFS: A:GEAR HANDLE POSITION, Bool=1 o L:Var&gt;3. Operadores &gt; &gt;= &lt; &lt;= = y rangos =a..b; sin operador = distinto de 0. Sin datos del simulador no se cumple." />
                                     <Button Grid.Column="2" Content="✕" Click="RemoveTerm_Click" Margin="4,0,0,0"
                                             Style="{StaticResource SmallButton}" ToolTip="Quitar esta pieza" />
                                 </Grid>
@@ -407,10 +411,10 @@
                                                         <CheckBox Content="NO" IsChecked="{Binding Negate}" VerticalAlignment="Center" Margin="0,0,6,0"
                                                                   ToolTip="Niega la condición"
                                                                   Visibility="{Binding IsParts, Converter={StaticResource BoolToVisibility}}" />
-                                                        <ComboBox Grid.Column="1" IsEditable="True" ItemsSource="{x:Static vm:LightTermViewModel.CommonVars}"
+                                                        <ComboBox Grid.Column="1" IsEditable="True" ItemsSource="{Binding DataContext.LightVars, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                   Text="{Binding Variable, UpdateSourceTrigger=LostFocus}" Margin="0,0,6,0"
                                                                   FontFamily="Cascadia Mono, Consolas" FontSize="12"
-                                                                  ToolTip="A:VARIABLE (simvar de MSFS, con :índice si hace falta) o L:Variable"
+                                                                  ToolTip="A:VARIABLE (simvar de MSFS, con :índice si hace falta), L:Variable o D:CONTROL (DCS-BIOS, sin unidades)"
                                                                   Visibility="{Binding IsParts, Converter={StaticResource BoolToVisibility}}" />
                                                         <TextBox Grid.Column="2" Text="{Binding Unit, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,6,0"
                                                                  ToolTip="Unidades: vacío = Number; Volts, psi, percent, inHg, Amperes..."

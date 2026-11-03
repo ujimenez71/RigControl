@@ -239,6 +239,7 @@ public sealed class SimConnectOutput : ISimOutput, IDisposable
         var vars = _profile!.WatchedVars;
         for (var i = 0; i < vars.Length; i++)
         {
+            if (vars[i].IsDcs) continue; // D: = DCS-BIOS, no se le pide a MSFS
             var id = _nextWatch++;
             SimConnect_AddToDataDefinition(_handle, id, vars[i].DatumName, vars[i].Unit, 4 /* FLOAT64 */, 0.001f, uint.MaxValue);
             Remember($"{vars[i]} (luces)");

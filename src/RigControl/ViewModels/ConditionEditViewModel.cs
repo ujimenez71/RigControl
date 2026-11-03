@@ -4,36 +4,44 @@ using RigControl.Core.Bindings;
 namespace RigControl.ViewModels;
 
 public enum ConditionMode { None, All, Any }
-public enum TermKind { Input, Layer }
+public enum TermKind { Input, Layer, State }
 
 public sealed record ModeOption(ConditionMode Value, string Label);
 public sealed record TermKindOption(TermKind Value, string Label);
 
-/// <summary>Una pieza de una condición: "se mantiene esta entrada" o "esta capa está activa", opcionalmente negada.</summary>
+/// <summary>
+/// Una pieza de una condición: "se mantiene esta entrada", "esta capa está activa" o "estado del
+/// simulador" (D:CONTROL=2, A:VAR&gt;5...), opcionalmente negada. En el estado, NO se guarda como "!"
+/// dentro del texto (sin datos del simulador no se cumple, ni negada).
+/// </summary>
 public sealed class ConditionTermViewModel(ConditionEditViewModel owner) : ObservableObject
 {
     private TermKind _kind = TermKind.Input;
     private bool _negate;
     private string _input = "";
     private string _layer = "";
+    private string _state = "";
 
     public ConditionEditViewModel Owner { get; } = owner;
 
     public TermKind Kind
     {
         get => _kind;
-        set { if (Set(ref _kind, value)) { Raise(nameof(IsInput)); Raise(nameof(IsLayer)); Owner.OnChanged(); } }
+        set { if (Set(ref _kind, value)) { Raise(nameof(IsInput)); Raise(nameof(IsLayer)); Raise(nameof(IsState)); Owner.OnChanged(); } }
     }
 
     public bool Negate { get => _negate; set { if (Set(ref _negate, value)) Owner.OnChanged(); } }
     public string Input { get => _input; set { if (Set(ref _input, value.Trim())) Owner.OnChanged(); } }
     public string Layer { get => _layer; set { if (Set(ref _layer, value ?? "")) Owner.OnChanged(); } }
+    public string State { get => _state; set { if (Set(ref _state, value.Trim())) Owner.OnChanged(); } }
 
     public bool IsInput => _kind == TermKind.Input;
     public bool IsLayer => _kind == TermKind.Layer;
+    public bool IsState => _kind == TermKind.State;
 
     public ConditionFile ToFile()
     {
+        if (_kind == TermKind.State) return new ConditionFile { State = (_negate ? "!" : "") + _state };
         var c = _kind == TermKind.Input ? new ConditionFile { Input = _input } : new ConditionFile { Layer = _layer };
         return _negate ? new ConditionFile { Not = c } : c;
     }
@@ -63,6 +71,7 @@ public sealed class ConditionEditViewModel : ObservableObject
     [
         new(TermKind.Input, "Se mantiene la entrada"),
         new(TermKind.Layer, "Está activa la capa"),
+        new(TermKind.State, "Estado del simulador"),
     ];
 
     private ConditionMode _mode;
@@ -149,7 +158,7 @@ public sealed class ConditionEditViewModel : ObservableObject
             return vm;
         }
         var list = c.All ?? c.Any;
-        var onlyList = (c.All is null) != (c.Any is null) && c.Input is null && c.Layer is null && c.Not is null;
+        var onlyList = (c.All is null) != (c.Any is null) && c.Input is null && c.Layer is null && c.State is null && c.Not is null;
         if (onlyList && list!.Count > 0)
         {
             var terms = new List<ConditionTermViewModel>();
@@ -183,15 +192,25 @@ public sealed class ConditionEditViewModel : ObservableObject
     {
         term = new ConditionTermViewModel(owner);
         var negate = false;
-        if (c.Not is not null && c.Input is null && c.Layer is null && c.All is null && c.Any is null)
+        if (c.Not is not null && c.Input is null && c.Layer is null && c.State is null && c.All is null && c.Any is null)
         {
+            // {"not": {"state": ...}} se cumple sin datos (no es lo mismo que "!"): se deja como compleja.
+            if (c.Not.State is not null) return false;
             negate = true;
             c = c.Not;
         }
         if (c.All is not null || c.Any is not null || c.Not is not null) return false;
-        if (c.Input is not null && c.Layer is null) { term.Input = c.Input; term.Kind = TermKind.Input; }
-        else if (c.Layer is not null && c.Input is null) { term.Layer = c.Layer; term.Kind = TermKind.Layer; }
-        else return false;
+        var set = (c.Input is not null ? 1 : 0) + (c.Layer is not null ? 1 : 0) + (c.State is not null ? 1 : 0);
+        if (set != 1) return false;
+        if (c.Input is not null) { term.Input = c.Input; term.Kind = TermKind.Input; }
+        else if (c.Layer is not null) { term.Layer = c.Layer; term.Kind = TermKind.Layer; }
+        else
+        {
+            var text = c.State!.Trim();
+            negate = text.StartsWith('!');
+            term.State = negate ? text[1..].TrimStart() : text;
+            term.Kind = TermKind.State;
+        }
         term.Negate = negate;
         return true;
     }

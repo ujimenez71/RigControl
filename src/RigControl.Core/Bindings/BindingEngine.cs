@@ -9,6 +9,9 @@ public interface IActionSink
 
     /// <summary>Se llama al arrancar y en cada recarga, antes de usar el perfil.</summary>
     void ProfileLoaded(CompiledProfile profile) { }
+
+    /// <summary>Valores actuales de CompiledProfile.WatchedVars, para las condiciones "state" (NaN = sin dato).</summary>
+    double[] Values => [];
 }
 
 /// <summary>
@@ -23,7 +26,7 @@ public interface IActionSink
 ///  - double: segunda pulsación dentro de doubleMs tras soltar la primera; anula el short.
 ///  - sequence: pasos en orden, cada uno dentro de sequenceMs del anterior. Pulsar otra entrada
 ///    con bindings la rompe; las entradas que solo son modificadores no.
-///  - Las condiciones se evalúan al pulsar. Entre bindings del mismo disparador, los condicionados
+///  - Las condiciones (entradas, capas y estado del simulador) se evalúan al pulsar. Entre bindings del mismo disparador, los condicionados
 ///    que se cumplen tienen prioridad; si no se cumple ninguno, se disparan los que no tienen condición.
 /// Sin asignaciones en SetInput/Tick.
 /// </summary>
@@ -157,9 +160,10 @@ public sealed class BindingEngine
                 Fire(g[(int)Gesture.Short], ActionPhase.Trigger, t); // venció antes del Tick: con las condiciones de su pulsación
         }
 
+        var values = _sink.Values;
         foreach (var list in g)
             foreach (var b in list)
-                b.Matched = b.When?.Evaluate(_down) ?? true;
+                b.Matched = b.When?.Evaluate(_down, values) ?? true;
 
         _downAt[slot] = t;
         _longFired[slot] = false;
@@ -232,7 +236,7 @@ public sealed class BindingEngine
 
                 seq.Progress = 0;
                 foreach (var b in seq.Bindings)
-                    b.Matched = b.When?.Evaluate(_down) ?? true;
+                    b.Matched = b.When?.Evaluate(_down, _sink.Values) ?? true;
                 Fire(seq.Bindings, ActionPhase.Trigger, t);
             }
             else

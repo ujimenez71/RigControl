@@ -23,6 +23,7 @@ internal static class Program
                      ("Repetición", RepeatTests.Run),
                      ("Luces", LightTests.Run),
                      ("DCS-BIOS", DcsTests.Run),
+                     ("Estado del simulador", StateTests.Run),
                      ("Descripciones", DescribeTests.Run),
                      ("Simulador del perfil", SimTests.Run),
                      ("Guardar perfiles", SaveTests.Run),

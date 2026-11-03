@@ -13,6 +13,8 @@ public sealed class ProfileCompiler
     private readonly Dictionary<InputRef, int> _slots = [];
     private readonly Dictionary<string, Condition> _layers = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _layersInProgress = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Variables del simulador vigiladas (luces y condiciones "state"), sin repetir.</summary>
+    private readonly List<SimVarSpec> _vars = [];
     private int _hysteresis;
 
     private static readonly string[] AxisNames = ["x", "y", "z", "rx", "ry", "rz", "s0", "s1"];
@@ -97,7 +99,7 @@ public sealed class ProfileCompiler
         foreach (var name in _file.Layers.Keys)
             ResolveLayer(name);
 
-        var (lights, watched) = CompileLights();
+        var lights = CompileLights();
 
         var bindings = new List<Binding>();
         for (var i = 0; i < _file.Bindings.Count; i++)
@@ -105,6 +107,8 @@ public sealed class ProfileCompiler
             var b = CompileBinding(_file.Bindings[i], i + 1);
             if (b is not null) bindings.Add(b);
         }
+
+        CheckVarsMatchSim(sim);
 
         return new CompiledProfile
         {
@@ -114,7 +118,7 @@ public sealed class ProfileCompiler
             Sim = sim,
             Aircraft = [.. _file.Aircraft.Select(a => a.Trim().Replace('/', '\\').ToLowerInvariant())],
             Lights = lights,
-            WatchedVars = watched,
+            WatchedVars = [.. _vars],
             DeviceAliases = [.. _aliases],
             DeviceKeys = [.. _keys],
             Inputs = [.. _inputs],
@@ -192,19 +196,28 @@ public sealed class ProfileCompiler
 
     // ---------------------------------------------------------------- luces
 
-    /// <summary>"lights": { "NombreLuz": "condición" | ["condición", ...] } -> reglas y variables a vigilar.</summary>
-    private (LightRule[] Rules, SimVarSpec[] Vars) CompileLights()
+    /// <summary>Índice de una variable vigilada (la añade si no estaba). Luces y condiciones comparten la lista.</summary>
+    private int VarIndex(SimVarSpec spec)
     {
-        var vars = new List<SimVarSpec>();
-        int VarIndex(SimVarSpec spec)
-        {
-            var i = vars.FindIndex(v => v.Name.Equals(spec.Name, StringComparison.OrdinalIgnoreCase) &&
-                                        v.Unit.Equals(spec.Unit, StringComparison.OrdinalIgnoreCase));
-            if (i >= 0) return i;
-            vars.Add(spec);
-            return vars.Count - 1;
-        }
+        var i = _vars.FindIndex(v => v.Name.Equals(spec.Name, StringComparison.OrdinalIgnoreCase) &&
+                                     v.Unit.Equals(spec.Unit, StringComparison.OrdinalIgnoreCase));
+        if (i >= 0) return i;
+        _vars.Add(spec);
+        return _vars.Count - 1;
+    }
 
+    /// <summary>D: solo en perfiles de DCS (o generales); A:/L: solo en los de MSFS (o generales).</summary>
+    private void CheckVarsMatchSim(SimKind sim)
+    {
+        if (sim == SimKind.Msfs && _vars.FirstOrDefault(v => v.IsDcs) is { } d)
+            _errors.Add($"{d.Name}: es un control de DCS-BIOS y el perfil es de MSFS.");
+        if (sim == SimKind.Dcs && _vars.FirstOrDefault(v => !v.IsDcs) is { } m)
+            _errors.Add($"{m.Name}: es una variable de MSFS y el perfil es de DCS (usa \"D:CONTROL\").");
+    }
+
+    /// <summary>"lights": { "NombreLuz": "condición" | ["condición", ...] } -> reglas (las variables van a _vars).</summary>
+    private LightRule[] CompileLights()
+    {
         var rules = new List<LightRule>();
         var seen = BravoLed.None;
         foreach (var (name, value) in _file.Lights)
@@ -249,7 +262,7 @@ public sealed class ProfileCompiler
                 rules.Add(new LightRule(led, Enum.GetName(led)!, [.. conditions], string.Join(" Y ", texts)));
         }
 
-        return ([.. rules], [.. vars]);
+        return [.. rules];
     }
 
     private static bool TryParseGesture(string? text, out Gesture gesture)
@@ -283,12 +296,22 @@ public sealed class ProfileCompiler
 
     private Condition? CompileCondition(ConditionFile c, string where)
     {
-        var set = (c.Input is not null ? 1 : 0) + (c.Layer is not null ? 1 : 0) +
+        var set = (c.Input is not null ? 1 : 0) + (c.Layer is not null ? 1 : 0) + (c.State is not null ? 1 : 0) +
                   (c.All is not null ? 1 : 0) + (c.Any is not null ? 1 : 0) + (c.Not is not null ? 1 : 0);
         if (set != 1)
         {
-            _errors.Add($"{where}: cada condición debe tener exactamente una de input, layer, all, any o not.");
+            _errors.Add($"{where}: cada condición debe tener exactamente una de input, layer, state, all, any o not.");
             return null;
+        }
+
+        if (c.State is not null)
+        {
+            if (!LightParser.TryParse(c.State, VarIndex, out var state, out var error))
+            {
+                _errors.Add($"{where}: {error}");
+                return null;
+            }
+            return new StateCondition(state, c.State.Trim());
         }
 
         if (c.Input is not null)

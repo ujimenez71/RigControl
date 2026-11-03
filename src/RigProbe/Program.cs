@@ -242,25 +242,30 @@ internal static class Program
         return null;
     }
 
-    /// <summary>Muestra cada segundo los valores que llegan de MSFS para las variables de luces del perfil.</summary>
+    /// <summary>
+    /// Muestra cada segundo los valores de las variables del perfil (luces y condiciones "state"):
+    /// A:/L: de MSFS y D: de DCS-BIOS, igual que los ve "run".
+    /// </summary>
     private static void SimVars(string profileName, int seconds)
     {
         var profile = ProfileLoader.LoadAndCheck(ProfileFile.Resolve(profileName), verbose: false);
         if (profile is null) return;
         using var sim = new SimConnectOutput();
-        sim.Prepare(profile);
+        using var dcs = new DcsBiosOutput();
+        using var values = new ActionDispatcher(null, sim, dryRun: true, dcs); // solo para juntar los valores
+        values.ProfileLoaded(profile);
         var vars = profile.WatchedVars;
         var clock = System.Diagnostics.Stopwatch.StartNew();
         long next = 1000;
         while (clock.ElapsedMilliseconds < seconds * 1000L)
         {
-            sim.Tick(clock.ElapsedMilliseconds);
+            values.Tick(clock.ElapsedMilliseconds);
             if (clock.ElapsedMilliseconds >= next)
             {
                 next += 1000;
-                Console.WriteLine($"--- {clock.ElapsedMilliseconds / 1000} s  conectado={sim.IsConnected}");
+                Console.WriteLine($"--- {clock.ElapsedMilliseconds / 1000} s  MSFS={sim.IsConnected}  DCS-BIOS={dcs.IsActive} ({dcs.Aircraft ?? "-"})");
                 for (var i = 0; i < vars.Length; i++)
-                    Console.WriteLine($"  {vars[i].Name,-40} {vars[i].Unit,-8} {sim.Values[i]}");
+                    Console.WriteLine($"  {vars[i].Name,-40} {(vars[i].IsDcs ? "" : vars[i].Unit),-8} {values.Values[i]}");
             }
             Thread.Sleep(20);
         }

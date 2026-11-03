@@ -102,6 +102,12 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
     public static CompareOption[] Compares => LightTermViewModel.Compares;
     public static string[] CommonVars => LightTermViewModel.CommonVars;
 
+    /// <summary>
+    /// Variables sugeridas para las luces: con controles de DCS-BIOS (perfil de DCS o DCS en marcha),
+    /// los que tienen valor numérico como "D:CONTROL"; si no, las A: frecuentes de MSFS.
+    /// </summary>
+    public string[] LightVars { get; private set; } = LightTermViewModel.CommonVars;
+
     // ------------------------------------------------------------ capas
 
     public void NewLayer()
@@ -296,6 +302,9 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         _dcsControlsFor = aircraft;
         _dcsControls = aircraft is null ? [] : DcsBiosCatalog.ForAircraft(aircraft);
         foreach (var b in Bindings) b.DcsControls = _dcsControls;
+        var dcsVars = _dcsControls.Where(c => c.Address is not null).Select(c => "D:" + c.Name).Distinct().Order().ToArray();
+        LightVars = dcsVars.Length > 0 ? dcsVars : LightTermViewModel.CommonVars;
+        Raise(nameof(LightVars));
         RefreshSuggestions();
     }
 
@@ -518,21 +527,34 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         var key = System.Text.Json.JsonSerializer.Serialize(file.Lights);
         if (key == _liveKey) return;
         _liveKey = key;
-        var (profile, _) = ProfileCompiler.Compile(new ProfileFile { Name = "luces", Lights = file.Lights });
+        var (profile, _) = ProfileCompiler.Compile(new ProfileFile
+        {
+            Name = "luces", Lights = file.Lights, Sim = file.Sim, Aircraft = file.Aircraft, // D: se buscan en el avión del perfil
+        });
         _liveProfile = profile;
-        if (profile is not null) _sim.Prepare(profile);
+        if (profile is null) return;
+        _sim.Prepare(profile);
+        _dcs.Prepare(profile);
+        _liveValues = new double[profile.WatchedVars.Length];
     }
+
+    private double[] _liveValues = [];
 
     private void UpdateLiveLights()
     {
-        var values = _sim.Values;
+        // A:/L: de MSFS y D: de DCS-BIOS, por el índice de WatchedVars (como ActionDispatcher.Values).
+        var values = _liveValues;
+        var fromSim = _sim.Values;
+        for (var i = 0; i < values.Length; i++) values[i] = i < fromSim.Length ? fromSim[i] : double.NaN;
+        _dcs.Fill(values);
+        var connected = _sim.IsConnected || _dcs.IsActive;
         foreach (var light in Lights)
         {
             var rule = _liveProfile?.Lights.FirstOrDefault(r => r.Name == light.Led);
-            if (rule is null || !_sim.IsConnected || values.Length == 0)
+            if (rule is null || !connected || values.Length == 0)
             {
                 light.LiveOn = null;
-                light.LiveState = _sim.IsConnected ? "" : "sin MSFS";
+                light.LiveState = connected ? "" : "sin simulador";
                 foreach (var t in light.Terms) t.Live = "";
                 continue;
             }

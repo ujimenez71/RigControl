@@ -8,7 +8,8 @@
     "colectivo": "3344:832E:080B2200"
   },
   "bindings": [
-    {"input":"colectivo:b18","gesture":"press","action":"D:PLT_EXTL_ACOL_L_SW 2"},
+    {"input":"colectivo:b18","gesture":"press","when":{"state":"D:PLT_EXTL_ACOL_L_SW=1"},"action":"D:PLT_EXTL_ACOL_L_SW 2","desc":"Anticolisión: si está en OFF, a WHT"},
+    {"input":"colectivo:b18","gesture":"press","action":"D:PLT_EXTL_ACOL_L_SW 1","desc":"Anticolisión: si no está en OFF, a OFF"},
     {"input":"colectivo:b20","gesture":"press","action":"D:PLT_EXTL_ACOL_L_SW 1"}
   ]
 }

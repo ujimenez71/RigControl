@@ -95,7 +95,7 @@ public sealed partial class LightTermViewModel(LightEditViewModel owner) : Obser
         }
     }
 
-    [GeneratedRegex(@"^\s*(!)?\s*([AaLl]:[^,<>=]+?)\s*(?:,\s*([^<>=]+?))?\s*(?:(>=|<=|>|<|=)\s*(-?\d+(?:\.\d+)?)(?:\.\.(-?\d+(?:\.\d+)?))?)?\s*$")]
+    [GeneratedRegex(@"^\s*(!)?\s*([AaLlDd]:[^,<>=]+?)\s*(?:,\s*([^<>=]+?))?\s*(?:(>=|<=|>|<|=)\s*(-?\d+(?:\.\d+)?)(?:\.\.(-?\d+(?:\.\d+)?))?)?\s*$")]
     private static partial Regex Pattern();
 
     public static LightTermViewModel FromText(LightEditViewModel owner, string text)
