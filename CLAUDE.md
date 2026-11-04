@@ -185,14 +185,19 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
     b5 lado derecho de la cabeza; hat de arriba b20 U, b21 R, b22 D, b23 L, centro b24 (diagonal =
     dos botones); hat del pulgar b28 U, b29 R, b30 D, b31 L (sin centro; en "Hat switch mode" de
     Pit House pasa a ser Hat 1 POV y desaparecen b28-b31); hat de debajo del pulgar b11 U, b12 R,
-    b13 D, b14 L; hat central (debajo de b2) b7 U, b9 R, b8 D, b10 L; hat de la izquierda b15 U,
+    b13 D, b14 L; hat central (debajo de b2) b7 U, b9 D, b8 R, b10 L (igual que el TMS del A-10C
+    del usuario; verificado con George); hat de la izquierda b15 U,
     b16 R, b17 D, b18 L, centro b19; basculante b26 arriba / b25 abajo. Asignación: gatillo ->
     TRIGGER Half(1)/Full(2); hat del pulgar = Force Trim/Hold (b28 = R/Up lo tiene DCS asignado
     en `MOZA AB9 FFB Base {03447680...}.diff.lua`: NO duplicar), b30 D, b31 AT, b29 AL; hat de
     arriba = Weapons Action (G/A/R/M), centro = ATA Cage; hat de la izquierda = Symbology (U/D,
     centro = Depress) + RTS (L RADIO / R ICS); b5 = RTS Depress (solo acepta TOGGLE, sin salida:
-    no se ve en `dcs vigilar`); b2 Flare; basculante Chaff / FMC Release. Libres: hat central y
-    hat de debajo del pulgar. OJO: DCS-BIOS tiene al revés las etiquetas de WEAPON_LR (0 dice "M"
+    no se ve en `dcs vigilar`); b2 Flare; basculante Chaff / FMC Release. George (IA del CPG)
+    asignado EN DCS por el usuario (04/11/2026, ✅ funciona; no está en DCS-BIOS y las teclas
+    W/A/S/D chocarían): perfil de controles aparte "AH-64D George AI Helper"
+    (`Config\Input\AH-64D_BLK_II_AI_Menu`, activo solo con el menú abierto) = hat central
+    Up/Down/Left/Right + Hide b11; en el del piloto Show/Hide b11, Multifunctional Input (Center)
+    b13, TADS Store Target b14. Libre en el Moza para el Apache: b12 (y b3, b4, que usa el A-10C). OJO: DCS-BIOS tiene al revés las etiquetas de WEAPON_LR (0 dice "M"
     pero en cabina es R = cohetes a la izquierda; 2 = misiles a la derecha), verificado en cabina.
     b1, b13, b25, b30, b36 no salieron con nada.
     Cortes de DCS-BIOS (investigado el 03/11/2026): con DCS a pantalla completa, al cambiar a otra
