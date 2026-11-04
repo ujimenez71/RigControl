@@ -65,6 +65,7 @@
     {"input":"colectivo:b22","gesture":"press","action":"D:PLT_COLLECTIVE_FCR_SCAN 2","desc":"FCR Scan: S (single)"},
     {"input":"colectivo:b22","gesture":"release","action":"D:PLT_COLLECTIVE_FCR_SCAN 1","desc":"FCR Scan: Off"},
     {"input":"colectivo:b12","gesture":"hold","action":"D:PLT_COLLECTIVE_CURSOR_ENTER","desc":"Cursor Enter"},
+    {"input":"colectivo:b19","gesture":"hold","action":"D:PLT_COLLECTIVE_ALT_CURSOR_ENTER","desc":"Alternate Cursor Enter (gatillo)"},
     {"input":"colectivo:b20","gesture":"hold","action":"D:PLT_COLLECTIVE_CUED_SEARCH","desc":"CUED Search"},
     {"input":"colectivo:b23","gesture":"press","action":"D:PLT_COLLECTIVE_FCR_SCAN 0","desc":"FCR Scan: C (continuous)"},
     {"input":"colectivo:b23","gesture":"release","action":"D:PLT_COLLECTIVE_FCR_SCAN 1","desc":"FCR Scan: Off"},

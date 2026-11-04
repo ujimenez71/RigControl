@@ -165,6 +165,18 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
     cola y Missile Advance 1->0; todos vuelven a Off=1), y con `dcs vigilar` b12, b17, b22, b39, b43.
     ✅ COLECTIVO COMPLETO VERIFICADO. FCR Scan S es b22 (las asignaciones viejas de DCS decían b2).
     CHOP funciona con la funda cerrada; el jettison (b35) envía bien, sin comprobar con la funda.
+    PENDIENTE (03/11/2026, a seguir el 04/11): botones del colectivo que NO están en el perfil,
+    vistos con `monitor` en un repaso completo: b7 (justo tras el hat FCR Mode), b19 (justo tras
+    b7), b2 (tras el hat FCR Scan Size), b21 (varias veces, tras el hat Sight Select) y el eje Y
+    (recorrido completo; DCS no lo tiene asignado, el colectivo es X). ✅ b7/b2/b21 = pulsar el
+    centro de los hats FCR Mode / FCR Scan Size / Sight Select (confirmado el 04/11/2026); el real
+    no los tiene: se dejan SIN ASIGNAR (decisión del usuario). Único control del colectivo sin
+    botón en DCS-BIOS: PLT_COLLECTIVE_ALT_CURSOR_ENTER -> ✅ b19 (gatillo de la cabeza del
+    colectivo), hold, verificado con `dcs vigilar` (04/11/2026). Perfil: 62 bindings. Eje Y = palanca de fricción
+    del colectivo (frena la palanca físicamente); DCS no simula la fricción del colectivo del
+    Apache (solo "Power Levers Friction" de las palancas de motor), así que se deja sin asignar.
+    ✅ Todas las entradas del colectivo identificadas.
+    b1, b13, b25, b30, b36 no salieron con nada.
     Cortes de DCS-BIOS (investigado el 03/11/2026): con DCS a pantalla completa, al cambiar a otra
     ventana DCS se minimiza (dcs.log: "resize main window to [0, 0]") y sigue exportando; al
     VOLVER ("resize ... [3840, 2160]" + "ModelTimeQuantizer: ANTIFREEZE ENABLED") se congela y deja
