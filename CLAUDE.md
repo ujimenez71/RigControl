@@ -339,7 +339,8 @@ que los corrija) y se abre como borrador en el editor (nunca se guarda solo). Ne
 (guardarla cifrada, DPAPI). Antes de escribir código con la API, cargar la skill claude-api.
 Alternativa sin integración: pedírselo a Claude Code en la sesión.
 
-Otros pendientes (02/11/2026): probar en DCS las luces `D:` del Bravo (cuando vuelva a detectarse); renombrar archivo de perfil en
+Otros pendientes (02/11/2026): (el Bravo NO se usará con DCS, decisión del usuario del 04/11/2026:
+no hace falta probar luces `D:` en él; la función sigue disponible); renombrar archivo de perfil en
 el editor; editar secuencias/timing/histéresis; escribir A:; perfil de jet (el usuario NO tiene el F-15E aunque su carpeta está en `Mods\aircraft`); limpiar la instalación
 errónea de DCS-BIOS en `Saved Games\DCS` (inactiva); comprobar que el Yoke y el Bravo vuelven a
 detectarse (no aparecían en Windows el 02/11/2026 ni el 03/11/2026).
