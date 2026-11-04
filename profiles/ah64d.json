@@ -4,9 +4,10 @@
   "timing": {"longMs":500,"doubleMs":300,"sequenceMs":1000},
   "aircraft": ["dcs:ah-64d_blk_ii"],
   "axisHysteresis": 2,
-  "notes": "Colectivo VPC con puño AH-64D, puesto del piloto. Botones según las asignaciones de DCS de abril de 2025 (LEFT VPC Rotor TCS PLUS .diff.lua). Interruptores con muelle: posición al pulsar, Off al soltar. Ejes (colectivo y cursor) siguen en DCS. Completado con monitor el 03/11/2026: b18 Cursor Display, b23 FCR Scan C, b24 Missile Advance, b26 PLRT, b27 B/S, b22 FCR Scan S (no b2 como decía DCS).",
+  "notes": "Colectivo VPC con puño AH-64D, puesto del piloto. Botones según las asignaciones de DCS de abril de 2025 (LEFT VPC Rotor TCS PLUS .diff.lua). Interruptores con muelle: posición al pulsar, Off al soltar. Ejes (colectivo y cursor) siguen en DCS. Completado con monitor el 03/11/2026: b18 Cursor Display, b23 FCR Scan C, b24 Missile Advance, b26 PLRT, b27 B/S, b22 FCR Scan S (no b2 como decía DCS). b19 (gatillo) = Alt Cursor Enter (04/11/2026). Cíclico Moza MH16 (04/11/2026): hat del pulgar en modo botones de Pit House, b28 = Force Trim R/Up asignado en DCS (no duplicar); ejes del cíclico en DCS.",
   "devices": {
-    "colectivo": "3344:832E:080B2200"
+    "colectivo": "3344:832E:080B2200",
+    "moza": "346E:1000:470048001251353133383438"
   },
   "bindings": [
     {"input":"colectivo:b28","gesture":"press","action":"D:PLT_COLLECTIVE_SEARCHLIGHT 2","desc":"Foco: ON"},
@@ -70,6 +71,38 @@
     {"input":"colectivo:b23","gesture":"press","action":"D:PLT_COLLECTIVE_FCR_SCAN 0","desc":"FCR Scan: C (continuous)"},
     {"input":"colectivo:b23","gesture":"release","action":"D:PLT_COLLECTIVE_FCR_SCAN 1","desc":"FCR Scan: Off"},
     {"input":"colectivo:b24","gesture":"hold","action":"D:PLT_COLLECTIVE_MISSILE_ADVANCE","desc":"Missile Advance"},
-    {"input":"colectivo:b18","gesture":"hold","action":"D:PLT_COLLECTIVE_CURSOR_DISPLAY","desc":"Cursor Display Select"}
+    {"input":"colectivo:b18","gesture":"hold","action":"D:PLT_COLLECTIVE_CURSOR_DISPLAY","desc":"Cursor Display Select"},
+    {"input":"moza:b1","gesture":"press","action":"D:PLT_CYCLIC_TRIGGER 1","desc":"Gatillo: primer tope (Half)"},
+    {"input":"moza:b1","gesture":"release","action":"D:PLT_CYCLIC_TRIGGER 0","desc":"Gatillo: Off"},
+    {"input":"moza:b6","gesture":"press","action":"D:PLT_CYCLIC_TRIGGER 2","desc":"Gatillo: a fondo (Full)"},
+    {"input":"moza:b6","gesture":"release","action":"D:PLT_CYCLIC_TRIGGER 1","desc":"Gatillo: vuelve al primer tope"},
+    {"input":"moza:b30","gesture":"press","action":"D:PLT_CYCLIC_TRIM_UD 0","desc":"Force Trim/Hold: D (abajo)"},
+    {"input":"moza:b30","gesture":"release","action":"D:PLT_CYCLIC_TRIM_UD 1","desc":"Force Trim/Hold: Off"},
+    {"input":"moza:b31","gesture":"press","action":"D:PLT_CYCLIC_TRIM_LR 0","desc":"Force Trim/Hold: AT (izquierda)"},
+    {"input":"moza:b31","gesture":"release","action":"D:PLT_CYCLIC_TRIM_LR 1","desc":"Force Trim/Hold: Off"},
+    {"input":"moza:b29","gesture":"press","action":"D:PLT_CYCLIC_TRIM_LR 2","desc":"Force Trim/Hold: AL (derecha)"},
+    {"input":"moza:b29","gesture":"release","action":"D:PLT_CYCLIC_TRIM_LR 1","desc":"Force Trim/Hold: Off"},
+    {"input":"moza:b20","gesture":"press","action":"D:PLT_CYCLIC_WEAPON_UD 2","desc":"Weapons Action: G (arriba)"},
+    {"input":"moza:b20","gesture":"release","action":"D:PLT_CYCLIC_WEAPON_UD 1","desc":"Weapons Action: Off"},
+    {"input":"moza:b22","gesture":"press","action":"D:PLT_CYCLIC_WEAPON_UD 0","desc":"Weapons Action: A (abajo)"},
+    {"input":"moza:b22","gesture":"release","action":"D:PLT_CYCLIC_WEAPON_UD 1","desc":"Weapons Action: Off"},
+    {"input":"moza:b23","gesture":"press","action":"D:PLT_CYCLIC_WEAPON_LR 0","desc":"Weapons Action: R (izquierda)"},
+    {"input":"moza:b23","gesture":"release","action":"D:PLT_CYCLIC_WEAPON_LR 1","desc":"Weapons Action: Off"},
+    {"input":"moza:b21","gesture":"press","action":"D:PLT_CYCLIC_WEAPON_LR 2","desc":"Weapons Action: M (derecha)"},
+    {"input":"moza:b21","gesture":"release","action":"D:PLT_CYCLIC_WEAPON_LR 1","desc":"Weapons Action: Off"},
+    {"input":"moza:b24","gesture":"hold","action":"D:PLT_CYCLIC_ATA_CAGE","desc":"ATA Missile Cage/Uncage"},
+    {"input":"moza:b15","gesture":"press","action":"D:PLT_CYCLIC_SYMBOLOGY 2","desc":"Symbology Select: arriba"},
+    {"input":"moza:b15","gesture":"release","action":"D:PLT_CYCLIC_SYMBOLOGY 1","desc":"Symbology Select: Off"},
+    {"input":"moza:b17","gesture":"press","action":"D:PLT_CYCLIC_SYMBOLOGY 0","desc":"Symbology Select: abajo"},
+    {"input":"moza:b17","gesture":"release","action":"D:PLT_CYCLIC_SYMBOLOGY 1","desc":"Symbology Select: Off"},
+    {"input":"moza:b19","gesture":"hold","action":"D:PLT_CYCLIC_SYMBOLOGY_PRESS","desc":"Symbology Select: pulsar"},
+    {"input":"moza:b18","gesture":"press","action":"D:PLT_CYCLIC_RTS 0","desc":"PTT/RTS: RADIO (izquierda)"},
+    {"input":"moza:b18","gesture":"release","action":"D:PLT_CYCLIC_RTS 1","desc":"PTT/RTS: Off"},
+    {"input":"moza:b16","gesture":"press","action":"D:PLT_CYCLIC_RTS 2","desc":"PTT/RTS: ICS (derecha)"},
+    {"input":"moza:b16","gesture":"release","action":"D:PLT_CYCLIC_RTS 1","desc":"PTT/RTS: Off"},
+    {"input":"moza:b5","gesture":"press","action":"D:PLT_CYCLIC_RTS_PRESS TOGGLE","desc":"PTT/RTS: pulsar (RTS)"},
+    {"input":"moza:b2","gesture":"hold","action":"D:PLT_CYCLIC_FLARE","desc":"Flare"},
+    {"input":"moza:b26","gesture":"hold","action":"D:PLT_CYCLIC_CHAFF","desc":"Chaff"},
+    {"input":"moza:b25","gesture":"hold","action":"D:PLT_CYCLIC_FMC_RELEASE","desc":"FMC Release"}
   ]
 }
