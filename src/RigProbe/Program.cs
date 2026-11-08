@@ -1,6 +1,7 @@
 using HidSharp;
 using RigControl.Core;
 using RigControl.Core.Bindings;
+using RigControl.Core.Hangar;
 using Vortice.DirectInput;
 
 namespace RigProbe;
@@ -76,6 +77,9 @@ internal static class Program
                     return DcsSend(args[2], readOnly: true);
                 DcsWatch(args.Length > 1 && int.TryParse(args[1], out var dsecs) ? dsecs : 15);
                 return 0;
+            case "hangar":
+                return HangarCommand(args.Skip(1).Where(a => !a.Equals("--dry", StringComparison.OrdinalIgnoreCase)).FirstOrDefault(),
+                                     args.Any(a => a.Equals("--dry", StringComparison.OrdinalIgnoreCase)));
             case "sim" when args.Length > 2 && args[1].Equals("vars", StringComparison.OrdinalIgnoreCase):
                 SimVars(args[2], args.Length > 3 && int.TryParse(args[3], out var secs) ? secs : 10);
                 return 0;
@@ -86,10 +90,60 @@ internal static class Program
             default:
                 Console.WriteLine("Uso: RigProbe list [all] | monitor | catalog | bravo-test | check <perfil> | run <perfil>|auto [--dry]");
                 Console.WriteLine("            | sim | sim eventos [filtro] | sim vars <perfil> [s] | dcs [s] | dcs enviar CONTROL [VALOR] | dcs leer CONTROL");
-                Console.WriteLine("            | dcs vigilar [filtro]");
+                Console.WriteLine("            | dcs vigilar [filtro] | hangar [nombre [--dry]]");
                 Console.WriteLine($"  <perfil> es una ruta a un .json o un nombre en {ProfileFile.ProfilesDir}");
                 return 1;
         }
+    }
+
+    // ----------------------------------------------------------------- hangar
+
+    /// <summary>"hangar": estado de todos. "hangar X --dry": lo que haría. "hangar X": abre la secuencia (Ctrl+C cancela).</summary>
+    private static int HangarCommand(string? name, bool dryRun)
+    {
+        var file = HangarFile.Load();
+        var runner = new HangarRunner();
+        var chosen = name is null ? file.Hangars : file.Hangars.Where(h => h.Name.Equals(name, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (chosen.Count == 0)
+        {
+            Console.WriteLine(name is null
+                ? $"No hay hangares en {HangarFile.DefaultPath}"
+                : $"No existe el hangar \"{name}\". Hay: {string.Join(", ", file.Hangars.Select(h => h.Name))}");
+            return 1;
+        }
+
+        if (name is null || dryRun)
+        {
+            foreach (var hangar in chosen)
+            {
+                Console.WriteLine($"=== {hangar.Name} ===");
+                foreach (var step in hangar.Steps)
+                {
+                    var state = !step.Enabled ? "desactivado" : runner.Inspect(step) switch
+                    {
+                        HangarPresence.Open => "ya abierto: no se lanzaría",
+                        HangarPresence.Closed => "se lanzaría",
+                        HangarPresence.Missing => "NO EXISTE",
+                        _ => "se lanzaría (sin proceso: no se sabe si ya está abierto)",
+                    };
+                    Console.WriteLine($"  {step.Name,-34} {state}");
+                }
+            }
+            return 0;
+        }
+
+        using var cts = new CancellationTokenSource();
+        Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+        var steps = chosen[0].Steps;
+        runner.StepChanged += (i, _, detail) => Console.WriteLine($"{DateTime.Now:HH:mm:ss}  {steps[i].Name}: {detail}");
+        var outcome = runner.RunAsync(chosen[0], cts.Token).GetAwaiter().GetResult();
+        Console.WriteLine(outcome switch
+        {
+            HangarOutcome.Ok => "Secuencia completa.",
+            HangarOutcome.Cancelled => "Secuencia cancelada.",
+            _ => "Secuencia terminada con problemas.",
+        });
+        return outcome == HangarOutcome.WithProblems ? 1 : 0;
     }
 
     // ----------------------------------------------------------------- run

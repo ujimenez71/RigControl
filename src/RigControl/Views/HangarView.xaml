@@ -1,0 +1,177 @@
+<UserControl x:Class="RigControl.Views.HangarView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:RigControl.ViewModels"
+             xmlns:hangar="clr-namespace:RigControl.Core.Hangar;assembly=RigControl.Core">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,12,8" />
+        </Style>
+        <Style x:Key="FieldBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="240" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Cabecera -->
+        <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,12">
+            <TextBlock Text="Hangar" FontSize="24" FontWeight="SemiBold" />
+            <TextBlock Opacity="0.7" TextWrapping="Wrap">
+                <Run Text="Abre en orden los programas de cada tipo de vuelo. Lo que ya está abierto no se vuelve a lanzar y nunca se cierra nada. Se guarda solo en " /><Run Text="{Binding FilePath, Mode=OneWay}" FontFamily="Cascadia Mono, Consolas" />
+            </TextBlock>
+        </StackPanel>
+
+        <!-- Lista de hangares -->
+        <DockPanel Grid.Row="1" Grid.Column="0" Margin="0,0,16,0">
+            <WrapPanel DockPanel.Dock="Bottom" Margin="0,8,0,0" IsEnabled="{Binding CanEdit}">
+                <Button Content="Nuevo" Click="AddHangar_Click" Margin="0,0,6,6" />
+                <Button Content="Duplicar" Click="DuplicateHangar_Click" Margin="0,0,6,6" IsEnabled="{Binding HasHangar}" />
+                <Button Content="Borrar" Click="RemoveHangar_Click" Margin="0,0,0,6" IsEnabled="{Binding HasHangar}" />
+            </WrapPanel>
+            <ListBox ItemsSource="{Binding Hangars}" SelectedItem="{Binding SelectedHangar}" DisplayMemberPath="Name"
+                     IsEnabled="{Binding CanEdit}" />
+        </DockPanel>
+
+        <!-- Hangar elegido -->
+        <Grid Grid.Row="1" Grid.Column="1" Visibility="{Binding HasHangar, Converter={StaticResource BoolToVisibility}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <DockPanel Grid.Row="0" Margin="0,0,0,12">
+                <Button DockPanel.Dock="Right" Content="{Binding LaunchText}" Click="Launch_Click" MinWidth="150" Padding="16,6"
+                        IsEnabled="{Binding CanLaunch}" VerticalAlignment="Center">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsBusy}" Value="False">
+                                    <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.AccentColorBrushKey}}" />
+                                    <Setter Property="Foreground" Value="White" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <CheckBox DockPanel.Dock="Right" Content="Al terminar, iniciar la ejecución automática" Margin="16,0"
+                          IsChecked="{Binding SelectedHangar.StartRun}" IsEnabled="{Binding CanEdit}" VerticalAlignment="Center"
+                          ToolTip="Como pulsar Iniciar en la pantalla Ejecución con «Automático»: el perfil se elige según el avión cargado" />
+                <TextBlock Text="Nombre" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <TextBox Text="{Binding SelectedHangar.Name, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanEdit}" VerticalAlignment="Center" />
+            </DockPanel>
+
+            <!-- Pasos -->
+            <ListBox Grid.Row="1" ItemsSource="{Binding SelectedHangar.Steps}" SelectedItem="{Binding SelectedStep}"
+                     HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:HangarStepItem}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="2*" />
+                            </Grid.ColumnDefinitions>
+                            <CheckBox Grid.Column="0" IsChecked="{Binding Enabled}" MinWidth="0" Margin="0,0,4,0" VerticalAlignment="Center"
+                                      IsEnabled="{Binding DataContext.CanEdit, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                      ToolTip="Incluir este programa en la secuencia" />
+                            <Ellipse Grid.Column="1" Width="10" Height="10" Margin="0,0,10,0" VerticalAlignment="Center" ToolTip="{Binding PresenceText}">
+                                <Ellipse.Style>
+                                    <Style TargetType="Ellipse">
+                                        <Setter Property="Fill" Value="Gray" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Presence}" Value="{x:Static hangar:HangarPresence.Open}">
+                                                <Setter Property="Fill" Value="LimeGreen" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Presence}" Value="{x:Static hangar:HangarPresence.Missing}">
+                                                <Setter Property="Fill" Value="OrangeRed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Ellipse.Style>
+                            </Ellipse>
+                            <TextBlock Grid.Column="2" Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="3" Text="{Binding RunText}" VerticalAlignment="Center" Margin="12,0,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding RunText}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Opacity" Value="0.7" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding RunProblem}" Value="True">
+                                                <Setter Property="Foreground" Value="OrangeRed" />
+                                                <Setter Property="Opacity" Value="1" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <WrapPanel Grid.Row="2" Margin="0,8,0,12" IsEnabled="{Binding CanEdit}">
+                <Button Content="Añadir programa" Click="AddStep_Click" Margin="0,0,6,0" />
+                <Button Content="↑ Subir" Click="MoveUp_Click" Margin="0,0,6,0" IsEnabled="{Binding HasStep}" />
+                <Button Content="↓ Bajar" Click="MoveDown_Click" Margin="0,0,6,0" IsEnabled="{Binding HasStep}" />
+                <Button Content="Quitar" Click="RemoveStep_Click" IsEnabled="{Binding HasStep}" />
+            </WrapPanel>
+
+            <!-- Detalle del paso -->
+            <Grid Grid.Row="3" IsEnabled="{Binding CanEdit}" Visibility="{Binding HasStep, Converter={StaticResource BoolToVisibility}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="110" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="Nombre" Style="{StaticResource FieldLabel}" />
+                <TextBox Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="3" Style="{StaticResource FieldBox}"
+                         Text="{Binding SelectedStep.Name, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock Grid.Row="1" Text="Programa" Style="{StaticResource FieldLabel}" />
+                <TextBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Style="{StaticResource FieldBox}"
+                         Text="{Binding SelectedStep.Target, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Ruta a un programa (admite %VARIABLES%) o una URI como steam://rungameid/N o shell:AppsFolder\…!App" />
+                <Button Grid.Row="1" Grid.Column="3" Content="Examinar…" Click="Browse_Click" Margin="8,0,0,8" HorizontalAlignment="Stretch" />
+
+                <TextBlock Grid.Row="2" Text="Argumentos" Style="{StaticResource FieldLabel}" />
+                <TextBox Grid.Row="2" Grid.Column="1" Style="{StaticResource FieldBox}"
+                         Text="{Binding SelectedStep.Args, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Grid.Row="2" Grid.Column="2" Text="Esperar después (s)" Style="{StaticResource FieldLabel}" Margin="16,0,12,8" />
+                <TextBox Grid.Row="2" Grid.Column="3" Style="{StaticResource FieldBox}" Text="{Binding SelectedStep.WaitSeconds}"
+                         ToolTip="Pausa tras abrirlo, antes del siguiente programa. No se aplica si ya estaba abierto." />
+
+                <TextBlock Grid.Row="3" Text="Proceso" Style="{StaticResource FieldLabel}" />
+                <TextBox Grid.Row="3" Grid.Column="1" Style="{StaticResource FieldBox}"
+                         Text="{Binding SelectedStep.Process, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Vacío = se deduce del .exe. Hace falta en las URI y en los programas que arrancan a través de otro." />
+                <TextBlock Grid.Row="3" Grid.Column="2" Text="Tiempo máximo (s)" Style="{StaticResource FieldLabel}" Margin="16,0,12,8" />
+                <TextBox Grid.Row="3" Grid.Column="3" Style="{StaticResource FieldBox}" Text="{Binding SelectedStep.TimeoutSeconds}"
+                         ToolTip="Máximo esperando a que aparezca el proceso; pasado, se avisa y se sigue con el siguiente." />
+            </Grid>
+        </Grid>
+
+        <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding Message}" Margin="0,12,0,0" TextWrapping="Wrap" />
+    </Grid>
+</UserControl>

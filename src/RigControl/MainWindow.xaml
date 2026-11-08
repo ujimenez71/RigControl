@@ -21,15 +21,17 @@
                         <ListBoxItem Content="🎮  Monitor" />
                         <ListBoxItem Content="▶  Ejecución" />
                         <ListBoxItem Content="📝  Perfiles" />
+                        <ListBoxItem Content="🛫  Hangar" />
                     </ListBox>
                 </StackPanel>
                 <TextBlock DockPanel.Dock="Bottom" VerticalAlignment="Bottom" Margin="8,0" FontSize="11" Opacity="0.5"
-                           Text="Fase 4 · .NET 10 · WPF" />
+                           Text="Fase 5 · .NET 10 · WPF" />
             </DockPanel>
         </Border>
 
         <views:MonitorView Grid.Column="1" x:Name="MonitorPage" />
         <views:RunView Grid.Column="1" x:Name="RunPage" Visibility="Collapsed" />
         <views:ProfilesView Grid.Column="1" x:Name="ProfilesPage" Visibility="Collapsed" />
+        <views:HangarView Grid.Column="1" x:Name="HangarPage" Visibility="Collapsed" />
     </Grid>
 </Window>

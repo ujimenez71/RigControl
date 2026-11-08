@@ -14,7 +14,7 @@ Software propio de control del rig de simulación, inspirado en Hangar Control d
   (`ViewModels/ObservableObject`), vistas en `Views/`.
 - `tests/RigControl.Tests/`: pruebas de escenarios en consola, sin paquetes externos
   (`dotnet run --project tests/RigControl.Tests`; `--hardware` añade la prueba que escribe en el
-  Bravo real). Ejes, acciones, repetición, luces y DCS-BIOS (con un DCS falso por UDP local).
+  Bravo real). Ejes, acciones, repetición, luces, DCS-BIOS (con un DCS falso por UDP local) y Hangar.
   Pasarlas antes de cada commit que toque Core.
 - `profiles/`: perfiles de ejemplo/fuente; los que se usan van en `%APPDATA%\RigControl\profiles`.
 - El runner (`BindingRunner.Run`) recibe un `CancellationToken`: la consola lo cancela con ESC.
@@ -65,7 +65,22 @@ Simuladores: DCS World (jets y helicópteros) y MSFS 2024 (aviación general). V
 Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <perfil>`, `run <perfil>|auto [--dry]`,
 `sim [eventos [filtro]]`, `sim vars <perfil> [s]`, `dcs [s]`, `dcs enviar CONTROL [VALOR]`, `dcs leer CONTROL`,
 `dcs vigilar [filtro]` (cada cambio de los mandos de la cabina con su posición y descripción: para
-comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez).
+comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez),
+`hangar` (estado de todos, no lanza nada), `hangar <nombre> --dry` (qué haría), `hangar <nombre>` (abre; Ctrl+C cancela).
+- Fase 5, App Hangar (08/11/2026; escenarios con host falso + ping real, pantalla comprobada fuera de
+  pantalla; SIN PROBAR aún lanzando los programas reales, DCS estaba abierto): `Core/Hangar/`
+  (`HangarFile`, `HangarRunner`, `IProcessHost`) + pantalla Hangar (`HangarViewModel`, se guarda sola).
+  `%APPDATA%\RigControl\hangar.json` (copia de `profiles/hangar.json`), hangares "DCS World" y
+  "MSFS 2024": cada paso = nombre, `target` (ruta con %VARIABLES% o URI), `args`, `process`,
+  `waitSeconds`, `timeoutSeconds`, `enabled`; `startRun` inicia la ejecución automática al terminar
+  (solo en la app, no en RigProbe). Lo ya abierto no se relanza; un fallo no detiene la secuencia; NUNCA cierra
+  nada (cancelar solo deja de esperar y de lanzar). JSON roto = se muestra el error y no se sobrescribe.
+  MSFS 2024 es de la Store: `shell:AppsFolder\Microsoft.Limitless_8wekyb3d8bbwe!App`, proceso
+  `FlightSimulator2024` (arranca vía GameLaunchHelper). DCS está en G: (el registro aún dice E:).
+  VPC no necesita programa residente. OpenKneeboard: su carpeta de Program Files no tiene .exe, sin incluir.
+  Para verificar la interfaz sin robar el foco a DCS (se minimiza y se congela): ventana fuera de pantalla con
+  `ShowActivated=false` + `RenderTargetBitmap`, en un proyecto aparte que referencie RigControl.
+  Falta en la fase 5: gestor de ventanas, mods por symlinks, snapshots, prioridad de CPU.
 - Fase 4 (en curso, hecho sin el usuario el 01/11/2026; NADA de esto probado aún en vuelo):
   - Luces del Bravo desde MSFS: sección `"lights"` del perfil: nombre de `BravoLed` -> condición o
     lista (AND) sobre `A:VAR[, unidades]` o `L:Var` con `> >= < <= =`, rango `=a..b`, `!` niega;
@@ -327,8 +342,8 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
    capturar el protocolo con Wireshark + USBPcap) y al Bravo. Hecho: luces del Bravo desde MSFS
    y cliente DCS-BIOS, ✅ verificado con DCS y el AH-64D (ver "Fase 4" arriba); luces y
    condiciones desde el estado de DCS (`D:`, ✅ verificado con el AH-64D). Falta: LEDs WinWing.
-5. App Hangar (lanzar apps en secuencia), gestor de ventanas, mods por symlinks, snapshots,
-   prioridad de CPU
+5. (en curso) ✅ App Hangar (lanzar apps en secuencia, falta probarlo con los programas reales);
+   gestor de ventanas, mods por symlinks, snapshots, prioridad de CPU
 
 Idea pendiente (propuesta el 02/11/2026, a decidir con el usuario): **generar perfiles con IA**
 (Claude por la API de Anthropic). Botón "Generar con IA" en Perfiles: se envían los mandos con sus

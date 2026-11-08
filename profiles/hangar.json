@@ -1,0 +1,26 @@
+{
+  "hangars": [
+    {
+      "name": "DCS World",
+      "startRun": true,
+      "steps": [
+        { "name": "PimaxPlay (VR)", "target": "C:\\Program Files\\Pimax\\PimaxClient\\pimaxui\\PimaxClient.exe", "waitSeconds": 10 },
+        { "name": "SimAppPro (WinWing)", "target": "C:\\Program Files (x86)\\SimAppPro\\SimAppPro.exe", "waitSeconds": 5 },
+        { "name": "MOZA Cockpit", "target": "C:\\Program Files (x86)\\MOZA Cockpit\\bin\\MOZA Cockpit.exe", "waitSeconds": 5 },
+        { "name": "SimHub", "target": "C:\\Program Files (x86)\\SimHub\\SimHubWPF.exe", "waitSeconds": 3 },
+        { "name": "bHaptics Player", "target": "%LOCALAPPDATA%\\bHapticsPlayer\\BhapticsPlayer.exe", "waitSeconds": 3 },
+        { "name": "DCS World", "target": "G:\\Eagle Dynamics\\DCS World OpenBeta\\bin\\DCS.exe", "timeoutSeconds": 120 }
+      ]
+    },
+    {
+      "name": "MSFS 2024",
+      "startRun": true,
+      "steps": [
+        { "name": "PimaxPlay (VR)", "target": "C:\\Program Files\\Pimax\\PimaxClient\\pimaxui\\PimaxClient.exe", "waitSeconds": 10 },
+        { "name": "SimHub", "target": "C:\\Program Files (x86)\\SimHub\\SimHubWPF.exe", "waitSeconds": 3 },
+        { "name": "Little Navmap", "target": "C:\\Program Files\\Little Navmap\\littlenavmap.exe", "waitSeconds": 2 },
+        { "name": "Microsoft Flight Simulator 2024", "target": "shell:AppsFolder\\Microsoft.Limitless_8wekyb3d8bbwe!App", "process": "FlightSimulator2024", "timeoutSeconds": 120 }
+      ]
+    }
+  ]
+}

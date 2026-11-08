@@ -126,6 +126,15 @@ public sealed class RunViewModel : ObservableObject, IDisposable
         else Start();
     }
 
+    /// <summary>Desde el Hangar: ejecución real con el perfil según el avión. Si ya hay una en marcha, no la toca.</summary>
+    public void StartAuto()
+    {
+        if (IsRunning) return;
+        SelectedTarget = AutoTarget;
+        DryRun = false;
+        Start();
+    }
+
     public void ClearLog() => Entries.Clear();
 
     public void Dispose()
