@@ -2,7 +2,9 @@
 using HapticSeat.Effects;
 using HapticSeat.Hf8;
 using HapticSeat.Profiles;
+using HapticSeat.Telemetry;
 using HapticSeat.Telemetry.Il2;
+using HapticSeat.Telemetry.Msfs;
 
 namespace HapticSeat;
 
@@ -17,6 +19,7 @@ namespace HapticSeat;
 ///       --minimo N     fuerza el mismo nivel mínimo 0-255 en todos los motores
 ///                      (por defecto, la calibración guardada por la app en %APPDATA%\HapticSeat\settings.json)
 ///       --puerto N     puerto UDP (5678 por defecto)
+///   HapticSeat msfs [opciones]             -> igual con MSFS 2024 por SimConnect (--puerto no aplica)
 /// Ctrl+C detiene; los motores siempre quedan a 0 al salir.
 /// </summary>
 internal static class Program
@@ -33,7 +36,8 @@ internal static class Program
             Cancel.Cancel();
         };
 
-        if (mode == "il2") return Il2(args[1..]);
+        if (mode == "il2") return Telemetry(args[1..], port => new Il2Source(port));
+        if (mode == "msfs") return Telemetry(args[1..], _ => new MsfsSource());
 
         Hf8Device hf8;
         try
@@ -60,15 +64,15 @@ internal static class Program
                     return Threshold(hf8, args.Length > 1 ? args[1] : "2");
                 default:
                     Console.WriteLine("Uso: HapticSeat estado | test [pct] | motor <0-7|todos> <pct> [ms] | umbral [motor]");
-                    Console.WriteLine("     HapticSeat il2 [--sin-cojin] [--ganancia %] [--minimo 0-255] [--puerto N]");
+                    Console.WriteLine("     HapticSeat il2|msfs [--sin-cojin] [--ganancia %] [--minimo 0-255] [--puerto N]");
                     return 1;
             }
         }
     }
 
-    // ------------------------------------------------------ il2
+    // ------------------------------------------------------ telemetría (il2, msfs)
 
-    private static int Il2(string[] options)
+    private static int Telemetry(string[] options, Func<int, ITelemetrySource> createSource)
     {
         var withSeat = true;
         var gain = 100;
@@ -112,7 +116,7 @@ internal static class Program
         }
 
         using (hf8)
-        using (var source = new Il2Source(port))
+        using (var source = createSource(port))
         {
             try
             {

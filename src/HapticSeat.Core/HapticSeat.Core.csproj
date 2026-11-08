@@ -16,4 +16,20 @@
     <InternalsVisibleTo Include="HapticSeat.Tests" />
   </ItemGroup>
 
+  <!-- SDK de MSFS 2024: variable MSFS2024_SDK (la crea el instalador) o la ruta por defecto. -->
+  <PropertyGroup>
+    <MsfsSdk Condition="'$(MSFS2024_SDK)' != ''">$([MSBuild]::EnsureTrailingSlash('$(MSFS2024_SDK)'))</MsfsSdk>
+    <MsfsSdk Condition="'$(MsfsSdk)' == ''">C:\MSFS 2024 SDK\</MsfsSdk>
+    <SimConnectDll>$(MsfsSdk)SimConnect SDK\lib\SimConnect.dll</SimConnectDll>
+  </PropertyGroup>
+
+  <!-- La DLL nativa se copia junto al ejecutable; sin el SDK se compila igual y no hay telemetría de MSFS. -->
+  <ItemGroup Condition="Exists('$(SimConnectDll)')">
+    <None Include="$(SimConnectDll)" Link="SimConnect.dll" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+
+  <Target Name="AvisoSimConnect" BeforeTargets="Build" Condition="!Exists('$(SimConnectDll)')">
+    <Warning Text="No se encuentra $(SimConnectDll): instala el SDK de MSFS 2024 o define MSFS2024_SDK. Sin ella no hay telemetría de MSFS." />
+  </Target>
+
 </Project>

@@ -9,6 +9,7 @@ namespace HapticSeat.Effects;
 public sealed class GroundEffect : IEffect
 {
     private const float OnGround = 0.005f;
+    private const float Rolling = 1; // m/s
 
     private readonly Oscillator[] _osc = [new(101), new(103), new(107), new(109)];
     private readonly float[] _prevLoad = new float[FlightState.MaxWheels];
@@ -38,10 +39,14 @@ public sealed class GroundEffect : IEffect
 
             if (load > OnGround)
             {
-                var hz = 6 + 20 * speed;
-                var rough = _osc[i].Noise(hz, dt);
-                var amount = (0.05f + 0.25f * speed) * Math.Clamp(0.4f + load, 0, 1) * rough / onGround;
-                for (var m = 0; m < motors.Length; m++) motors[m] += Zones.Seat[m] * _weights[m] * amount * Gain;
+                // Parado no hay rodadura: si no, el asiento vibraría sin parar con el avión aparcado
+                if (s.IasMs > Rolling)
+                {
+                    var hz = 6 + 20 * speed;
+                    var rough = _osc[i].Noise(hz, dt);
+                    var amount = (0.05f + 0.25f * speed) * Math.Clamp(0.4f + load, 0, 1) * rough / onGround;
+                    for (var m = 0; m < motors.Length; m++) motors[m] += Zones.Seat[m] * _weights[m] * amount * Gain;
+                }
 
                 // Toma de contacto: rueda que estaba en el aire y viene con velocidad
                 if (_primed && _prevLoad[i] <= OnGround && s.IasMs > 15)

@@ -3,7 +3,9 @@ using System.Windows.Threading;
 using HapticSeat.App.ViewModels;
 using HapticSeat.Effects;
 using HapticSeat.Profiles;
+using HapticSeat.Telemetry;
 using HapticSeat.Telemetry.Il2;
+using HapticSeat.Telemetry.Msfs;
 
 namespace HapticSeat.App;
 
@@ -38,7 +40,8 @@ public partial class App : Application
         var warnings = new List<string>();
         var profiles = store.LoadAll(warnings.Add);
 
-        _host = new HapticHost(new Il2Source(settings.Il2Port), EffectEngine.CreateDefault(), settings.MinLevelBytes());
+        var source = new MultiSource(new MsfsSource(), new Il2Source(settings.Il2Port));
+        _host = new HapticHost(source, EffectEngine.CreateDefault(), settings.MinLevelBytes());
         _host.Start();
 
         var dialogs = new Dialogs();

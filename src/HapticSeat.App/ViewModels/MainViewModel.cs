@@ -363,12 +363,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             _ => ("No detectado (¿enchufado y en modo PC?)", Error),
         };
 
-        if (_host.SourceError is null)
-        {
-            (SimText, SimColor) = !f.Connected ? ("IL-2: esperando telemetría (UDP)", Idle)
-                : f.Paused ? ("IL-2: en pausa o menús", Warn)
-                : ("IL-2: recibiendo", Ok);
-        }
+        // Un error de IL-2 (puerto ocupado) no debe tapar que MSFS está funcionando
+        (SimText, SimColor) = f.Connected
+            ? f.Paused ? ($"{f.Source}: en pausa o menús", Warn) : ($"{f.Source}: recibiendo", Ok)
+            : _host.SourceError is { } sourceError ? (sourceError, Warn)
+            : ("Esperando a MSFS o IL-2", Idle);
         Flying = f.Active;
 
         if (f.Active)

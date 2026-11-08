@@ -11,6 +11,9 @@ public sealed class FlightState
     public const int MaxEngines = 4;
     public const int MaxWheels = 4;
 
+    /// <summary>Simulador del que viene este estado ("MSFS", "IL-2"), para mostrarlo.</summary>
+    public string Source = "";
+
     /// <summary>Llegan paquetes (el simulador está emitiendo).</summary>
     public bool Connected;
 
@@ -55,6 +58,7 @@ public sealed class FlightState
 
     public void CopyTo(FlightState o)
     {
+        o.Source = Source;
         o.Connected = Connected;
         o.Paused = Paused;
         o.Aircraft = Aircraft;

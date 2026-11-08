@@ -19,7 +19,7 @@ public sealed class Il2Source(int port = Il2Source.DefaultPort) : ITelemetrySour
     private const int MaxPendingEvents = 512;
 
     private readonly Il2Decoder _decoder = new();
-    private readonly FlightState _state = new();
+    private readonly FlightState _state = new() { Source = "IL-2" };
     private readonly List<FlightEvent> _events = new(64);
     private readonly Lock _lock = new();
     private readonly Stopwatch _clock = Stopwatch.StartNew();

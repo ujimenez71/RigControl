@@ -82,7 +82,28 @@ tests/HapticSeat.Tests
 | IL-2 GB | UDP 5678 a 127.255.255.255 (`telemetrydevice` + `motiondevice` en `data\startup.cfg`) | Decodificador hecho; falta probar en vuelo |
 | IL-2 Korea | `E:\IL2Series\game\data\startup.cfg` | Bloques añadidos el 20/10/2026 (copia en `startup.cfg.antes-hapticseat`); falta ver si emite |
 | DCS | OJO: la carpeta activa es `Saved Games\DCS.openbeta\Scripts\Export.lua` (ver CLAUDE.md de la raíz), no `Saved Games\DCS` | Pendiente. El activo carga SimAppPro, MOZA y DCS-BIOS |
-| MSFS 2024 | SimConnect | Pendiente. Cliente instalado |
+| MSFS 2024 | SimConnect (`Telemetry/Msfs/`) | ✅ Verificado volando el C172 con el cojín puesto (08/11/2026): el usuario notó todos los efectos. Sin ajustar intensidades ni probar una toma suave |
+
+La app escucha MSFS e IL-2 a la vez (`MultiSource`: gana el que está volando).
+
+### MSFS 2024
+
+- `MsfsVars` (puro) convierte las variables al estado común; `MsfsSource` lleva la conexión en su hilo, reintenta cada 3 s y
+  detecta una caída con un ping cada 5 s. `SimConnect.dll` se copia desde el SDK (`HapticSeat.Core.csproj`).
+- Pausa = evento `Pause`, `Sim` a 0 o más de 500 ms sin datos (MSFS no envía datos parado).
+- Sin datos en MSFS, y por tanto supuestos: posición de motores y ruedas (avión típico) y buffet, deducido de
+  `INCIDENCE ALPHA` frente a `STALL ALPHA` y de `STALL WARNING`. Turbinas: `TURB ENG N1` como proporción.
+- Visto con el C172 (08/11/2026): MSFS acepta todas las variables (si rechaza alguna sale un aviso «excepción» en la consola; en
+  la app no se ven los avisos). Nada más conectar, el estado "Sim" no da un vuelo aunque lo haya: se insiste cada segundo.
+  En vuelo normal (101-228 km/h) el buffet es 0, sin falsos positivos. La pantalla de choque cuenta como pausa.
+- En el C172 `CONTACT POINT COMPRESSION` vale siempre 0, también rodando: siempre entra el respaldo de `SIM ON GROUND`, así que
+  las tres ruedas tocan a la vez y el golpe no distingue morro, izquierda o derecha. Sin probar en otros aviones.
+- Buffet: entra con el aviso de pérdida y se mantuvo durante una pérdida con caída (80-110 km/h). También saltó a 141 km/h en un
+  tirón brusco a 1,4 G, unos 50 km/h por encima de la pérdida en vuelo normal: vigilar si molesta.
+- Durante el vuelo con el cojín hubo una pausa larga con los motores a 0; supuesto ESC, sin confirmar. Sin probar: menú principal
+  de MSFS 2024 y una toma suave (las dos pasadas acabaron en choque). Sin armas: no hay eventos.
+- OJO: SimConnect es código nativo en el mismo proceso que el HF8. Si lo tumbara, el watchdog no actuaría; sin
+  comprobar qué hace el cojín si deja de recibir órdenes más allá de 1 s.
 
 ### Formato IL-2 (sin documentación oficial; IDs de la ingeniería inversa de IL2Shaker, GPL: no copiar código)
 
@@ -102,7 +123,7 @@ tests/HapticSeat.Tests
 App WPF funcionando (20/10/2026): probada con telemetría simulada (perfil automático por avión, datos en vivo,
 cojín en vivo). Falta probarla volando y los botones Probar/Medir con el usuario sentado.
 Comandos de consola: `estado`, `test [pct]`, `motor <0-7|todos> <pct> [ms]`, `umbral [motor]`,
-`il2 [--sin-cojin] [--ganancia %] [--minimo 0-255] [--puerto N]` (la consola no usa perfiles, solo los mínimos).
+`il2|msfs [--sin-cojin] [--ganancia %] [--minimo 0-255] [--puerto N]` (la consola no usa perfiles, solo los mínimos).
 Efectos: motor, buffet, suelo (rodadura + toma de contacto), tren/flaps, aerofreno, carga G, armas, impactos,
 bombas/cohetes. Probado con paquetes sintéticos de extremo a extremo (20/10/2026); falta volar.
 Nivel mínimo por motor (`Hf8Motors.DefaultMinLevels`), medido con `umbral` sentado y el dial al máximo
@@ -113,7 +134,7 @@ Nivel mínimo por motor (`Hf8Motors.DefaultMinLevels`), medido con `umbral` sent
 1. ✅ Driver del HF8 con watchdog y pruebas de motores
 2. ✅ Lector IL-2 (UDP), modelo de telemetría común y motor de efectos. Pendiente: calibrar en vuelo
 3. ✅ Perfiles JSON por avión y app WPF (visor en vivo, efectos, calibración guiada, bandeja)
-4. DCS (Export.lua por UDP; añade AoA, rotor de helicópteros, cañón) y MSFS 2024 (SimConnect)
+4. ✅ MSFS 2024 (SimConnect). Falta DCS (Export.lua por UDP; añade AoA, rotor de helicópteros, cañón)
 5. Pendientes menores: ajustes avanzados por efecto (escalas de buffet/impactos tras calibrar en vuelo),
    arranque con Windows, cambiar el puerto UDP desde la interfaz (hoy solo en settings.json, requiere reiniciar)
 
