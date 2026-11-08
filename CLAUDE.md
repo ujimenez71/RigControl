@@ -16,6 +16,10 @@ Software propio de control del rig de simulación, inspirado en Hangar Control d
   (`dotnet run --project tests/RigControl.Tests`; `--hardware` añade la prueba que escribe en el
   Bravo real). Ejes, acciones, repetición, luces, DCS-BIOS (con un DCS falso por UDP local) y Hangar.
   Pasarlas antes de cada commit que toque Core.
+- `src/HapticSeat.*` y `tests/HapticSeat.Tests`: programa aparte para el cojín HF8 Pro (documentación
+  en `docs/HapticSeat.md`, léela antes de tocarlo). Sin dependencias con RigControl y en su propio
+  proceso a propósito: un fallo nativo en RigControl no debe dejar los motores encendidos. Pasar
+  también `dotnet test tests/HapticSeat.Tests` antes de cada commit que lo toque.
 - `profiles/`: perfiles de ejemplo/fuente; los que se usan van en `%APPDATA%\RigControl\profiles`.
 - El runner (`BindingRunner.Run`) recibe un `CancellationToken`: la consola lo cancela con ESC.
 - Core NO escribe en la consola: usa `Log` (Info/Warning/Error/Action, `Log.Sink`). RigProbe lo
@@ -78,6 +82,7 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
   MSFS 2024 es de la Store: `shell:AppsFolder\Microsoft.Limitless_8wekyb3d8bbwe!App`, proceso
   `FlightSimulator2024` (arranca vía GameLaunchHelper). DCS está en G: (el registro aún dice E:).
   VPC no necesita programa residente. OpenKneeboard: su carpeta de Program Files no tiene .exe, sin incluir.
+  HapticSeat va en los dos hangares (copia publicada, ver `docs/HapticSeat.md`), aunque aún solo tiene telemetría de IL-2.
   Para verificar la interfaz sin robar el foco a DCS (se minimiza y se congela): ventana fuera de pantalla con
   `ShowActivated=false` + `RenderTargetBitmap`, en un proyecto aparte que referencie RigControl.
   Falta en la fase 5: gestor de ventanas, mods por symlinks, snapshots, prioridad de CPU.

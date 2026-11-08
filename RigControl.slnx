@@ -3,18 +3,24 @@
     <Project Path="src/RigControl.Core/RigControl.Core.csproj" />
     <Project Path="src/RigControl/RigControl.csproj" />
     <Project Path="src/RigProbe/RigProbe.csproj" />
+    <Project Path="src/HapticSeat.Core/HapticSeat.Core.csproj" />
+    <Project Path="src/HapticSeat.Cli/HapticSeat.Cli.csproj" />
+    <Project Path="src/HapticSeat.App/HapticSeat.App.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/RigControl.Tests/RigControl.Tests.csproj" />
+    <Project Path="tests/HapticSeat.Tests/HapticSeat.Tests.csproj" />
   </Folder>
   <Folder Name="/profiles/">
     <File Path="profiles/c172.json" />
     <File Path="profiles/ejemplo-ga.json" />
     <File Path="profiles/uh1h.json" />
     <File Path="profiles/ah64d.json" />
+    <File Path="profiles/hangar.json" />
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path="CLAUDE.md" />
+    <File Path="docs/HapticSeat.md" />
     <File Path=".gitignore" />
   </Folder>
 </Solution>

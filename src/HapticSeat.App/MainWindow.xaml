@@ -1,0 +1,334 @@
+﻿<Window x:Class="HapticSeat.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:HapticSeat.App.ViewModels"
+        mc:Ignorable="d"
+        d:DataContext="{d:DesignInstance Type=vm:MainViewModel}"
+        Title="HapticSeat" Width="1200" Height="800" MinWidth="980" MinHeight="640"
+        Background="{StaticResource PageBrush}"
+        WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+        <!-- Punto de color de estado -->
+        <Style x:Key="Dot" TargetType="Ellipse">
+            <Setter Property="Width" Value="10" />
+            <Setter Property="Height" Value="10" />
+            <Setter Property="Margin" Value="0,0,10,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <!-- Fila etiqueta / valor de los datos de vuelo -->
+        <Style x:Key="Label" TargetType="TextBlock" BasedOn="{StaticResource Muted}">
+            <Setter Property="Margin" Value="0,2,12,2" />
+        </Style>
+        <Style x:Key="Value" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,2" />
+            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas" />
+        </Style>
+    </Window.Resources>
+
+    <DockPanel>
+        <!-- Barra superior: perfil -->
+        <Border DockPanel.Dock="Top" Background="{StaticResource CardBrush}" BorderBrush="{StaticResource CardBorderBrush}"
+                BorderThickness="0,0,0,1" Padding="20,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="HapticSeat" FontSize="20" FontWeight="SemiBold" />
+                    <TextBlock Text="Next Level Racing HF8 Pro" Style="{StaticResource Muted}" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Perfil" VerticalAlignment="Center" Margin="0,0,10,0" />
+                    <ComboBox x:Name="ProfileBox" Width="220" ItemsSource="{Binding Profiles}" DisplayMemberPath="Name"
+                              SelectedItem="{Binding SelectedProfile}" DropDownClosed="ProfileBox_DropDownClosed" />
+                    <CheckBox Content="Cambiar según el avión" IsChecked="{Binding AutoProfile}" Margin="16,0,16,0"
+                              VerticalAlignment="Center"
+                              ToolTip="Al entrar en un avión se elige el perfil que lo tenga asignado (o General)." />
+                    <Button Content="Nuevo" Command="{Binding NewProfileCommand}" Margin="0,0,6,0" />
+                    <Button Content="Duplicar" Command="{Binding DuplicateProfileCommand}" Margin="0,0,6,0" />
+                    <Button Content="Renombrar" Command="{Binding RenameProfileCommand}" Margin="0,0,6,0" />
+                    <Button Content="Eliminar" Command="{Binding DeleteProfileCommand}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <TabControl Margin="12,8,12,12">
+            <!-- ===================================================== VUELO -->
+            <TabItem Header="Vuelo">
+                <Grid Margin="4,12,4,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="330" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <!-- Estado -->
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Text="Estado" Style="{StaticResource CardTitle}" />
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <Ellipse Style="{StaticResource Dot}" Fill="{Binding SeatColor}" />
+                                        <TextBlock Text="{Binding SeatText}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Ellipse Style="{StaticResource Dot}" Fill="{Binding SimColor}" />
+                                        <TextBlock Text="{Binding SimText}" TextWrapping="Wrap" MaxWidth="260" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Cojín en vivo -->
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Text="Cojín" Style="{StaticResource CardTitle}" />
+                                    <Grid Margin="0,0,0,6">
+                                        <TextBlock Text="Izquierda" Style="{StaticResource Muted}" HorizontalAlignment="Left" Margin="40,0,0,0" />
+                                        <TextBlock Text="Derecha" Style="{StaticResource Muted}" HorizontalAlignment="Right" Margin="0,0,40,0" />
+                                    </Grid>
+                                    <ItemsControl ItemsSource="{Binding SeatLayout}" HorizontalAlignment="Center">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <UniformGrid Columns="2" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="{x:Type vm:MotorViewModel}">
+                                                <Grid Width="130" Height="40" Margin="4,3">
+                                                    <Border CornerRadius="10" Background="{StaticResource SeatZoneBrush}" />
+                                                    <Border CornerRadius="10" Background="{DynamicResource {x:Static SystemColors.AccentColorBrushKey}}" Opacity="{Binding Glow}" />
+                                                    <TextBlock Text="{Binding Name}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                               Foreground="White" FontSize="12" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Datos de vuelo -->
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Text="Datos de vuelo" Style="{StaticResource CardTitle}" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Text="Avión" Style="{StaticResource Label}" />
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding AircraftText}" Style="{StaticResource Value}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Row="1" Text="Velocidad" Style="{StaticResource Label}" />
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding IasText}" Style="{StaticResource Value}" />
+                                        <TextBlock Grid.Row="2" Text="Carga G" Style="{StaticResource Label}" />
+                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding GText}" Style="{StaticResource Value}" />
+                                        <TextBlock Grid.Row="3" Text="Altura (AGL)" Style="{StaticResource Label}" />
+                                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding AglText}" Style="{StaticResource Value}" />
+                                        <TextBlock Grid.Row="4" Text="RPM" Style="{StaticResource Label}" />
+                                        <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding RpmText}" Style="{StaticResource Value}" />
+                                        <TextBlock Grid.Row="5" Text="Buffet" Style="{StaticResource Label}" />
+                                        <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding BuffetText}" Style="{StaticResource Value}" />
+                                    </Grid>
+                                    <TextBlock Text="{Binding EventsText}" Style="{StaticResource Muted}" Margin="0,10,0,0" FontSize="12" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- Efectos del perfil -->
+                    <Border Grid.Column="2" Style="{StaticResource Card}" Margin="0">
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Top">
+                                <TextBlock Style="{StaticResource CardTitle}">
+                                    <Run Text="Efectos del perfil «" /><Run Text="{Binding SelectedProfile.Name, Mode=OneWay}" /><Run Text="»" />
+                                </TextBlock>
+
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="260" />
+                                        <ColumnDefinition Width="60" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Intensidad general" FontWeight="SemiBold" />
+                                        <TextBlock Text="Multiplica todos los efectos de este perfil." Style="{StaticResource Muted}" FontSize="12" />
+                                    </StackPanel>
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="200" TickFrequency="5" IsSnapToTickEnabled="True"
+                                            Value="{Binding MasterGain}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2" Text="{Binding MasterGain, StringFormat={}{0} %}" VerticalAlignment="Center"
+                                               HorizontalAlignment="Right" Style="{StaticResource Value}" />
+                                </Grid>
+
+                                <Grid Margin="0,0,0,12" IsEnabled="{Binding CanEditAircraft}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Aviones" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                    <TextBox Grid.Column="1" Text="{Binding AircraftPatterns, UpdateSourceTrigger=LostFocus}"
+                                             ToolTip="Nombres tal como los da el simulador, separados por comas. Admite * y ?, p. ej. «Bf 109*»." />
+                                </Grid>
+                                <StackPanel Orientation="Horizontal" Margin="0,-6,0,12">
+                                    <TextBlock Style="{StaticResource Muted}" FontSize="12" VerticalAlignment="Center">
+                                        <Run Text="El perfil General se usa para cualquier avión sin perfil propio." />
+                                    </TextBlock>
+                                    <Button Content="Crear perfil para el avión actual" Command="{Binding CreateAircraftProfileCommand}"
+                                            Margin="12,0,0,0" FontSize="12" />
+                                </StackPanel>
+                                <Separator Margin="0,0,0,8" />
+                            </StackPanel>
+
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding Effects}" Margin="0,0,16,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type vm:EffectViewModel}">
+                                            <Grid Margin="0,6">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="40" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="260" />
+                                                    <ColumnDefinition Width="60" />
+                                                    <ColumnDefinition Width="100" />
+                                                </Grid.ColumnDefinitions>
+                                                <CheckBox IsChecked="{Binding Enabled}" VerticalAlignment="Center" ToolTip="Activar o desactivar" />
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{Binding Description}" Style="{StaticResource Muted}" FontSize="12" />
+                                                </StackPanel>
+                                                <Slider Grid.Column="2" Minimum="0" Maximum="200" TickFrequency="5" IsSnapToTickEnabled="True"
+                                                        Value="{Binding Gain}" IsEnabled="{Binding Enabled}" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="3" Text="{Binding Gain, StringFormat={}{0} %}" VerticalAlignment="Center"
+                                                           HorizontalAlignment="Right" Style="{StaticResource Value}" />
+                                                <Button Grid.Column="4" HorizontalAlignment="Right" VerticalAlignment="Center" MinWidth="84"
+                                                        Command="{Binding DataContext.TestEffectCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}"
+                                                        ToolTip="Hace sonar este efecto unos segundos con un vuelo simulado (sin estar volando).">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                                            <Setter Property="Content" Value="Probar" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsTesting}" Value="True">
+                                                                    <Setter Property="Content" Value="Sonando…" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- ===================================================== CALIBRACIÓN -->
+            <TabItem Header="Calibración">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="4,12,4,0" MaxWidth="900" HorizontalAlignment="Left">
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Nivel mínimo de cada motor" Style="{StaticResource CardTitle}" />
+                                <TextBlock Style="{StaticResource Muted}">
+                                    Por debajo de cierto nivel un motor gira pero no se nota. Los efectos empiezan en ese mínimo, para que hasta
+                                    el más suave se sienta. Siéntate, pulsa «Medir» y pulsa «¡Lo noto!» en cuanto notes la vibración: el mínimo
+                                    se fija en ese motor y en el del otro lado. Mídelo con el dial rojo donde lo uses normalmente.
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Panel de medición en curso -->
+                        <Border Style="{StaticResource Card}" BorderBrush="{DynamicResource {x:Static SystemColors.AccentColorBrushKey}}"
+                                Visibility="{Binding Calibrating, Converter={StaticResource BoolToVis}}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding CalibrationText}" FontSize="16" VerticalAlignment="Center" />
+                                <Button Grid.Column="1" Content="¡Lo noto!" Command="{Binding FeltCommand}" FontSize="18"
+                                        Padding="28,10" Margin="0,0,10,0" Style="{StaticResource AccentButtonStyle}" />
+                                <Button Grid.Column="2" Content="Cancelar" Command="{Binding CancelMeasureCommand}" />
+                            </Grid>
+                        </Border>
+                        <TextBlock Text="{Binding CalibrationText}" Margin="2,0,0,12">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource Muted}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Calibrating}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding CalibrationText}" Value="">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <Border Style="{StaticResource Card}">
+                            <ItemsControl ItemsSource="{Binding Motors}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:MotorViewModel}">
+                                        <Grid Margin="0,5">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="140" />
+                                                <ColumnDefinition Width="300" />
+                                                <ColumnDefinition Width="60" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                                            <Slider Grid.Column="1" Minimum="0" Maximum="80" TickFrequency="1" IsSnapToTickEnabled="True"
+                                                    Value="{Binding MinLevel}" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Text="{Binding MinLevel}" VerticalAlignment="Center"
+                                                       HorizontalAlignment="Right" Style="{StaticResource Value}" />
+                                            <Button Grid.Column="3" Content="Medir" Margin="16,0,8,0" MinWidth="80"
+                                                    Command="{Binding DataContext.MeasureCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    CommandParameter="{Binding}" />
+                                            <Button Grid.Column="4" Content="Probar mínimo" MinWidth="120"
+                                                    Command="{Binding DataContext.PulseMinimumCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    CommandParameter="{Binding}"
+                                                    ToolTip="Un pulso de 1 s al nivel mínimo: debería notarse apenas." />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                            <Button Content="Restaurar los valores medidos" Command="{Binding RestoreMinLevelsCommand}" />
+                        </StackPanel>
+
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="Aplicación" Style="{StaticResource CardTitle}" />
+                                <CheckBox Content="Arrancar minimizado en la bandeja del sistema" IsChecked="{Binding StartMinimized}" />
+                                <TextBlock Style="{StaticResource Muted}" Margin="0,10,0,0" FontSize="12">
+                                    Al minimizar, HapticSeat se esconde en la bandeja y sigue funcionando. Al cerrar la ventana se sale y el cojín se apaga.
+                                    Perfiles y ajustes en %APPDATA%\HapticSeat (JSON editables a mano).
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</Window>

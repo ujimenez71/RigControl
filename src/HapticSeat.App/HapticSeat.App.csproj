@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <!-- Solo para el icono de la bandeja (NotifyIcon) -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>HapticSeatApp</AssemblyName>
+    <RootNamespace>HapticSeat.App</RootNamespace>
+    <!-- WPF0001: ThemeMode (tema Fluent) sigue marcado como experimental -->
+    <NoWarn>$(NoWarn);WPF0001</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- WinForms solo aporta el icono de la bandeja: que sus tipos no choquen con los de WPF -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\HapticSeat.Core\HapticSeat.Core.csproj" />
+  </ItemGroup>
+
+</Project>
