@@ -5,7 +5,7 @@
       "startRun": true,
       "steps": [
         { "name": "PimaxPlay (VR)", "target": "C:\\Program Files\\Pimax\\PimaxClient\\pimaxui\\PimaxClient.exe", "waitSeconds": 10 },
-        { "name": "SimAppPro (WinWing)", "target": "C:\\Program Files (x86)\\SimAppPro\\SimAppPro.exe", "waitSeconds": 5 },
+        { "name": "SimAppPro (WinWing)", "target": "%SystemRoot%\\System32\\schtasks.exe", "args": "/run /tn \"RigControl\\SimAppPro\"", "process": "SimAppPro", "waitSeconds": 5 },
         { "name": "MOZA Cockpit", "target": "C:\\Program Files (x86)\\MOZA Cockpit\\bin\\MOZA Cockpit.exe", "waitSeconds": 5 },
         { "name": "SimHub", "target": "C:\\Program Files (x86)\\SimHub\\SimHubWPF.exe", "waitSeconds": 3 },
         { "name": "bHaptics Player", "target": "%LOCALAPPDATA%\\bHapticsPlayer\\BhapticsPlayer.exe", "waitSeconds": 3 },

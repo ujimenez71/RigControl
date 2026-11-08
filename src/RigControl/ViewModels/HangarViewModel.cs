@@ -131,7 +131,11 @@ public sealed class HangarViewModel : ObservableObject, IDisposable
     public HangarViewModel()
     {
         _saveTimer.Tick += (_, _) => Save();
-        _presenceTimer.Tick += async (_, _) => await RefreshPresenceAsync();
+        _presenceTimer.Tick += async (_, _) =>
+        {
+            ReloadIfChangedOnDisk();
+            await RefreshPresenceAsync();
+        };
         Load();
     }
 
@@ -267,6 +271,7 @@ public sealed class HangarViewModel : ObservableObject, IDisposable
             _cts?.Cancel();
             return;
         }
+        ReloadIfChangedOnDisk(); // no pisar con la copia en memoria lo editado a mano
         if (SelectedHangar is not { } hangar) return;
 
         Save(); // lo que se lanza es lo que se ve

@@ -72,7 +72,8 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
 comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez),
 `hangar` (estado de todos, no lanza nada), `hangar <nombre> --dry` (qué haría), `hangar <nombre>` (abre; Ctrl+C cancela).
 - Fase 5, App Hangar (08/11/2026; escenarios con host falso + ping real, pantalla comprobada fuera de
-  pantalla; SIN PROBAR aún lanzando los programas reales, DCS estaba abierto): `Core/Hangar/`
+  pantalla; ✅ verificado por el usuario con los programas reales: ningún paso en rojo, MSFS arranca,
+  HapticSeat aparece en la bandeja y SimAppPro abre sin aviso de UAC): `Core/Hangar/`
   (`HangarFile`, `HangarRunner`, `IProcessHost`) + pantalla Hangar (`HangarViewModel`, se guarda sola).
   `%APPDATA%\RigControl\hangar.json` (copia de `profiles/hangar.json`), hangares "DCS World" y
   "MSFS 2024": cada paso = nombre, `target` (ruta con %VARIABLES% o URI), `args`, `process`,
@@ -80,9 +81,12 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
   (solo en la app, no en RigProbe). Lo ya abierto no se relanza; un fallo no detiene la secuencia; NUNCA cierra
   nada (cancelar solo deja de esperar y de lanzar). JSON roto = se muestra el error y no se sobrescribe.
   MSFS 2024 es de la Store: `shell:AppsFolder\Microsoft.Limitless_8wekyb3d8bbwe!App`, proceso
-  `FlightSimulator2024` (arranca vía GameLaunchHelper). DCS está en G: (el registro aún dice E:).
+  `FlightSimulator2024` (arranca vía GameLaunchHelper), ✅ arranque verificado por el usuario (08/11/2026). DCS está en G: (el registro aún dice E:).
   VPC no necesita programa residente. OpenKneeboard: su carpeta de Program Files no tiene .exe, sin incluir.
   HapticSeat va en los dos hangares (copia publicada, ver `docs/HapticSeat.md`), aunque aún solo tiene telemetría de IL-2.
+  SimAppPro pide administrador: el Hangar lanza la tarea programada `RigControl\SimAppPro` (nivel elevado, sin
+  disparadores, creada el 08/11/2026) con `schtasks /run` para que no salga el aviso de UAC. Si se reinstala en otra
+  ruta, hay que recrear la tarea (crearla requiere elevación).
   Para verificar la interfaz sin robar el foco a DCS (se minimiza y se congela): ventana fuera de pantalla con
   `ShowActivated=false` + `RenderTargetBitmap`, en un proyecto aparte que referencie RigControl.
   Falta en la fase 5: gestor de ventanas, mods por symlinks, snapshots, prioridad de CPU.
@@ -347,7 +351,7 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
    capturar el protocolo con Wireshark + USBPcap) y al Bravo. Hecho: luces del Bravo desde MSFS
    y cliente DCS-BIOS, ✅ verificado con DCS y el AH-64D (ver "Fase 4" arriba); luces y
    condiciones desde el estado de DCS (`D:`, ✅ verificado con el AH-64D). Falta: LEDs WinWing.
-5. (en curso) ✅ App Hangar (lanzar apps en secuencia, falta probarlo con los programas reales);
+5. (en curso) ✅ App Hangar (lanzar apps en secuencia);
    gestor de ventanas, mods por symlinks, snapshots, prioridad de CPU
 
 Idea pendiente (propuesta el 02/11/2026, a decidir con el usuario): **generar perfiles con IA**
