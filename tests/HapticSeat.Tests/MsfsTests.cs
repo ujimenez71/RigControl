@@ -131,7 +131,7 @@ public class MsfsTests
         var engine = new EffectEngine(new GroundEffect());
         var motors = new float[8];
         var d = Cruise();
-        engine.Update(Apply(d), [], 0.01f, motors);
+        for (var i = 0; i < 60; i++) engine.Update(Apply(d), [], 0.01f, motors);
         Assert.All(motors, v => Assert.Equal(0, v));
 
         d[Index("SIM ON GROUND")] = 1;

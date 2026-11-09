@@ -53,7 +53,7 @@ public class EffectTests
         s.WheelPos[0] = new Vector3(0, -1.5f, -1.2f);
         s.WheelPos[1] = new Vector3(0, -1.5f, 1.2f);
 
-        engine.Update(s, [], Dt, _motors); // en el aire
+        for (var i = 0; i < 60; i++) engine.Update(s, [], Dt, _motors); // 0,6 s en el aire
         Assert.All(_motors, v => Assert.Equal(0, v));
 
         s.WheelLoad[0] = s.WheelLoad[1] = 0.6f;
@@ -63,6 +63,57 @@ public class EffectTests
         for (var i = 0; i < 100; i++) engine.Update(s, [], Dt, _motors); // 1 s rodando
         Assert.True(_motors.Max() < 0.4f, "sin golpes repetidos, solo rodadura");
         Assert.True(_motors.Max() > 0, "sigue la rodadura");
+    }
+
+    /// <summary>Dos ruedas en el suelo con velocidad sobre el suelo y en IAS dadas (helicóptero: Y = 0 en los patines).</summary>
+    private static FlightState TwoWheels(float iasMs, float groundSpeedMs, float load)
+    {
+        var s = Flying(iasMs);
+        s.GroundSpeedMs = groundSpeedMs;
+        s.WheelCount = 2;
+        s.WheelPos[0] = new Vector3(0, -1.5f, -1.2f);
+        s.WheelPos[1] = new Vector3(0, -1.5f, 1.2f);
+        s.WheelLoad[0] = s.WheelLoad[1] = load;
+        return s;
+    }
+
+    [Fact]
+    public void Helicoptero_que_se_posa_casi_parado_da_el_golpe()
+    {
+        var engine = new EffectEngine(new GroundEffect());
+        var s = TwoWheels(iasMs: 2, groundSpeedMs: 0.5f, load: 0);
+        for (var i = 0; i < 60; i++) engine.Update(s, [], Dt, _motors);
+
+        s.WheelLoad[0] = s.WheelLoad[1] = 0.6f;
+        engine.Update(s, [], Dt, _motors);
+        Assert.True(_motors.Max() > 0.4f);
+    }
+
+    [Fact]
+    public void Rueda_que_se_descarga_un_instante_no_da_golpe()
+    {
+        var engine = new EffectEngine(new GroundEffect());
+        var s = TwoWheels(iasMs: 10, groundSpeedMs: 10, load: 0.6f);
+        for (var i = 0; i < 50; i++) engine.Update(s, [], Dt, _motors);
+
+        s.WheelLoad[0] = 0; // bache: 0,1 s sin carga
+        for (var i = 0; i < 10; i++) engine.Update(s, [], Dt, _motors);
+        s.WheelLoad[0] = 0.6f;
+        engine.Update(s, [], Dt, _motors);
+        Assert.True(_motors.Max() < 0.4f, "solo rodadura");
+    }
+
+    [Fact]
+    public void Helicoptero_parado_con_el_rotor_no_rueda_aunque_la_IAS_no_sea_cero()
+    {
+        var engine = new EffectEngine(new GroundEffect());
+        var s = TwoWheels(iasMs: 2.2f, groundSpeedMs: 0.05f, load: 0.6f);
+        for (var i = 0; i < 20; i++) engine.Update(s, [], Dt, _motors);
+        Assert.All(_motors, v => Assert.Equal(0, v));
+
+        s.GroundSpeedMs = float.NaN; // simulador sin velocidad sobre el suelo: se usa la IAS
+        for (var i = 0; i < 20; i++) engine.Update(s, [], Dt, _motors);
+        Assert.True(_motors.Max() > 0);
     }
 
     [Fact]

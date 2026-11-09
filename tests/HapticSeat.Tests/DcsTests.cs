@@ -11,9 +11,10 @@ public class DcsTests
     /// <summary>Paquete como el del script; cambiar solo lo que interese en cada prueba.</summary>
     private static byte[] Packet(string name = "AH-64D_BLK_II", double time = 10, string ias = "50.000", string agl = "100.000", string g = "1.000",
         string flaps = "0.000", string brake = "0.000", string gear = "1.000", string rodN = "0.000", string rodL = "0.000", string rodR = "0.000",
-        string rpmL = "90.000", string rpmR = "80.000", string shells = "1200", string bombs = "0", string rockets = "38", string failures = "0", string stall = "0") =>
-        Encoding.UTF8.GetBytes(string.Join(';', "HS1", time.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture), name, ias, agl, g, flaps, brake, gear,
-            rodN, rodL, rodR, rpmL, rpmR, shells, bombs, rockets, failures, stall));
+        string rpmL = "90.000", string rpmR = "80.000", string shells = "1200", string bombs = "0", string rockets = "38", string failures = "0", string stall = "0",
+        string? groundSpeed = "49.000") =>
+        Encoding.UTF8.GetBytes(string.Join(';', new[] { "HS1", time.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture), name, ias, agl, g, flaps, brake, gear,
+            rodN, rodL, rodR, rpmL, rpmR, shells, bombs, rockets, failures, stall, groundSpeed }.Where(f => f is not null)));
 
     private readonly DcsDecoder _decoder = new();
     private readonly FlightState _state = new();
@@ -35,6 +36,20 @@ public class DcsTests
         Assert.Equal(0.75f, _state.GearPosition[2], 0.001f);
         Assert.Equal(0.1f, _state.WheelLoad[1], 0.001f);
         Assert.Equal(0, _state.WheelLoad[0]);
+    }
+
+    [Fact]
+    public void Velocidad_sobre_el_suelo_y_paquetes_del_script_anterior_sin_ella()
+    {
+        Feed(Packet(groundSpeed: "0.300"));
+        Assert.Equal(0.3f, _state.GroundSpeedMs, 0.001f);
+
+        Feed(Packet(groundSpeed: ""));
+        Assert.True(float.IsNaN(_state.GroundSpeedMs));
+
+        Feed(Packet(groundSpeed: null)); // 19 campos
+        Assert.True(float.IsNaN(_state.GroundSpeedMs));
+        Assert.Equal(50, _state.IasMs, 0.001f);
     }
 
     [Fact]
@@ -63,7 +78,7 @@ public class DcsTests
     [InlineData("")]
     [InlineData("HS1;1;2")]
     [InlineData("XX1;0;a;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0")]
-    [InlineData("HS1;0;a;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;campo de más")]
+    [InlineData("HS1;0;a;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;campo de más")]
     public void Paquete_ajeno_se_rechaza(string text) =>
         Assert.False(_decoder.Decode(Encoding.UTF8.GetBytes(text), _state, _events));
 

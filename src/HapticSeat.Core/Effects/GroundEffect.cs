@@ -5,17 +5,21 @@ namespace HapticSeat.Effects;
 /// <summary>
 /// Rodadura por pista (cada rueda en su lado, más rugosa con la velocidad) y golpe de toma de contacto
 /// cuando una rueda pasa de estar en el aire a tener carga, más fuerte cuanto mayor la G vertical.
+/// El golpe exige que esa rueda haya estado un rato en el aire, no una velocidad: un helicóptero toma
+/// tierra casi parado, y un bache rodando no deja una rueda medio segundo sin carga.
 /// </summary>
 public sealed class GroundEffect : IEffect
 {
     private const float OnGround = 0.005f;
     private const float Rolling = 1; // m/s
+    private const float MinAirborne = 0.5f; // s
 
     private readonly Oscillator[] _osc = [new(101), new(103), new(107), new(109)];
     private readonly float[] _prevLoad = new float[FlightState.MaxWheels];
     private readonly float[] _weights = new float[8];
     private readonly Envelope _touchdown = new(0.15f);
     private bool _primed;
+    private readonly float[] _airborne = new float[FlightState.MaxWheels]; // s de cada rueda sin carga
 
     public string Id => "ground";
     public string Name => "Suelo";
@@ -24,7 +28,8 @@ public sealed class GroundEffect : IEffect
 
     public void Update(FlightState s, ReadOnlySpan<FlightEvent> events, float dt, Span<float> motors)
     {
-        var speed = Math.Clamp(s.IasMs / 50, 0, 1);
+        var rolling = s.RollingSpeedMs;
+        var speed = Math.Clamp(rolling / 50, 0, 1);
 
         // La rodadura se promedia entre las ruedas apoyadas: con más ruedas no debe vibrar más,
         // y así la toma de contacto siempre destaca sobre ella
@@ -40,7 +45,7 @@ public sealed class GroundEffect : IEffect
             if (load > OnGround)
             {
                 // Parado no hay rodadura: si no, el asiento vibraría sin parar con el avión aparcado
-                if (s.IasMs > Rolling)
+                if (rolling > Rolling)
                 {
                     var hz = 6 + 20 * speed;
                     var rough = _osc[i].Noise(hz, dt);
@@ -48,14 +53,15 @@ public sealed class GroundEffect : IEffect
                     for (var m = 0; m < motors.Length; m++) motors[m] += Zones.Seat[m] * _weights[m] * amount * Gain;
                 }
 
-                // Toma de contacto: rueda que estaba en el aire y viene con velocidad
-                if (_primed && _prevLoad[i] <= OnGround && s.IasMs > 15)
+                // Toma de contacto: rueda que se carga tras un rato en el aire
+                if (_primed && _prevLoad[i] <= OnGround && _airborne[i] >= MinAirborne)
                 {
                     var hit = Math.Clamp(0.45f + 0.35f * (s.VerticalG - 1), 0.45f, 1);
                     _touchdown.Trigger(_weights, hit * Gain);
                 }
             }
             _prevLoad[i] = load;
+            _airborne[i] = load > OnGround ? 0 : _airborne[i] + dt;
         }
 
         _primed = true;
@@ -65,6 +71,7 @@ public sealed class GroundEffect : IEffect
     public void Reset()
     {
         _primed = false;
+        Array.Clear(_airborne);
         Array.Clear(_prevLoad);
         _touchdown.Reset();
     }

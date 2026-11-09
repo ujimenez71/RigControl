@@ -26,9 +26,12 @@ public sealed class DcsDecoder
     /// <summary>Tope de golpes por paquete, para que una caída de munición (rearme) no dé una ráfaga larga.</summary>
     private const int MaxEventsPerPacket = 4;
 
-    private const int FieldCount = 19;
+    /// <summary>La velocidad sobre el suelo (último campo) llegó después: sin ella el paquete también vale.</summary>
+    private const int FieldCount = 20, MinFieldCount = 19;
     private const int Time = 1, Name = 2, Ias = 3, Agl = 4, G = 5, Flaps = 6, Airbrake = 7, Gear = 8, RodNose = 9,
-        Shells = 14, Bombs = 15, Rockets = 16, Failures = 17, Stall = 18, RpmLeft = 12, RpmRight = 13;
+        Shells = 14, Bombs = 15, Rockets = 16, Failures = 17, Stall = 18, RpmLeft = 12, RpmRight = 13, GroundSpeed = 19;
+
+    private int _fieldCount;
 
     private static readonly Vector3 GunPosition = new(1.5f, -1, 0);
     private static readonly Vector3 PylonPosition = new(0, -1, 0);
@@ -57,6 +60,7 @@ public sealed class DcsDecoder
         ModelTime = Number(packet, Time);
         s.IasMs = (float)Number(packet, Ias);
         s.AglM = (float)Number(packet, Agl);
+        s.GroundSpeedMs = _fieldCount > GroundSpeed && OptionalNumber(packet, GroundSpeed, out var gs) ? (float)gs : float.NaN;
         s.Accel = new Vector3(0, (float)Number(packet, G) * StandardG, 0);
         s.Flaps = (float)Number(packet, Flaps);
         s.Airbrake = (float)Number(packet, Airbrake);
@@ -75,7 +79,7 @@ public sealed class DcsDecoder
         return true;
     }
 
-    /// <summary>Localiza los campos; false si no son exactamente los esperados.</summary>
+    /// <summary>Localiza los campos; false si no son los esperados.</summary>
     private bool SplitFields(ReadOnlySpan<byte> packet)
     {
         int count = 0, start = 0;
@@ -87,13 +91,17 @@ public sealed class DcsDecoder
             start = i + 1;
         }
         _fields[count++] = start..packet.Length;
-        return count == FieldCount;
+        _fieldCount = count;
+        return count >= MinFieldCount;
     }
 
     private void ForgetArmament() => _prevShells = _prevBombs = _prevRockets = _prevFailures = -1;
 
     private double Number(ReadOnlySpan<byte> packet, int field) =>
         Utf8Parser.TryParse(packet[_fields[field]], out double value, out _) && double.IsFinite(value) ? value : 0;
+
+    private bool OptionalNumber(ReadOnlySpan<byte> packet, int field, out double value) =>
+        Utf8Parser.TryParse(packet[_fields[field]], out value, out _) && double.IsFinite(value);
 
     private void ReadEngines(ReadOnlySpan<byte> packet, FlightState s)
     {

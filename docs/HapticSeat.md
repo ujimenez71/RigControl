@@ -81,7 +81,7 @@ tests/HapticSeat.Tests
 |---|---|---|
 | IL-2 GB | UDP 5678 a 127.255.255.255 (`telemetrydevice` + `motiondevice` en `data\startup.cfg`) | Decodificador hecho; falta probar en vuelo |
 | IL-2 Korea | `E:\IL2Series\game\data\startup.cfg` | Bloques añadidos el 20/10/2026 (copia en `startup.cfg.antes-hapticseat`); falta ver si emite |
-| DCS | `dcs/HapticSeatExport.lua` → UDP 5679 (`Telemetry/Dcs/`). OJO: la carpeta activa es `Saved Games\DCS.openbeta\Scripts`, no `Saved Games\DCS` | Probado con el script real en el `luae.exe` de DCS y funciones Lo* simuladas; FALTA contrastar con DCS real |
+| DCS | `dcs/HapticSeatExport.lua` → UDP 5679 (`Telemetry/Dcs/`). OJO: la carpeta activa es `Saved Games\DCS.openbeta\Scripts`, no `Saved Games\DCS` | ✅ Datos verificados volando el AH-64D sin cojín (09/11/2026); faltan armas, pausa y probarlo con el cojín |
 | MSFS 2024 | SimConnect (`Telemetry/Msfs/`) | ✅ Verificado volando el C172 con el cojín puesto (08/11/2026): el usuario notó todos los efectos. Sin ajustar intensidades ni probar una toma suave |
 
 La app escucha MSFS, DCS e IL-2 a la vez (`MultiSource`: gana el que está volando).
@@ -96,9 +96,14 @@ La app escucha MSFS, DCS e IL-2 a la vez (`MultiSource`: gana el que está volan
 - Pausa = deja de avanzar `LoGetModelTime` o de llegar paquetes. Sin permiso de exportación del servidor no se envía nada.
 - `DcsDecoder` deduce disparos, bombas y cohetes de lo que baja el armamento (sin distinguir calibre; misiles = cohetes) e impactos de que
   aumente el número de averías de `LoGetMCPState`.
-- **A comprobar con el Apache:** qué devuelve cada función en un módulo de cabina completa (`LoGetMCPState` puede venir vacío y el
-  `gear.main.*.rod` puede no valer cero en el aire o no existir en ruedas de helicóptero, lo que afecta a la rodadura y al golpe), si
-  `Cannon.shells` baja al disparar el cañón y si las RPM del motor representan bien la vibración. Aún no hay efecto propio de rotor.
+- **Vuelo con el AH-64D (09/11/2026, `dcs --sin-cojin`):** avión, IAS, AGL, G y RPM coherentes (RPM en %: 87 en tierra, 93-96 en
+  vuelo). `gear.main.left/right.rod` = 0,5-0,7 en tierra y 0 en el aire; `nose` siempre 0 (la rueda de cola no sale en la API).
+  Dos fallos corregidos: (1) el golpe de contacto exigía IAS > 15 m/s y el helicóptero toma tierra casi parado: ahora exige que
+  esa rueda lleve ≥ 0,5 s sin carga; (2) posado con el rotor girando la IAS marca ~8 km/h por el aire del rotor y la rodadura
+  vibraba parado: el script envía la velocidad horizontal sobre el suelo (`LoGetVectorVelocity`, campo 20, opcional) y la
+  rodadura usa `FlightState.RollingSpeedMs` (sobre el suelo o, si el simulador no la da, la IAS).
+  **Falta comprobar:** que `Cannon.shells` baja al disparar, cohetes/misiles, la pausa (ESC) y si `LoGetMCPState` da averías.
+  Aún no hay efecto propio de rotor.
 
 ### MSFS 2024
 

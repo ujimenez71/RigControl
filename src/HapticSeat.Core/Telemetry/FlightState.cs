@@ -27,6 +27,13 @@ public sealed class FlightState
     public float IasMs;
     public float AglM;
 
+    /// <summary>Velocidad horizontal respecto al suelo en m/s; NaN = el simulador no la da.</summary>
+    public float GroundSpeedMs = float.NaN;
+
+    /// <summary>Para la rodadura: la velocidad sobre el suelo o, si no se sabe, la IAS (en un helicóptero
+    /// parado la IAS no es cero por el aire que mueve el rotor).</summary>
+    public float RollingSpeedMs => float.IsNaN(GroundSpeedMs) ? IasMs : GroundSpeedMs;
+
     /// <summary>Aceleraciones del avión en m/s²: longitudinal, vertical y lateral.</summary>
     public Vector3 Accel;
 
@@ -64,6 +71,7 @@ public sealed class FlightState
         o.Aircraft = Aircraft;
         o.IasMs = IasMs;
         o.AglM = AglM;
+        o.GroundSpeedMs = GroundSpeedMs;
         o.Accel = Accel;
         o.RollRate = RollRate;
         o.PitchRate = PitchRate;
@@ -87,6 +95,7 @@ public sealed class FlightState
     /// <summary>Vuelve a cero al cambiar de avión o de misión.</summary>
     public void ResetAircraft()
     {
+        GroundSpeedMs = float.NaN;
         EngineCount = 0;
         WheelCount = 0;
         Array.Clear(EngineRpm);

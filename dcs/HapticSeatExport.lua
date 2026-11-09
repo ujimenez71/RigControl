@@ -6,7 +6,7 @@
 --
 -- Formato (texto, separado por ";"; un campo vacío = sin dato):
 --   HS1;tiempo;avión;ias;agl;g;flaps;aerofreno;tren;rodMorro;rodIzq;rodDer;rpmIzq;rpmDer;
---   proyectiles;bombas;cohetes;averías;aviso de pérdida
+--   proyectiles;bombas;cohetes;averías;aviso de pérdida;velocidad sobre el suelo
 
 do
     local HOST, PORT = "127.0.0.1", 5679
@@ -81,6 +81,7 @@ do
         local accel = call(LoGetAccelerationUnits)
         local mech = call(LoGetMechInfo)
         local engine = call(LoGetEngineInfo)
+        local velocity = call(LoGetVectorVelocity) -- ejes del mundo, Y arriba
 
         local gear = type(mech) == "table" and mech.gear or nil
         local main = type(gear) == "table" and gear.main or nil
@@ -102,6 +103,8 @@ do
             type(rpm) == "table" and num(rpm.left) or "",
             type(rpm) == "table" and num(rpm.right) or "",
             tostring(shells), tostring(bombs), tostring(rockets), tostring(failures), tostring(stall),
+            type(velocity) == "table" and type(velocity.x) == "number" and type(velocity.z) == "number"
+                and num(math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z)) or "",
         }, ";"))
     end
 
