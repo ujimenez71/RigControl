@@ -32,6 +32,11 @@ public sealed class EffectDemo
                 _s.EngineMaxRpm[0] = 2800;
                 _s.EnginePos[0] = new Vector3(2, 0, 0);
                 break;
+            case "rotor":
+                _s.Rotorcraft = true;
+                _s.RotorSpeed = 1;
+                _s.BladePassHz = 19;
+                break;
             case "ground" or "gearflaps":
                 _s.WheelCount = 3;
                 _s.WheelPos[0] = new Vector3(0.5f, -1.5f, -1.2f);
@@ -52,6 +57,9 @@ public sealed class EffectDemo
         {
             case "engine": // de ralentí a potencia máxima
                 _s.EngineRpm[0] = 800 + 1900 * u;
+                break;
+            case "rotor": // de estacionario a 70 km/h: pasa por la sustentación traslacional
+                _s.IasMs = 20 * u;
                 break;
             case "buffet": // entra en pérdida y sale
                 _s.BuffetFrequency = 10;

@@ -102,8 +102,16 @@ La app escucha MSFS, DCS e IL-2 a la vez (`MultiSource`: gana el que está volan
   esa rueda lleve ≥ 0,5 s sin carga; (2) posado con el rotor girando la IAS marca ~8 km/h por el aire del rotor y la rodadura
   vibraba parado: el script envía la velocidad horizontal sobre el suelo (`LoGetVectorVelocity`, campo 20, opcional) y la
   rodadura usa `FlightState.RollingSpeedMs` (sobre el suelo o, si el simulador no la da, la IAS).
-  **Falta comprobar:** que `Cannon.shells` baja al disparar, cohetes/misiles, la pausa (ESC) y si `LoGetMCPState` da averías.
-  Aún no hay efecto propio de rotor.
+  2.º vuelo con el cojín (09/11/2026): ✅ cañón (`Cannon.shells` baja, ~10 disparos/s), ✅ cohetes (uno por cohete), ✅ pausa (ESC:
+  "En pausa" y a los ~2,5 s DCS deja de enviar; motores a cero) y ✅ golpe de toma de contacto (4,1 G, 2,2 G y 2,7 G). El usuario:
+  cañón y cohetes se notan bien; el motor, exagerado en tierra y en vuelo (en helicópteros de turbina reales apenas se nota).
+  Falta comprobar si `LoGetMCPState` da averías.
+- **Rotor (09/11/2026):** el script envía el campo 21 = helicóptero (`LoGetSelfData().Type.level2 == 2`). DCS no
+  da las RPM del rotor: `RotorSpeed` se deduce de las turbinas (40 % = parado, 80 % = a régimen; el Apache marca 87 % posado).
+  `RotorEffect` vibra a la frecuencia de paso de palas (`Telemetry/Rotors.cs`, por modelo: AH-64 19,3 Hz, UH-1 10,8 Hz...; 15 Hz si
+  no se conoce): base suave + sustentación traslacional (pico a 36 km/h IAS) + alta velocidad (desde 234 km/h) + G. En
+  helicópteros `EngineEffect` baja al 12 %. ✅ Volado con el AH-64D y el cojín (09/11/2026): rotor detectado (100 %), el usuario
+  da por buenos el rotor y el resto de efectos; el motor al 25 % aún se notaba demasiado y se bajó al 12 % (sin volar aún así).
 
 ### MSFS 2024
 
@@ -143,7 +151,7 @@ App WPF funcionando (20/10/2026): probada con telemetría simulada (perfil autom
 cojín en vivo). Falta probarla volando y los botones Probar/Medir con el usuario sentado.
 Comandos de consola: `estado`, `test [pct]`, `motor <0-7|todos> <pct> [ms]`, `umbral [motor]`,
 `il2|msfs|dcs [--sin-cojin] [--ganancia %] [--minimo 0-255] [--puerto N]` (la consola no usa perfiles, solo los mínimos).
-Efectos: motor, buffet, suelo (rodadura + toma de contacto), tren/flaps, aerofreno, carga G, armas, impactos,
+Efectos: motor, rotor (helicópteros), buffet, suelo (rodadura + toma de contacto), tren/flaps, aerofreno, carga G, armas, impactos,
 bombas/cohetes. Probado con paquetes sintéticos de extremo a extremo (20/10/2026); falta volar.
 Nivel mínimo por motor (`Hf8Motors.DefaultMinLevels`), medido con `umbral` sentado y el dial al máximo
 (20/10/2026): glúteos 20, espalda 25, hombros 30; muslos sin medir (20, como glúteos). `--minimo N` fuerza uno común.
@@ -153,7 +161,7 @@ Nivel mínimo por motor (`Hf8Motors.DefaultMinLevels`), medido con `umbral` sent
 1. ✅ Driver del HF8 con watchdog y pruebas de motores
 2. ✅ Lector IL-2 (UDP), modelo de telemetría común y motor de efectos. Pendiente: calibrar en vuelo
 3. ✅ Perfiles JSON por avión y app WPF (visor en vivo, efectos, calibración guiada, bandeja)
-4. ✅ MSFS 2024 (SimConnect). DCS (Export.lua por UDP) hecho, falta contrastarlo en vuelo; después, efecto de rotor para helicópteros
+4. ✅ MSFS 2024 (SimConnect). ✅ DCS (Export.lua por UDP), verificado con el AH-64D. ✅ Efecto de rotor (volado con el AH-64D)
 5. Pendientes menores: ajustes avanzados por efecto (escalas de buffet/impactos tras calibrar en vuelo),
    arranque con Windows, cambiar el puerto UDP desde la interfaz (hoy solo en settings.json, requiere reiniciar)
 

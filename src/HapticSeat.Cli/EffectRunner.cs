@@ -88,6 +88,7 @@ public static class EffectRunner
         else
         {
             sb.Append($"IAS {s.IasMs * 3.6f,4:0} km/h  G {s.VerticalG,4:0.0}  AGL {s.AglM,5:0} m  RPM {(s.EngineCount > 0 ? s.EngineRpm[0] : 0),4:0}");
+            if (s.Rotorcraft) sb.Append($"  rotor {s.RotorSpeed * 100,3:0}%");
             sb.Append($"  buffet {s.BuffetAmplitude:0.00}@{s.BuffetFrequency:0}Hz  ruedas ");
             for (var i = 0; i < s.WheelCount; i++) sb.Append($"{s.WheelLoad[i]:0.0} ");
         }

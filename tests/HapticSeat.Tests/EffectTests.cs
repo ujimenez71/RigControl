@@ -77,6 +77,71 @@ public class EffectTests
         return s;
     }
 
+    private static FlightState Helicopter(float iasMs, float rotor = 1)
+    {
+        var s = Flying(iasMs);
+        s.Rotorcraft = true;
+        s.RotorSpeed = rotor;
+        s.BladePassHz = 19;
+        return s;
+    }
+
+    private float RotorPeak(FlightState s)
+    {
+        var engine = new EffectEngine(new RotorEffect());
+        var peak = 0f;
+        for (var i = 0; i < 100; i++)
+        {
+            engine.Update(s, [], Dt, _motors);
+            peak = Math.Max(peak, _motors.Max());
+        }
+        return peak;
+    }
+
+    [Fact]
+    public void Rotor_suave_en_estacionario_y_crucero_y_fuerte_en_traslacional_y_alta_velocidad()
+    {
+        var hover = RotorPeak(Helicopter(0));
+        var etl = RotorPeak(Helicopter(10));
+        var cruise = RotorPeak(Helicopter(45));
+        var fast = RotorPeak(Helicopter(90));
+        Assert.InRange(hover, 0.04f, 0.12f);
+        Assert.InRange(cruise, 0.04f, 0.12f);
+        Assert.True(etl > hover * 2.5f, $"traslacional {etl:0.00} frente a estacionario {hover:0.00}");
+        Assert.True(fast > cruise * 3, $"rápido {fast:0.00} frente a crucero {cruise:0.00}");
+
+        var g = Helicopter(45);
+        g.Accel = new Vector3(0, 9.81f * 2.5f, 0);
+        Assert.True(RotorPeak(g) > cruise * 2);
+    }
+
+    [Fact]
+    public void Rotor_parado_o_avion_no_vibran()
+    {
+        Assert.Equal(0, RotorPeak(Helicopter(10, rotor: 0)));
+        var plane = Helicopter(10);
+        plane.Rotorcraft = false;
+        Assert.Equal(0, RotorPeak(plane));
+        Assert.True(RotorPeak(Helicopter(10, rotor: 0.5f)) < RotorPeak(Helicopter(10)) * 0.4f, "arrancando, flojo");
+    }
+
+    [Fact]
+    public void En_helicopteros_el_motor_casi_no_se_nota()
+    {
+        float EnginePeak(bool rotorcraft)
+        {
+            var engine = new EffectEngine(new EngineEffect());
+            var s = Flying();
+            s.Rotorcraft = rotorcraft;
+            s.EngineCount = 1;
+            s.EngineRpm[0] = s.EngineMaxRpm[0] = 3000;
+            var peak = 0f;
+            for (var i = 0; i < 100; i++) { engine.Update(s, [], Dt, _motors); peak = Math.Max(peak, _motors.Max()); }
+            return peak;
+        }
+        Assert.True(EnginePeak(true) < EnginePeak(false) * 0.3f);
+    }
+
     [Fact]
     public void Helicoptero_que_se_posa_casi_parado_da_el_golpe()
     {

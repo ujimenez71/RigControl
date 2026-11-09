@@ -4,11 +4,13 @@ namespace HapticSeat.Effects;
 
 /// <summary>
 /// Vibración de fondo de cada motor: crece con las RPM y "late" a un ritmo ligado a ellas.
-/// En multimotores se nota más del lado de cada motor.
+/// En multimotores se nota más del lado de cada motor. En helicópteros (turbinas) casi no se nota:
+/// lo que se siente es el rotor (<see cref="RotorEffect"/>).
 /// </summary>
 public sealed class EngineEffect : IEffect
 {
     private const float DefaultMaxRpm = 2700;
+    private const float RotorcraftScale = 0.12f;
     private readonly Oscillator[] _osc = [new(11), new(23), new(37), new(53)];
     private readonly float[] _weights = new float[8];
 
@@ -26,7 +28,7 @@ public sealed class EngineEffect : IEffect
 
             var max = s.EngineMaxRpm[i] > 0 ? s.EngineMaxRpm[i] : DefaultMaxRpm;
             var norm = Math.Clamp(rpm / max, 0, 1.2f);
-            var level = 0.10f + 0.25f * norm;
+            var level = (0.10f + 0.25f * norm) * (s.Rotorcraft ? RotorcraftScale : 1);
             var throbHz = Math.Clamp(rpm / 60 / 8, 2, 12);
             var throb = 0.7f + 0.3f * _osc[i].Sine(throbHz, dt);
 

@@ -48,6 +48,15 @@ public sealed class FlightState
     public float BuffetFrequency;
     public float BuffetAmplitude;
 
+    /// <summary>Helicóptero: el efecto de rotor sustituye casi por completo al de motor (turbinas).</summary>
+    public bool Rotorcraft;
+
+    /// <summary>Velocidad del rotor respecto a la nominal, 0 parado .. 1.</summary>
+    public float RotorSpeed;
+
+    /// <summary>Paso de palas a régimen nominal (palas × vueltas por segundo); 0 = desconocido.</summary>
+    public float BladePassHz;
+
     public int EngineCount;
     public readonly float[] EngineRpm = new float[MaxEngines];
     public readonly float[] EngineMaxRpm = new float[MaxEngines];
@@ -82,6 +91,9 @@ public sealed class FlightState
         o.Airbrake = Airbrake;
         o.BuffetFrequency = BuffetFrequency;
         o.BuffetAmplitude = BuffetAmplitude;
+        o.Rotorcraft = Rotorcraft;
+        o.RotorSpeed = RotorSpeed;
+        o.BladePassHz = BladePassHz;
         o.EngineCount = EngineCount;
         EngineRpm.CopyTo(o.EngineRpm, 0);
         EngineMaxRpm.CopyTo(o.EngineMaxRpm, 0);
@@ -96,6 +108,9 @@ public sealed class FlightState
     public void ResetAircraft()
     {
         GroundSpeedMs = float.NaN;
+        Rotorcraft = false;
+        RotorSpeed = 0;
+        BladePassHz = 0;
         EngineCount = 0;
         WheelCount = 0;
         Array.Clear(EngineRpm);

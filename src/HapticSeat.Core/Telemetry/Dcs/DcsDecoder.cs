@@ -26,10 +26,14 @@ public sealed class DcsDecoder
     /// <summary>Tope de golpes por paquete, para que una caída de munición (rearme) no dé una ráfaga larga.</summary>
     private const int MaxEventsPerPacket = 4;
 
-    /// <summary>La velocidad sobre el suelo (último campo) llegó después: sin ella el paquete también vale.</summary>
-    private const int FieldCount = 20, MinFieldCount = 19;
+    /// <summary>Velocidad sobre el suelo y helicóptero llegaron después: sin ellos el paquete también vale.</summary>
+    private const int FieldCount = 21, MinFieldCount = 19;
     private const int Time = 1, Name = 2, Ias = 3, Agl = 4, G = 5, Flaps = 6, Airbrake = 7, Gear = 8, RodNose = 9,
-        Shells = 14, Bombs = 15, Rockets = 16, Failures = 17, Stall = 18, RpmLeft = 12, RpmRight = 13, GroundSpeed = 19;
+        Shells = 14, Bombs = 15, Rockets = 16, Failures = 17, Stall = 18, RpmLeft = 12, RpmRight = 13, GroundSpeed = 19, Rotorcraft = 20;
+
+    /// <summary>% de RPM de las turbinas con el que el rotor se da por parado / a régimen. DCS no da las RPM del
+    /// rotor; los helicópteros lo mantienen a régimen con el motor en marcha, así que basta para el arranque.</summary>
+    private const float RotorStoppedPct = 40, RotorNominalPct = 80;
 
     private int _fieldCount;
 
@@ -70,6 +74,7 @@ public sealed class DcsDecoder
         s.BuffetFrequency = stalling ? StallBuffetHz : 0;
 
         ReadEngines(packet, s);
+        ReadRotor(packet, s);
         ReadWheels(packet, s);
 
         Armament(Number(packet, Shells), ref _prevShells, FlightEventType.GunFired, GunMomentum, GunPosition, events);
@@ -115,6 +120,19 @@ public sealed class DcsDecoder
             s.EnginePos[i] = TypicalAirframe.EnginePosition(s.EngineCount, i);
         }
         if (s.EngineCount == 1) s.EngineRpm[1] = s.EngineMaxRpm[1] = 0;
+    }
+
+    private void ReadRotor(ReadOnlySpan<byte> packet, FlightState s)
+    {
+        s.Rotorcraft = _fieldCount > Rotorcraft && Number(packet, Rotorcraft) == 1;
+        if (!s.Rotorcraft)
+        {
+            s.RotorSpeed = s.BladePassHz = 0;
+            return;
+        }
+        var pct = Math.Max(Number(packet, RpmLeft), Number(packet, RpmRight));
+        s.RotorSpeed = (float)Math.Clamp((pct - RotorStoppedPct) / (RotorNominalPct - RotorStoppedPct), 0, 1);
+        s.BladePassHz = Rotors.BladePassHz(s.Aircraft);
     }
 
     private void ReadWheels(ReadOnlySpan<byte> packet, FlightState s)

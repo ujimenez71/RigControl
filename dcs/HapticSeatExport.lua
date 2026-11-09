@@ -6,7 +6,8 @@
 --
 -- Formato (texto, separado por ";"; un campo vacío = sin dato):
 --   HS1;tiempo;avión;ias;agl;g;flaps;aerofreno;tren;rodMorro;rodIzq;rodDer;rpmIzq;rpmDer;
---   proyectiles;bombas;cohetes;averías;aviso de pérdida;velocidad sobre el suelo
+--   proyectiles;bombas;cohetes;averías;aviso de pérdida;velocidad sobre el suelo;
+--   helicóptero (1/0, del tipo del avión: level2 = 2 en Scripts\database\wsTypes.lua)
 
 do
     local HOST, PORT = "127.0.0.1", 5679
@@ -23,6 +24,7 @@ do
     local shells, bombs, rockets, failures, stall = "", "", "", "", 0
 
     local WEAPON, MISSILE, BOMB, NURS = 4, 4, 5, 7
+    local HELICOPTER = 2
 
     local function call(fn)
         if not fn then return nil end
@@ -105,6 +107,7 @@ do
             tostring(shells), tostring(bombs), tostring(rockets), tostring(failures), tostring(stall),
             type(velocity) == "table" and type(velocity.x) == "number" and type(velocity.z) == "number"
                 and num(math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z)) or "",
+            type(self) == "table" and type(self.Type) == "table" and (self.Type.level2 == HELICOPTER and "1" or "0") or "",
         }, ";"))
     end
 

@@ -12,9 +12,9 @@ public class DcsTests
     private static byte[] Packet(string name = "AH-64D_BLK_II", double time = 10, string ias = "50.000", string agl = "100.000", string g = "1.000",
         string flaps = "0.000", string brake = "0.000", string gear = "1.000", string rodN = "0.000", string rodL = "0.000", string rodR = "0.000",
         string rpmL = "90.000", string rpmR = "80.000", string shells = "1200", string bombs = "0", string rockets = "38", string failures = "0", string stall = "0",
-        string? groundSpeed = "49.000") =>
+        string? groundSpeed = "49.000", string? heli = "1") =>
         Encoding.UTF8.GetBytes(string.Join(';', new[] { "HS1", time.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture), name, ias, agl, g, flaps, brake, gear,
-            rodN, rodL, rodR, rpmL, rpmR, shells, bombs, rockets, failures, stall, groundSpeed }.Where(f => f is not null)));
+            rodN, rodL, rodR, rpmL, rpmR, shells, bombs, rockets, failures, stall, groundSpeed, heli }.Where(f => f is not null)));
 
     private readonly DcsDecoder _decoder = new();
     private readonly FlightState _state = new();
@@ -47,9 +47,31 @@ public class DcsTests
         Feed(Packet(groundSpeed: ""));
         Assert.True(float.IsNaN(_state.GroundSpeedMs));
 
-        Feed(Packet(groundSpeed: null)); // 19 campos
+        Feed(Packet(groundSpeed: null, heli: null)); // 19 campos
         Assert.True(float.IsNaN(_state.GroundSpeedMs));
         Assert.Equal(50, _state.IasMs, 0.001f);
+    }
+
+    [Fact]
+    public void Helicoptero_con_rotor_segun_las_turbinas_y_paso_de_palas_por_modelo()
+    {
+        Feed(Packet(rpmL: "87.000", rpmR: "60.000"));
+        Assert.True(_state.Rotorcraft);
+        Assert.Equal(1, _state.RotorSpeed);
+        Assert.Equal(19.3f, _state.BladePassHz, 0.1f);
+
+        Feed(Packet(rpmL: "60.000", rpmR: "0.000")); // arrancando
+        Assert.Equal(0.5f, _state.RotorSpeed, 0.001f);
+
+        Feed(Packet(name: "Desconocido", heli: "1"));
+        Assert.Equal(0, _state.BladePassHz);
+
+        Feed(Packet(name: "F-16C_50", heli: "0"));
+        Assert.False(_state.Rotorcraft);
+        Assert.Equal(0, _state.RotorSpeed);
+
+        Feed(Packet(heli: null)); // script anterior: no se sabe, se trata como avión
+        Assert.False(_state.Rotorcraft);
     }
 
     [Fact]
@@ -78,7 +100,7 @@ public class DcsTests
     [InlineData("")]
     [InlineData("HS1;1;2")]
     [InlineData("XX1;0;a;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0")]
-    [InlineData("HS1;0;a;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;campo de más")]
+    [InlineData("HS1;0;a;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;campo de más")]
     public void Paquete_ajeno_se_rechaza(string text) =>
         Assert.False(_decoder.Decode(Encoding.UTF8.GetBytes(text), _state, _events));
 

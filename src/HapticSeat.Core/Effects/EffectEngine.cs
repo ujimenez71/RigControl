@@ -47,6 +47,7 @@ public sealed class EffectEngine
 
     public static EffectEngine CreateDefault() => new(
         new EngineEffect(),
+        new RotorEffect(),
         new StallBuffetEffect(),
         new GroundEffect(),
         new GearFlapsEffect(),
