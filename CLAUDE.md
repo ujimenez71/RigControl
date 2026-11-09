@@ -83,7 +83,7 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
   MSFS 2024 es de la Store: `shell:AppsFolder\Microsoft.Limitless_8wekyb3d8bbwe!App`, proceso
   `FlightSimulator2024` (arranca vía GameLaunchHelper), ✅ arranque verificado por el usuario (08/11/2026). DCS está en G: (el registro aún dice E:).
   VPC no necesita programa residente. OpenKneeboard: su carpeta de Program Files no tiene .exe, sin incluir.
-  HapticSeat va en los dos hangares (copia publicada, ver `docs/HapticSeat.md`), aunque aún solo tiene telemetría de IL-2.
+  HapticSeat va en los dos hangares (copia publicada, ver `docs/HapticSeat.md`), con telemetría de IL-2, MSFS 2024 y DCS (✅ verificado con el AH-64D, efecto de rotor incluido, 09/11/2026).
   SimAppPro pide administrador: el Hangar lanza la tarea programada `RigControl\SimAppPro` (nivel elevado, sin
   disparadores, creada el 08/11/2026) con `schtasks /run` para que no salga el aviso de UAC. Si se reinstala en otra
   ruta, hay que recrear la tarea (crearla requiere elevación).
