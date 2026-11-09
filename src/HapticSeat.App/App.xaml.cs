@@ -4,6 +4,7 @@ using HapticSeat.App.ViewModels;
 using HapticSeat.Effects;
 using HapticSeat.Profiles;
 using HapticSeat.Telemetry;
+using HapticSeat.Telemetry.Dcs;
 using HapticSeat.Telemetry.Il2;
 using HapticSeat.Telemetry.Msfs;
 
@@ -40,7 +41,7 @@ public partial class App : Application
         var warnings = new List<string>();
         var profiles = store.LoadAll(warnings.Add);
 
-        var source = new MultiSource(new MsfsSource(), new Il2Source(settings.Il2Port));
+        var source = new MultiSource(new MsfsSource(), new DcsSource(), new Il2Source(settings.Il2Port));
         _host = new HapticHost(source, EffectEngine.CreateDefault(), settings.MinLevelBytes());
         _host.Start();
 

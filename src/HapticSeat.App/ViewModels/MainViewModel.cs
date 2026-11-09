@@ -367,7 +367,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         (SimText, SimColor) = f.Connected
             ? f.Paused ? ($"{f.Source}: en pausa o menús", Warn) : ($"{f.Source}: recibiendo", Ok)
             : _host.SourceError is { } sourceError ? (sourceError, Warn)
-            : ("Esperando a MSFS o IL-2", Idle);
+            : ("Esperando a MSFS, DCS o IL-2", Idle);
         Flying = f.Active;
 
         if (f.Active)

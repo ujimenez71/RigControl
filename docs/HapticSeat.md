@@ -4,7 +4,7 @@ App propia de efectos hápticos para el cojín Next Level Racing HF8 Pro a parti
 de DCS World, MSFS 2024, IL-2 Sturmovik (Great Battles) e IL-2 Korea. Nace porque HFS (app oficial)
 y SimHub se quedan cortos en simulación de vuelo. Vive en el repo de RigControl (desde el 08/11/2026) como
 programa aparte: comparten solución, no proceso ni código, y RigControl lo abre desde el Hangar.
-La copia antigua en `C:\Users\ujime\source\repos\HapticSeat` ya no es la buena.
+La carpeta antigua `source\repos\HapticSeat` se borró el 08/11/2026.
 
 ## Stack
 
@@ -81,10 +81,24 @@ tests/HapticSeat.Tests
 |---|---|---|
 | IL-2 GB | UDP 5678 a 127.255.255.255 (`telemetrydevice` + `motiondevice` en `data\startup.cfg`) | Decodificador hecho; falta probar en vuelo |
 | IL-2 Korea | `E:\IL2Series\game\data\startup.cfg` | Bloques añadidos el 20/10/2026 (copia en `startup.cfg.antes-hapticseat`); falta ver si emite |
-| DCS | OJO: la carpeta activa es `Saved Games\DCS.openbeta\Scripts\Export.lua` (ver CLAUDE.md de la raíz), no `Saved Games\DCS` | Pendiente. El activo carga SimAppPro, MOZA y DCS-BIOS |
+| DCS | `dcs/HapticSeatExport.lua` → UDP 5679 (`Telemetry/Dcs/`). OJO: la carpeta activa es `Saved Games\DCS.openbeta\Scripts`, no `Saved Games\DCS` | Probado con el script real en el `luae.exe` de DCS y funciones Lo* simuladas; FALTA contrastar con DCS real |
 | MSFS 2024 | SimConnect (`Telemetry/Msfs/`) | ✅ Verificado volando el C172 con el cojín puesto (08/11/2026): el usuario notó todos los efectos. Sin ajustar intensidades ni probar una toma suave |
 
-La app escucha MSFS e IL-2 a la vez (`MultiSource`: gana el que está volando).
+La app escucha MSFS, DCS e IL-2 a la vez (`MultiSource`: gana el que está volando).
+
+### DCS
+
+- El script se carga al final de `Export.lua` con `pcall(dofile, ...)`, encadena las `LuaExport*` previas y no deja salir errores. Claude no
+  puede modificar esa carpeta: el usuario copia el script y añade la línea con un comando (si cambia el script, volver a copiarlo).
+- API oficial en `G:\Eagle Dynamics\DCS World OpenBeta\Scripts\Export.lua`. Se usa solo lo documentado ahí: `LoGetIndicatedAirSpeed`,
+  `LoGetAltitudeAboveGroundLevel`, `LoGetAccelerationUnits`, `LoGetMechInfo`, `LoGetEngineInfo`, `LoGetPayloadInfo`, `LoGetMCPState`.
+  Armamento y averías a 10 Hz para no gastar en cada fotograma.
+- Pausa = deja de avanzar `LoGetModelTime` o de llegar paquetes. Sin permiso de exportación del servidor no se envía nada.
+- `DcsDecoder` deduce disparos, bombas y cohetes de lo que baja el armamento (sin distinguir calibre; misiles = cohetes) e impactos de que
+  aumente el número de averías de `LoGetMCPState`.
+- **A comprobar con el Apache:** qué devuelve cada función en un módulo de cabina completa (`LoGetMCPState` puede venir vacío y el
+  `gear.main.*.rod` puede no valer cero en el aire o no existir en ruedas de helicóptero, lo que afecta a la rodadura y al golpe), si
+  `Cannon.shells` baja al disparar el cañón y si las RPM del motor representan bien la vibración. Aún no hay efecto propio de rotor.
 
 ### MSFS 2024
 
@@ -123,7 +137,7 @@ La app escucha MSFS e IL-2 a la vez (`MultiSource`: gana el que está volando).
 App WPF funcionando (20/10/2026): probada con telemetría simulada (perfil automático por avión, datos en vivo,
 cojín en vivo). Falta probarla volando y los botones Probar/Medir con el usuario sentado.
 Comandos de consola: `estado`, `test [pct]`, `motor <0-7|todos> <pct> [ms]`, `umbral [motor]`,
-`il2|msfs [--sin-cojin] [--ganancia %] [--minimo 0-255] [--puerto N]` (la consola no usa perfiles, solo los mínimos).
+`il2|msfs|dcs [--sin-cojin] [--ganancia %] [--minimo 0-255] [--puerto N]` (la consola no usa perfiles, solo los mínimos).
 Efectos: motor, buffet, suelo (rodadura + toma de contacto), tren/flaps, aerofreno, carga G, armas, impactos,
 bombas/cohetes. Probado con paquetes sintéticos de extremo a extremo (20/10/2026); falta volar.
 Nivel mínimo por motor (`Hf8Motors.DefaultMinLevels`), medido con `umbral` sentado y el dial al máximo
@@ -134,7 +148,7 @@ Nivel mínimo por motor (`Hf8Motors.DefaultMinLevels`), medido con `umbral` sent
 1. ✅ Driver del HF8 con watchdog y pruebas de motores
 2. ✅ Lector IL-2 (UDP), modelo de telemetría común y motor de efectos. Pendiente: calibrar en vuelo
 3. ✅ Perfiles JSON por avión y app WPF (visor en vivo, efectos, calibración guiada, bandeja)
-4. ✅ MSFS 2024 (SimConnect). Falta DCS (Export.lua por UDP; añade AoA, rotor de helicópteros, cañón)
+4. ✅ MSFS 2024 (SimConnect). DCS (Export.lua por UDP) hecho, falta contrastarlo en vuelo; después, efecto de rotor para helicópteros
 5. Pendientes menores: ajustes avanzados por efecto (escalas de buffet/impactos tras calibrar en vuelo),
    arranque con Windows, cambiar el puerto UDP desde la interfaz (hoy solo en settings.json, requiere reiniciar)
 

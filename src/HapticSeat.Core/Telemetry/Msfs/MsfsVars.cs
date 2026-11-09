@@ -15,22 +15,7 @@ public static class MsfsVars
     private const float TurbineFullRpm = 3000;
 
     private const float StallRampDegrees = 3;
-    private const int Wheels = 3;
-
-    private static readonly Vector3[] WheelPositions =
-    [
-        new(1.5f, -1.5f, 0),      // morro o rueda central
-        new(-0.5f, -1.5f, -1.2f), // izquierda
-        new(-0.5f, -1.5f, 1.2f),  // derecha
-    ];
-
-    private static readonly Vector3[][] EnginePositions =
-    [
-        [new(2.5f, 0, 0)],
-        [new(0.5f, 0, -2.5f), new(0.5f, 0, 2.5f)],
-        [new(0.5f, 0, -2.5f), new(2.5f, 0, 0), new(0.5f, 0, 2.5f)],
-        [new(0.5f, 0, -5), new(0.5f, 0, -2.5f), new(0.5f, 0, 2.5f), new(0.5f, 0, 5)],
-    ];
+    private const int Wheels = TypicalAirframe.Wheels;
 
     private const int Ias = 0, Agl = 1, GForce = 2, OnGround = 3, StallWarning = 4, Alpha = 5, StallAlpha = 6,
         Flaps = 7, Spoilers = 8, EngineCount = 9, MaxRpm = 10, Rpm1 = 11, N1First = 15,
@@ -114,7 +99,7 @@ public static class MsfsVars
             var n1 = (float)d[N1First + i];
             s.EngineRpm[i] = n1 > 1 ? n1 / 100 * TurbineFullRpm : (float)d[Rpm1 + i];
             s.EngineMaxRpm[i] = n1 > 1 ? TurbineFullRpm : maxRpm;
-            s.EnginePos[i] = EnginePositions[count - 1][i];
+            s.EnginePos[i] = TypicalAirframe.EnginePosition(count, i);
         }
     }
 
@@ -133,7 +118,7 @@ public static class MsfsVars
         {
             // Hay aviones sin dato de compresión: basta saber que están en el suelo
             s.WheelLoad[i] = anyCompressed ? (float)d[Contact0 + i] : onGround ? 0.5f : 0;
-            s.WheelPos[i] = WheelPositions[i];
+            s.WheelPos[i] = TypicalAirframe.WheelPositions[i];
         }
     }
 }
