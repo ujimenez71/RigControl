@@ -143,6 +143,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Text="Nombre" Style="{StaticResource FieldLabel}" />
@@ -169,6 +170,12 @@
                 <TextBlock Grid.Row="3" Grid.Column="2" Text="Tiempo máximo (s)" Style="{StaticResource FieldLabel}" Margin="16,0,12,8" />
                 <TextBox Grid.Row="3" Grid.Column="3" Style="{StaticResource FieldBox}" Text="{Binding SelectedStep.TimeoutSeconds}"
                          ToolTip="Máximo esperando a que aparezca el proceso; pasado, se avisa y se sigue con el siguiente." />
+
+                <TextBlock Grid.Row="4" Text="Prioridad de CPU" Style="{StaticResource FieldLabel}" />
+                <ComboBox Grid.Row="4" Grid.Column="1" Margin="0,0,0,8" HorizontalAlignment="Left" MinWidth="220"
+                          ItemsSource="{x:Static vm:PriorityOption.All}" SelectedItem="{Binding SelectedStep.Priority}"
+                          DisplayMemberPath="Text"
+                          ToolTip="Se pone al proceso al aparecer, o al pasar por el paso si ya estaba abierto. Alta = más CPU para el simulador; Baja = que no moleste. Necesita el proceso (se deduce del .exe). No funciona con programas que se ejecutan como administrador." />
             </Grid>
         </Grid>
 

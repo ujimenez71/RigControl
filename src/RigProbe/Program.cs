@@ -126,6 +126,10 @@ internal static class Program
                         HangarPresence.Missing => "NO EXISTE",
                         _ => "se lanzaría (sin proceso: no se sabe si ya está abierto)",
                     };
+                    if (step.Enabled && step.Priority is { } priority)
+                        state += HangarRunner.ProcessNameOf(step) is null
+                            ? $"; prioridad {HangarRunner.PriorityText(priority)} IMPOSIBLE: falta \"process\""
+                            : $"; prioridad {HangarRunner.PriorityText(priority)}";
                     Console.WriteLine($"  {step.Name,-34} {state}");
                 }
             }
@@ -143,6 +147,11 @@ internal static class Program
             HangarOutcome.Cancelled => "Secuencia cancelada.",
             _ => "Secuencia terminada con problemas.",
         });
+        if (!runner.Watching.IsCompleted)
+        {
+            Console.WriteLine($"Manteniendo la prioridad mientras sigan abiertos (hasta {runner.PriorityWatchSeconds:0} s después de cerrarse; Ctrl+C para salir)…");
+            runner.Watching.GetAwaiter().GetResult();
+        }
         return outcome == HangarOutcome.WithProblems ? 1 : 0;
     }
 

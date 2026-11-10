@@ -6,6 +6,20 @@ using RigControl.Core.Hangar;
 
 namespace RigControl.ViewModels;
 
+/// <summary>Una opción del desplegable de prioridad; null = no tocarla.</summary>
+public sealed record PriorityOption(HangarPriority? Value, string Text)
+{
+    public static IReadOnlyList<PriorityOption> All { get; } =
+    [
+        new(null, "Sin cambiar"),
+        .. Enum.GetValues<HangarPriority>().Select(p => new PriorityOption(p, HangarRunner.PriorityText(p))),
+    ];
+
+    public static PriorityOption Of(HangarPriority? value) => All.First(o => o.Value == value);
+
+    public override string ToString() => Text;
+}
+
 /// <summary>Un programa de la secuencia, editable y con su estado.</summary>
 public sealed class HangarStepItem(HangarStep step, Action changed) : ObservableObject
 {
@@ -16,6 +30,7 @@ public sealed class HangarStepItem(HangarStep step, Action changed) : Observable
     private double _waitSeconds = step.WaitSeconds;
     private double _timeoutSeconds = step.TimeoutSeconds;
     private bool _enabled = step.Enabled;
+    private PriorityOption _priority = PriorityOption.Of(step.Priority);
     private HangarPresence _presence = HangarPresence.Unknown;
     private string _runText = "";
     private bool _runProblem;
@@ -27,6 +42,7 @@ public sealed class HangarStepItem(HangarStep step, Action changed) : Observable
     public double WaitSeconds { get => _waitSeconds; set => Edit(ref _waitSeconds, Math.Max(0, value)); }
     public double TimeoutSeconds { get => _timeoutSeconds; set => Edit(ref _timeoutSeconds, Math.Max(0, value)); }
     public bool Enabled { get => _enabled; set => Edit(ref _enabled, value); }
+    public PriorityOption Priority { get => _priority; set => Edit(ref _priority, value ?? PriorityOption.All[0]); }
 
     public HangarPresence Presence
     {
@@ -49,7 +65,7 @@ public sealed class HangarStepItem(HangarStep step, Action changed) : Observable
     public void SetRun(HangarStepState state, string detail)
     {
         RunText = detail;
-        RunProblem = state is HangarStepState.Failed or HangarStepState.TimedOut;
+        RunProblem = state is HangarStepState.Failed or HangarStepState.TimedOut or HangarStepState.Warning;
     }
 
     public void ClearRun() { RunText = ""; RunProblem = false; }
@@ -63,6 +79,7 @@ public sealed class HangarStepItem(HangarStep step, Action changed) : Observable
         WaitSeconds = WaitSeconds,
         TimeoutSeconds = TimeoutSeconds,
         Enabled = Enabled,
+        Priority = Priority.Value,
     };
 
     private void Edit<T>(ref T field, T value, [CallerMemberName] string? name = null)
@@ -118,6 +135,7 @@ public sealed class HangarViewModel : ObservableObject, IDisposable
     private readonly DispatcherTimer _presenceTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly HangarRunner _inspector = new();
     private CancellationTokenSource? _cts;
+    private HangarRunner? _runner; // el último: puede seguir vigilando prioridades tras la secuencia
     private DateTime _fileTime;
     private bool _loading;
     private bool _inspecting;
@@ -283,7 +301,8 @@ public sealed class HangarViewModel : ObservableObject, IDisposable
         IsBusy = true;
         Message = $"Abriendo {hangar.Name}…";
 
-        var runner = new HangarRunner();
+        _runner?.StopWatching();
+        var runner = _runner = new HangarRunner();
         var dispatcher = Dispatcher.CurrentDispatcher;
         runner.StepChanged += (i, state, detail) => dispatcher.BeginInvoke(() => items[i].SetRun(state, detail));
         try
@@ -316,6 +335,7 @@ public sealed class HangarViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         _cts?.Cancel();
+        _runner?.StopWatching();
         _presenceTimer.Stop();
         if (_saveTimer.IsEnabled) Save();
         _saveTimer.Stop();

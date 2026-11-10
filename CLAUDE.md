@@ -89,7 +89,19 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
   ruta, hay que recrear la tarea (crearla requiere elevación).
   Para verificar la interfaz sin robar el foco a DCS (se minimiza y se congela): ventana fuera de pantalla con
   `ShowActivated=false` + `RenderTargetBitmap`, en un proyecto aparte que referencie RigControl.
-  Falta en la fase 5: gestor de ventanas, mods por symlinks, snapshots, prioridad de CPU.
+  Prioridad de CPU (10/11/2026, escenarios + ping real; ✅ verificada por el usuario con DCS y el launcher: queda en Por encima de lo normal): `priority` en
+  cada paso (`idle`, `belowNormal`, `normal`, `aboveNormal`, `high`; sin tiempo real a propósito, y números
+  rechazados), desplegable "Prioridad de CPU" en la pantalla. Se pone a todos los procesos con el nombre de
+  `process` al aparecer, o al pasar por el paso si ya estaba abierto (no relanza). No se puede con los procesos
+  elevados (SimAppPro: acceso denegado) ni sin `process`: el paso queda en aviso (en rojo, como los fallos) y la secuencia sigue.
+  La prioridad se MANTIENE mientras el programa siga abierto (también acabada la secuencia; cada segundo se
+  corrige; la app lo para al cerrarse o al abrir otro hangar, RigProbe espera o Ctrl+C) y hasta 60 s después de
+  cerrarse. Motivo (10/11/2026): DCS.exe abre primero un launcher, se relanza (`--restarted`) al pulsar pantalla/VR
+  y al arrancar fija él mismo su prioridad (edCore.dll llama a SetPriorityClass; reparte "render/IO cores" él
+  solo): ponerla una vez no bastaba. Un cambio a mano también se corrige (para no tocarla: "Sin cambiar").
+  Si aparece tras `timeoutSeconds`, también se le pone.
+  `hangar X --dry` la muestra.
+  Falta en la fase 5: gestor de ventanas, mods por symlinks, snapshots.
 - Fase 4 (en curso, hecho sin el usuario el 01/11/2026; NADA de esto probado aún en vuelo):
   - Luces del Bravo desde MSFS: sección `"lights"` del perfil: nombre de `BravoLed` -> condición o
     lista (AND) sobre `A:VAR[, unidades]` o `L:Var` con `> >= < <= =`, rango `=a..b`, `!` niega;
@@ -351,8 +363,8 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
    capturar el protocolo con Wireshark + USBPcap) y al Bravo. Hecho: luces del Bravo desde MSFS
    y cliente DCS-BIOS, ✅ verificado con DCS y el AH-64D (ver "Fase 4" arriba); luces y
    condiciones desde el estado de DCS (`D:`, ✅ verificado con el AH-64D). Falta: LEDs WinWing.
-5. (en curso) ✅ App Hangar (lanzar apps en secuencia);
-   gestor de ventanas, mods por symlinks, snapshots, prioridad de CPU
+5. (en curso) ✅ App Hangar (lanzar apps en secuencia); prioridad de CPU por paso;
+   gestor de ventanas, mods por symlinks, snapshots
 
 Idea pendiente (propuesta el 02/11/2026, a decidir con el usuario): **generar perfiles con IA**
 (Claude por la API de Anthropic). Botón "Generar con IA" en Perfiles: se envían los mandos con sus
