@@ -10,7 +10,14 @@
     <PlatformTarget>x64</PlatformTarget>
     <!-- ThemeMode (tema Fluent) todavía está marcado como experimental en WPF. -->
     <NoWarn>$(NoWarn);WPF0001</NoWarn>
+    <!-- Icono del .exe (explorador, accesos directos). Se genera con tools/icono/rigcontrol_icon.py. -->
+    <ApplicationIcon>Assets\RigControl.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Icono de la ventana y de la barra de tareas -->
+    <Resource Include="Assets\RigControl.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\RigControl.Core\RigControl.Core.csproj" />

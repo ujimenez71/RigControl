@@ -20,6 +20,9 @@ Software propio de control del rig de simulación, inspirado en Hangar Control d
   en `docs/HapticSeat.md`, léela antes de tocarlo). Sin dependencias con RigControl y en su propio
   proceso a propósito: un fallo nativo en RigControl no debe dejar los motores encendidos. Pasar
   también `dotnet test tests/HapticSeat.Tests` antes de cada commit que lo toque.
+- `tools/icono/rigcontrol_icon.py`: genera el icono de la app (`src/RigControl/Assets/RigControl.ico`, caza
+  sobre el horizonte, elegido por el usuario el 10/11/2026; vista previa grande en `tools/icono/RigControl.png`).
+  `python -I tools/icono/rigcontrol_icon.py src/RigControl/Assets` (necesita Pillow).
 - `profiles/`: perfiles de ejemplo/fuente; los que se usan van en `%APPDATA%\RigControl\profiles`.
 - El runner (`BindingRunner.Run`) recibe un `CancellationToken`: la consola lo cancela con ESC.
 - Core NO escribe en la consola: usa `Log` (Info/Warning/Error/Action, `Log.Sink`). RigProbe lo
