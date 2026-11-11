@@ -67,7 +67,12 @@
                         </Style>
                     </Button.Style>
                 </Button>
-                <CheckBox DockPanel.Dock="Right" Content="Al terminar, iniciar la ejecución automática" Margin="16,0"
+                <ComboBox DockPanel.Dock="Right" MinWidth="150" Margin="8,0,0,0" VerticalAlignment="Center"
+                          ItemsSource="{Binding ModSetOptions}" SelectedItem="{Binding SelectedHangar.ModSetChoice}" DisplayMemberPath="Text"
+                          IsEnabled="{Binding CanEdit}"
+                          ToolTip="Conjunto de la pantalla Mods que se aplica antes de abrir nada. Con el simulador ya abierto no se cambia." />
+                <TextBlock DockPanel.Dock="Right" Text="Mods" VerticalAlignment="Center" Margin="16,0,0,0" />
+                <CheckBox DockPanel.Dock="Right" Content="Al terminar, iniciar la ejecución automática" Margin="16,0,0,0"
                           IsChecked="{Binding SelectedHangar.StartRun}" IsEnabled="{Binding CanEdit}" VerticalAlignment="Center"
                           ToolTip="Como pulsar Iniciar en la pantalla Ejecución con «Automático»: el perfil se elige según el avión cargado" />
                 <TextBlock Text="Nombre" VerticalAlignment="Center" Margin="0,0,8,0" />

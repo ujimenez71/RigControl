@@ -1,0 +1,49 @@
+{
+  "libraries": [
+    {
+      "name": "MSFS 2024",
+      "library": "C:\\RigControl\\Mods\\MSFS 2024",
+      "target": "%LOCALAPPDATA%\\Packages\\Microsoft.Limitless_8wekyb3d8bbwe\\LocalCache\\Packages\\Community",
+      "process": "FlightSimulator2024",
+      "always": [
+        "BravoLED", "WasmKeySender", "winwing-wwtwasm", "mobiflight-event-module",
+        "bkiel-efb-lnm-vr", "bkiel-ingamepanels-lnm-vr",
+        "navigraph-avionics-g1000", "navigraph-avionics-g3000-g5000", "navigraph-avionics-g3x",
+        "navigraph-efb-simbriefapp", "navigraph-ingamepanels-charts"
+      ]
+    },
+    {
+      "name": "DCS aircraft",
+      "library": "C:\\RigControl\\Mods\\DCS aircraft",
+      "target": "%USERPROFILE%\\Saved Games\\DCS.openbeta\\Mods\\aircraft",
+      "process": "DCS"
+    },
+    {
+      "name": "DCS tech",
+      "library": "C:\\RigControl\\Mods\\DCS tech",
+      "target": "%USERPROFILE%\\Saved Games\\DCS.openbeta\\Mods\\tech",
+      "process": "DCS",
+      "always": [ "VAICOMPRO" ]
+    }
+  ],
+  "sets": [
+    {
+      "name": "Canarias",
+      "mods": {
+        "MSFS 2024": [
+          "simwings-airport-gclp-gran-canaria", "dcs-airport-gchi-hierro", "dcs-airport-gclb-el-berriel",
+          "zzz-village1111-gclp", "zzz-village1111-gcxo", "fsltl-traffic-base", "fsltl-traffic-injector"
+        ]
+      }
+    },
+    {
+      "name": "Bush PNG",
+      "mods": {
+        "MSFS 2024": [
+          "orbx-airport-pngbushstrips-pack1", "orbx-airport-pngbushstrips-pack2", "orbx-airport-pngbushstrips-pack3",
+          "orbx-aircraft-pac750", "sws-aircraft-kodiak-wheels"
+        ]
+      }
+    }
+  ]
+}

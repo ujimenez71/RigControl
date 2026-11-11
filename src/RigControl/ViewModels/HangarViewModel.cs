@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Threading;
 using RigControl.Core.Hangar;
+using RigControl.Core.Mods;
 
 namespace RigControl.ViewModels;
 
@@ -42,6 +43,19 @@ public sealed record TopmostOption(bool? Value, string Text)
     public static IReadOnlyList<TopmostOption> All { get; } = [new(null, "Sin cambiar"), new(true, "Sí"), new(false, "No (quitarlo)")];
 
     public static TopmostOption Of(bool? value) => All.First(o => o.Value == value);
+
+    public override string ToString() => Text;
+}
+
+/// <summary>Una opción del desplegable de conjunto de mods del hangar; null = no tocar los mods.</summary>
+public sealed record ModSetOption(string? Value, bool Missing = false)
+{
+    public string Text => Value is null ? "Sin cambiar" : Missing ? $"{Value} (no existe en mods.json)" : Value;
+
+    /// <summary>Iguales por el nombre del conjunto (así el desplegable reconoce la opción elegida).</summary>
+    public bool Equals(ModSetOption? other) => other is not null && string.Equals(Value, other.Value, StringComparison.OrdinalIgnoreCase);
+
+    public override int GetHashCode() => Value is null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(Value);
 
     public override string ToString() => Text;
 }
@@ -168,12 +182,14 @@ public sealed class HangarItem : ObservableObject
     private readonly Action _changed;
     private string _name;
     private bool _startRun;
+    private string? _modSet;
 
     public HangarItem(HangarProfile model, Action changed)
     {
         _changed = changed;
         _name = model.Name;
         _startRun = model.StartRun;
+        _modSet = string.IsNullOrWhiteSpace(model.ModSet) ? null : model.ModSet;
         Steps.CollectionChanged += (_, e) =>
         {
             foreach (HangarStepItem item in e.NewItems ?? Array.Empty<HangarStepItem>()) item.PropertyChanged += OnStepChanged;
@@ -204,10 +220,33 @@ public sealed class HangarItem : ObservableObject
         set { if (Set(ref _startRun, value)) _changed(); }
     }
 
+    /// <summary>Conjunto de mods que se aplica antes de abrir nada; null = no tocarlos.</summary>
+    public string? ModSet
+    {
+        get => _modSet;
+        set
+        {
+            if (!Set(ref _modSet, value)) return;
+            Raise(nameof(ModSetChoice));
+            _changed();
+        }
+    }
+
+    /// <summary>Para el desplegable: el valor envuelto (null = "Sin cambiar").</summary>
+    public ModSetOption ModSetChoice
+    {
+        get => new(_modSet);
+        set { if (value is not null) ModSet = value.Value; } // null: el desplegable se está vaciando
+    }
+
+    /// <summary>Tras rehacer la lista de opciones, para que el desplegable vuelva a marcar la elegida.</summary>
+    public void RefreshChoice() => Raise(nameof(ModSetChoice));
+
     public HangarProfile ToModel() => new()
     {
         Name = Name,
         StartRun = StartRun,
+        ModSet = ModSet,
         Steps = [.. Steps.Select(s => s.ToModel())],
     };
 }
@@ -249,6 +288,9 @@ public sealed class HangarViewModel : ObservableObject, IDisposable
 
     public ObservableCollection<HangarItem> Hangars { get; } = [];
 
+    /// <summary>"Sin cambiar" + los conjuntos de mods.json (+ el del hangar elegido si ya no existe).</summary>
+    public ObservableCollection<ModSetOption> ModSetOptions { get; } = [];
+
     public HangarItem? SelectedHangar
     {
         get => _selectedHangar;
@@ -256,6 +298,7 @@ public sealed class HangarViewModel : ObservableObject, IDisposable
         {
             if (!Set(ref _selectedHangar, value)) return;
             SelectedStep = value?.Steps.FirstOrDefault();
+            RefreshModSets();
             Raise(nameof(HasHangar));
             Raise(nameof(CanLaunch));
             _ = RefreshPresenceAsync();
@@ -295,6 +338,7 @@ public sealed class HangarViewModel : ObservableObject, IDisposable
         if (visible)
         {
             ReloadIfChangedOnDisk();
+            RefreshModSets();
             _presenceTimer.Start();
             _ = RefreshPresenceAsync();
         }
@@ -416,7 +460,13 @@ public sealed class HangarViewModel : ObservableObject, IDisposable
         using var cts = new CancellationTokenSource();
         _cts = cts;
         IsBusy = true;
-        Message = $"Abriendo {hangar.Name}…";
+        var modsText = "";
+        if (model.ModSet is { } setName)
+        {
+            Message = $"Aplicando los mods «{setName}»…";
+            modsText = await Task.Run(() => ApplyMods(setName));
+        }
+        Message = $"{modsText}Abriendo {hangar.Name}…";
 
         _runner?.StopWatching();
         var runner = _runner = new HangarRunner();
@@ -425,7 +475,7 @@ public sealed class HangarViewModel : ObservableObject, IDisposable
         try
         {
             var outcome = await Task.Run(() => runner.RunAsync(model, cts.Token));
-            Message = outcome switch
+            Message = modsText + outcome switch
             {
                 HangarOutcome.Ok => "Secuencia completa.",
                 HangarOutcome.Cancelled => "Secuencia cancelada. Lo que ya se había abierto sigue abierto.",
@@ -447,6 +497,42 @@ public sealed class HangarViewModel : ObservableObject, IDisposable
             IsBusy = false;
         }
         await RefreshPresenceAsync();
+    }
+
+    /// <summary>Aplica el conjunto de mods del hangar; devuelve el resumen para el mensaje. Un fallo no detiene la secuencia.</summary>
+    private static string ApplyMods(string setName)
+    {
+        try
+        {
+            var file = ModsFile.Load();
+            if (file.FindSet(setName) is not { } set) return $"Mods: no existe el conjunto «{setName}», no se tocan. ";
+            var changes = new ModManager().ApplySet(file, set);
+            var errors = changes.Where(c => c.Error is not null).ToList();
+            if (changes.Count == 0) return $"Mods «{set.Name}»: ya estaban así. ";
+            return errors.Count == 0
+                ? $"Mods «{set.Name}»: {changes.Count} cambio(s). "
+                : $"Mods «{set.Name}» con problemas: {string.Join("; ", errors)}. ";
+        }
+        catch (Exception ex)
+        {
+            return $"Mods: {ex.Message}. ";
+        }
+    }
+
+    private void RefreshModSets()
+    {
+        var names = new List<string>();
+        try { names.AddRange(ModsFile.Load().Sets.Select(s => s.Name)); }
+        catch (Exception) { /* mods.json roto: lo dice la pantalla Mods */ }
+        var options = new List<ModSetOption> { new(null) };
+        options.AddRange(names.Select(n => new ModSetOption(n)));
+        if (SelectedHangar?.ModSet is { } current && !names.Contains(current, StringComparer.OrdinalIgnoreCase))
+            options.Add(new ModSetOption(current, Missing: true));
+        if (options.SequenceEqual(ModSetOptions) && options.Select(o => o.Text).SequenceEqual(ModSetOptions.Select(o => o.Text))) return;
+        var keep = SelectedHangar;
+        ModSetOptions.Clear();
+        foreach (var o in options) ModSetOptions.Add(o);
+        keep?.RefreshChoice();
     }
 
     public void Dispose()

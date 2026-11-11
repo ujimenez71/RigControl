@@ -92,6 +92,9 @@ public sealed class HangarProfile
     /// <summary>Al terminar la secuencia, iniciar la ejecución automática de perfiles (solo en la app).</summary>
     public bool StartRun { get; set; }
 
+    /// <summary>Conjunto de mods.json que se aplica antes de abrir nada (null = no tocar los mods).</summary>
+    public string? ModSet { get; set; }
+
     public List<HangarStep> Steps { get; set; } = [];
 }
 

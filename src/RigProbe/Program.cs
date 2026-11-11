@@ -2,6 +2,7 @@ using HidSharp;
 using RigControl.Core;
 using RigControl.Core.Bindings;
 using RigControl.Core.Hangar;
+using RigControl.Core.Mods;
 using Vortice.DirectInput;
 
 namespace RigProbe;
@@ -77,6 +78,9 @@ internal static class Program
                     return DcsSend(args[2], readOnly: true);
                 DcsWatch(args.Length > 1 && int.TryParse(args[1], out var dsecs) ? dsecs : 15);
                 return 0;
+            case "mods":
+                return ModsCommand([.. args.Skip(1).Where(a => !a.Equals("--dry", StringComparison.OrdinalIgnoreCase))],
+                                   args.Any(a => a.Equals("--dry", StringComparison.OrdinalIgnoreCase)));
             case "ventanas" when args.Length > 1:
                 return WindowsCommand(string.Join(' ', args.Skip(1)));
             case "hangar":
@@ -93,6 +97,7 @@ internal static class Program
                 Console.WriteLine("Uso: RigProbe list [all] | monitor | catalog | bravo-test | check <perfil> | run <perfil>|auto [--dry]");
                 Console.WriteLine("            | sim | sim eventos [filtro] | sim vars <perfil> [s] | dcs [s] | dcs enviar CONTROL [VALOR] | dcs leer CONTROL");
                 Console.WriteLine("            | dcs vigilar [filtro] | hangar [nombre [--dry]] | ventanas <proceso>");
+                Console.WriteLine("            | mods | mods <conjunto> [--dry] | mods importar <biblioteca> [--dry]");
                 Console.WriteLine($"  <perfil> es una ruta a un .json o un nombre en {ProfileFile.ProfilesDir}");
                 return 1;
         }
@@ -119,6 +124,7 @@ internal static class Program
             foreach (var hangar in chosen)
             {
                 Console.WriteLine($"=== {hangar.Name} ===");
+                if (hangar.ModSet is { } setName) ApplyHangarMods(setName, dryRun: true);
                 foreach (var step in hangar.Steps)
                 {
                     var state = !step.Enabled ? "desactivado" : runner.Inspect(step) switch
@@ -146,6 +152,7 @@ internal static class Program
 
         using var cts = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+        if (chosen[0].ModSet is { } modSet) ApplyHangarMods(modSet, dryRun: false);
         var steps = chosen[0].Steps;
         runner.StepChanged += (i, _, detail) => Console.WriteLine($"{DateTime.Now:HH:mm:ss}  {steps[i].Name}: {detail}");
         var outcome = runner.RunAsync(chosen[0], cts.Token).GetAwaiter().GetResult();
@@ -162,6 +169,97 @@ internal static class Program
             runner.Watching.GetAwaiter().GetResult();
         }
         return outcome == HangarOutcome.WithProblems ? 1 : 0;
+    }
+
+    /// <summary>Conjunto de mods de un hangar, antes de abrir nada. Un fallo se dice y la secuencia sigue.</summary>
+    private static void ApplyHangarMods(string setName, bool dryRun)
+    {
+        try
+        {
+            var file = ModsFile.Load();
+            if (file.FindSet(setName) is not { } set)
+            {
+                Console.WriteLine($"  Mods: no existe el conjunto «{setName}» en {ModsFile.DefaultPath}; no se tocan.");
+                return;
+            }
+            var changes = new ModManager().ApplySet(file, set, dryRun);
+            Console.WriteLine($"  Mods «{set.Name}»: {(changes.Count == 0 ? "ya estaban así" : $"{changes.Count} cambio(s){(dryRun ? " (sin hacer)" : "")}")}");
+            foreach (var c in changes) Console.WriteLine($"    {c}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  Mods: {ex.Message}");
+        }
+    }
+
+    /// <summary>"mods": estado. "mods X [--dry]": aplica el conjunto X. "mods importar B [--dry]": mete en la biblioteca B lo que hay suelto en su destino.</summary>
+    private static int ModsCommand(string[] args, bool dryRun)
+    {
+        var file = ModsFile.Load();
+        var mgr = new ModManager();
+        if (args.Length == 0)
+        {
+            foreach (var lib in file.Libraries)
+            {
+                var entries = mgr.Scan(lib);
+                Console.WriteLine($"=== {lib.Name}{(mgr.IsLocked(lib) ? $"  ({lib.Process} ABIERTO: no se puede cambiar)" : "")} ===");
+                Console.WriteLine($"  biblioteca: {ModManager.Expand(lib.Library)}");
+                Console.WriteLine($"  destino:    {ModManager.Expand(lib.Target)}");
+                foreach (var e in entries)
+                {
+                    var state = e.State switch
+                    {
+                        ModState.Active => "activo",
+                        ModState.Inactive => "inactivo",
+                        ModState.Foreign => "suelto en el destino (sin importar)",
+                        ModState.Conflict => "CONFLICTO",
+                        _ => "ENLACE ROTO",
+                    };
+                    var always = lib.Always.Contains(e.Name, StringComparer.OrdinalIgnoreCase) ? " [siempre]" : "";
+                    Console.WriteLine($"  {e.Name,-48} {state}{always}{(e.Detail is null ? "" : $": {e.Detail}")}");
+                }
+            }
+            Console.WriteLine($"Conjuntos: {(file.Sets.Count == 0 ? "ninguno" : string.Join(", ", file.Sets.Select(s => s.Name)))}");
+            return 0;
+        }
+
+        if (args[0].Equals("importar", StringComparison.OrdinalIgnoreCase))
+        {
+            if (args.Length < 2 || file.FindLibrary(string.Join(' ', args.Skip(1))) is not { } lib)
+            {
+                Console.WriteLine($"Uso: mods importar <biblioteca> [--dry]. Hay: {string.Join(", ", file.Libraries.Select(l => l.Name))}");
+                return 1;
+            }
+            var loose = mgr.Scan(lib).Where(e => e.State == ModState.Foreign && e.Detail is null).ToList();
+            var problems = 0;
+            foreach (var e in loose)
+            {
+                if (dryRun) { Console.WriteLine($"  importaría {e.Name}"); continue; }
+                try
+                {
+                    mgr.Import(lib, e.Name);
+                    Console.WriteLine($"  importado {e.Name}");
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.ComponentModel.Win32Exception)
+                {
+                    problems++;
+                    Console.WriteLine($"  NO se pudo importar {e.Name}: {ex.Message}");
+                }
+            }
+            Console.WriteLine(loose.Count == 0 ? "No hay nada suelto que importar." : $"{loose.Count - problems} de {loose.Count}{(dryRun ? " (sin hacer)" : "")}.");
+            return problems == 0 ? 0 : 1;
+        }
+
+        var name = string.Join(' ', args);
+        if (file.FindSet(name) is not { } set)
+        {
+            Console.WriteLine($"No existe el conjunto «{name}». Hay: {string.Join(", ", file.Sets.Select(s => s.Name))}");
+            return 1;
+        }
+        var changes = mgr.ApplySet(file, set, dryRun);
+        foreach (var c in changes) Console.WriteLine($"  {c}");
+        Console.WriteLine(changes.Count == 0 ? "Ya estaba así." : $"{changes.Count} cambio(s){(dryRun ? " (sin hacer)" : "")}.");
+        return changes.Any(c => c.Error is not null) ? 1 : 0;
     }
 
     /// <summary>"ventanas X": ventanas principales del proceso X con su posición, para copiarla a hangar.json.</summary>

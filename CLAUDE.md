@@ -7,7 +7,8 @@ Software propio de control del rig de simulación, inspirado en Hangar Control d
 
 - `src/RigControl.Core/`: biblioteca con todo lo que no es interfaz: dispositivos (`DeviceScanner`,
   `DeviceCatalog`, `DeviceMonitor`), `BravoLights`, y `Bindings/` (motor, perfiles, salidas teclado
-  y SimConnect). Copia `SimConnect.dll` del SDK a la salida de quien la referencia.
+  y SimConnect), `Hangar/` (secuencias, prioridad, ventanas) y `Mods/` (biblioteca de mods con uniones).
+  Copia `SimConnect.dll` del SDK a la salida de quien la referencia.
 - `src/RigProbe/`: consola de sondeo y pruebas (`Program.cs`, `ConsoleInput.cs`).
   `dotnet run --project src/RigProbe -- <comando>`; exe en `src/RigProbe/bin/Debug/net10.0/RigProbe.exe`.
 - `src/RigControl/`: app WPF (`dotnet run --project src/RigControl`). MVVM sin librerías
@@ -73,7 +74,8 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
 `sim [eventos [filtro]]`, `sim vars <perfil> [s]`, `dcs [s]`, `dcs enviar CONTROL [VALOR]`, `dcs leer CONTROL`,
 `dcs vigilar [filtro]` (cada cambio de los mandos de la cabina con su posición y descripción: para
 comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez),
-`hangar` (estado de todos, no lanza nada), `hangar <nombre> --dry` (qué haría), `hangar <nombre>` (abre; Ctrl+C cancela), `ventanas <proceso>` (posición de sus ventanas, para `"window"`).
+`hangar` (estado de todos, no lanza nada), `hangar <nombre> --dry` (qué haría), `hangar <nombre>` (abre; Ctrl+C cancela), `ventanas <proceso>` (posición de sus ventanas, para `"window"`),
+`mods` (estado de cada biblioteca), `mods <conjunto> [--dry]`, `mods importar <biblioteca> [--dry]`.
 - Fase 5, App Hangar (08/11/2026; escenarios con host falso + ping real, pantalla comprobada fuera de
   pantalla; ✅ verificado por el usuario con los programas reales: ningún paso en rojo, MSFS arranca,
   HapticSeat aparece en la bandeja y SimAppPro abre sin aviso de UAC): `Core/Hangar/`
@@ -116,7 +118,23 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
   reciente del paso (AttachThreadInput + SetForegroundWindow, sin teclas); cancelar = nada. Pantalla: "Ventana",
   "Siempre encima", "Traer al frente al terminar" (uno por hangar) y "Colocar" con "Usar la posición actual".
   `RigProbe ventanas <proceso>` da las coordenadas para el JSON. El ejemplo del repo marca los simuladores con focus.
-  Falta en la fase 5: mods por symlinks, snapshots.
+  Mods (11/11/2026; escenarios con uniones REALES en una carpeta temporal; ✅ verificado por el usuario con MSFS 2024 y
+  la carpeta Community real el 11/11/2026: importar, conjuntos y hangar): `Core/Mods/` (`Junction`, `ModsFile`, `ModManager`) + pantalla Mods + `"modSet"` en
+  cada hangar (se aplica antes de abrir nada; un fallo no para la secuencia). `%APPDATA%\RigControl\mods.json`
+  (copia de `profiles/mods.json`, copiada el 11/11/2026): bibliotecas = `library` (carpeta con un mod por
+  subcarpeta), `target` (donde los busca el simulador), `process` (abierto = no se cambia nada), `always`
+  (activos en todo conjunto); conjuntos = nombre + mods por biblioteca (las que no salen no se tocan).
+  Activar = UNIÓN de directorio (junction, FSCTL_SET_REPARSE_POINT; no necesita administrador; el modo
+  desarrollador está desactivado, así que los symlinks sí lo necesitarían). Reglas: nunca se borra una carpeta de
+  verdad, solo enlaces que apuntan a la biblioteca; lo suelto en el destino ("Foreign") no se toca salvo al
+  importar (mover a la biblioteca, MISMA unidad = renombrar, y dejar el enlace: sigue activo). Biblioteca en
+  `C:\RigControl\Mods\<biblioteca>` (decisión del usuario: misma unidad que Community). Bibliotecas: "MSFS 2024"
+  (Community de la Store: `%LOCALAPPDATA%\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\Packages\Community`,
+  35 mods sueltos ~100 GB el 11/11/2026; Community2024 vacía), "DCS aircraft" y "DCS tech" (Saved Games\DCS.openbeta;
+  solo VAICOMPRO, "always"). Liveries de DCS sin incluir (van por avión: una biblioteca por avión si hace falta).
+  Conjuntos de ejemplo "Canarias" y "Bush PNG": a revisar por el usuario. El usuario importa desde la app (Claude
+  no mueve sus mods).
+  Falta en la fase 5: snapshots.
 - Fase 4 (en curso, hecho sin el usuario el 01/11/2026; NADA de esto probado aún en vuelo):
   - Luces del Bravo desde MSFS: sección `"lights"` del perfil: nombre de `BravoLed` -> condición o
     lista (AND) sobre `A:VAR[, unidades]` o `L:Var` con `> >= < <= =`, rango `=a..b`, `!` niega;
@@ -379,7 +397,7 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
    y cliente DCS-BIOS, ✅ verificado con DCS y el AH-64D (ver "Fase 4" arriba); luces y
    condiciones desde el estado de DCS (`D:`, ✅ verificado con el AH-64D). Falta: LEDs WinWing.
 5. (en curso) ✅ App Hangar (lanzar apps en secuencia); prioridad de CPU por paso;
-   ✅ gestor de ventanas; mods por symlinks, snapshots
+   ✅ gestor de ventanas; ✅ mods con uniones de directorio; snapshots
 
 Idea pendiente (propuesta el 02/11/2026, a decidir con el usuario): **generar perfiles con IA**
 (Claude por la API de Anthropic). Botón "Generar con IA" en Perfiles: se envían los mandos con sus

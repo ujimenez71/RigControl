@@ -28,6 +28,7 @@ internal static class Program
                      ("Simulador del perfil", SimTests.Run),
                      ("Guardar perfiles", SaveTests.Run),
                      ("Hangar", HangarTests.Run),
+                     ("Mods", ModTests.Run),
                  })
         {
             Console.WriteLine($"\n===== {name} =====");
