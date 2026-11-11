@@ -144,6 +144,8 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Text="Nombre" Style="{StaticResource FieldLabel}" />
@@ -176,6 +178,35 @@
                           ItemsSource="{x:Static vm:PriorityOption.All}" SelectedItem="{Binding SelectedStep.Priority}"
                           DisplayMemberPath="Text"
                           ToolTip="Se pone al proceso al aparecer, o al pasar por el paso si ya estaba abierto. Alta = más CPU para el simulador; Baja = que no moleste. Necesita el proceso (se deduce del .exe). No funciona con programas que se ejecutan como administrador." />
+
+                <TextBlock Grid.Row="5" Text="Ventana" Style="{StaticResource FieldLabel}" />
+                <WrapPanel Grid.Row="5" Grid.Column="1" Margin="0,0,0,8">
+                    <ComboBox MinWidth="150" ItemsSource="{x:Static vm:WindowStateOption.All}" SelectedItem="{Binding SelectedStep.WindowState}"
+                              DisplayMemberPath="Text" VerticalAlignment="Center"
+                              ToolTip="Cómo dejar sus ventanas al aparecer (también si ya estaba abierto). Necesita el proceso. No funciona con programas que se ejecutan como administrador." />
+                    <TextBlock Text="Siempre encima" VerticalAlignment="Center" Margin="16,0,8,0" />
+                    <ComboBox MinWidth="130" ItemsSource="{x:Static vm:TopmostOption.All}" SelectedItem="{Binding SelectedStep.Topmost}"
+                              DisplayMemberPath="Text" VerticalAlignment="Center"
+                              ToolTip="Que su ventana quede por encima de las demás aunque no tenga el foco (p. ej. un mapa en otro monitor)." />
+                </WrapPanel>
+                <CheckBox Grid.Row="5" Grid.Column="2" Grid.ColumnSpan="2" Content="Traer al frente al terminar" Margin="16,0,0,8"
+                          IsChecked="{Binding SelectedStep.Focus}" VerticalAlignment="Center"
+                          ToolTip="Al acabar la secuencia pone este programa en primer plano (o cuando aparezca su ventana), para que ningún auxiliar le quite el foco. Solo uno por hangar: normalmente el simulador." />
+
+                <TextBlock Grid.Row="6" Text="Colocar" Style="{StaticResource FieldLabel}" />
+                <WrapPanel Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="3" Margin="0,0,0,8">
+                    <CheckBox Content="Posición" IsChecked="{Binding SelectedStep.PlacePosition}" VerticalAlignment="Center" MinWidth="0" Margin="0,0,8,0"
+                              ToolTip="Esquina superior izquierda en píxeles reales del escritorio (el monitor principal empieza en 0,0; los de la izquierda o arriba tienen coordenadas negativas)." />
+                    <TextBox Width="70" Text="{Binding SelectedStep.X}" IsEnabled="{Binding SelectedStep.PlacePosition}" VerticalAlignment="Center" ToolTip="X" />
+                    <TextBlock Text="," VerticalAlignment="Center" Margin="4,0" />
+                    <TextBox Width="70" Text="{Binding SelectedStep.Y}" IsEnabled="{Binding SelectedStep.PlacePosition}" VerticalAlignment="Center" ToolTip="Y" />
+                    <CheckBox Content="Tamaño" IsChecked="{Binding SelectedStep.PlaceSize}" VerticalAlignment="Center" MinWidth="0" Margin="20,0,8,0" />
+                    <TextBox Width="70" Text="{Binding SelectedStep.Width}" IsEnabled="{Binding SelectedStep.PlaceSize}" VerticalAlignment="Center" ToolTip="Ancho" />
+                    <TextBlock Text="×" VerticalAlignment="Center" Margin="4,0" />
+                    <TextBox Width="70" Text="{Binding SelectedStep.Height}" IsEnabled="{Binding SelectedStep.PlaceSize}" VerticalAlignment="Center" ToolTip="Alto" />
+                    <Button Content="Usar la posición actual" Click="CaptureWindow_Click" Margin="20,0,0,0" VerticalAlignment="Center"
+                            ToolTip="Abre el programa, pon su ventana donde la quieras y pulsa: copia su posición y tamaño (y si está maximizada)." />
+                </WrapPanel>
             </Grid>
         </Grid>
 

@@ -73,7 +73,7 @@ Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <
 `sim [eventos [filtro]]`, `sim vars <perfil> [s]`, `dcs [s]`, `dcs enviar CONTROL [VALOR]`, `dcs leer CONTROL`,
 `dcs vigilar [filtro]` (cada cambio de los mandos de la cabina con su posición y descripción: para
 comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez),
-`hangar` (estado de todos, no lanza nada), `hangar <nombre> --dry` (qué haría), `hangar <nombre>` (abre; Ctrl+C cancela).
+`hangar` (estado de todos, no lanza nada), `hangar <nombre> --dry` (qué haría), `hangar <nombre>` (abre; Ctrl+C cancela), `ventanas <proceso>` (posición de sus ventanas, para `"window"`).
 - Fase 5, App Hangar (08/11/2026; escenarios con host falso + ping real, pantalla comprobada fuera de
   pantalla; ✅ verificado por el usuario con los programas reales: ningún paso en rojo, MSFS arranca,
   HapticSeat aparece en la bandeja y SimAppPro abre sin aviso de UAC): `Core/Hangar/`
@@ -104,7 +104,19 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
   solo): ponerla una vez no bastaba. Un cambio a mano también se corrige (para no tocarla: "Sin cambiar").
   Si aparece tras `timeoutSeconds`, también se le pone.
   `hangar X --dry` la muestra.
-  Falta en la fase 5: gestor de ventanas, mods por symlinks, snapshots.
+  Gestor de ventanas (11/11/2026; escenarios con ventanas falsas + una ventana real transparente sin activar
+  en las pruebas; ✅ verificado por el usuario con los programas reales el 11/11/2026): `"window"` en cada paso (`state`
+  normal/minimized/maximized, `x`/`y` y `width`/`height` por parejas, `topmost` true/false; lo que falta no se toca)
+  y `"focus": true` (vale el último paso marcado). `WindowHost` (Core/Hangar, user32, en píxeles reales: DPI por
+  monitor en el hilo) detrás de `IWindowHost`. Ventanas principales = visibles, sin dueño, no de herramientas, no
+  ocultas por DWM. Se coloca cada ventana NUEVA al verla y ~3 s más (programas que se recolocan solos), nunca
+  después (no pelear con lo hecho a mano); se buscan nuevas hasta 120 s tras la secuencia (DCS se relanza). También
+  lo ya abierto. Posición fuera de todas las pantallas = no se mueve y aviso; elevados (SimAppPro) = aviso.
+  Foco: al acabar la secuencia (o al aparecer su ventana, dentro del plazo) se trae al frente UNA vez la ventana más
+  reciente del paso (AttachThreadInput + SetForegroundWindow, sin teclas); cancelar = nada. Pantalla: "Ventana",
+  "Siempre encima", "Traer al frente al terminar" (uno por hangar) y "Colocar" con "Usar la posición actual".
+  `RigProbe ventanas <proceso>` da las coordenadas para el JSON. El ejemplo del repo marca los simuladores con focus.
+  Falta en la fase 5: mods por symlinks, snapshots.
 - Fase 4 (en curso, hecho sin el usuario el 01/11/2026; NADA de esto probado aún en vuelo):
   - Luces del Bravo desde MSFS: sección `"lights"` del perfil: nombre de `BravoLed` -> condición o
     lista (AND) sobre `A:VAR[, unidades]` o `L:Var` con `> >= < <= =`, rango `=a..b`, `!` niega;
@@ -367,7 +379,7 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
    y cliente DCS-BIOS, ✅ verificado con DCS y el AH-64D (ver "Fase 4" arriba); luces y
    condiciones desde el estado de DCS (`D:`, ✅ verificado con el AH-64D). Falta: LEDs WinWing.
 5. (en curso) ✅ App Hangar (lanzar apps en secuencia); prioridad de CPU por paso;
-   gestor de ventanas, mods por symlinks, snapshots
+   ✅ gestor de ventanas; mods por symlinks, snapshots
 
 Idea pendiente (propuesta el 02/11/2026, a decidir con el usuario): **generar perfiles con IA**
 (Claude por la API de Anthropic). Botón "Generar con IA" en Perfiles: se envían los mandos con sus

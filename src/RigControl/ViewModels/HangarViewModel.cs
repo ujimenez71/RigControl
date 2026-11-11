@@ -20,6 +20,32 @@ public sealed record PriorityOption(HangarPriority? Value, string Text)
     public override string ToString() => Text;
 }
 
+/// <summary>Una opción del desplegable de estado de la ventana; null = no tocarlo.</summary>
+public sealed record WindowStateOption(HangarWindowState? Value, string Text)
+{
+    public static IReadOnlyList<WindowStateOption> All { get; } =
+    [
+        new(null, "Sin cambiar"),
+        new(HangarWindowState.Normal, "Normal"),
+        new(HangarWindowState.Minimized, "Minimizada"),
+        new(HangarWindowState.Maximized, "Maximizada"),
+    ];
+
+    public static WindowStateOption Of(HangarWindowState? value) => All.First(o => o.Value == value);
+
+    public override string ToString() => Text;
+}
+
+/// <summary>Una opción del desplegable "Siempre encima"; null = no tocarlo.</summary>
+public sealed record TopmostOption(bool? Value, string Text)
+{
+    public static IReadOnlyList<TopmostOption> All { get; } = [new(null, "Sin cambiar"), new(true, "Sí"), new(false, "No (quitarlo)")];
+
+    public static TopmostOption Of(bool? value) => All.First(o => o.Value == value);
+
+    public override string ToString() => Text;
+}
+
 /// <summary>Un programa de la secuencia, editable y con su estado.</summary>
 public sealed class HangarStepItem(HangarStep step, Action changed) : ObservableObject
 {
@@ -31,6 +57,15 @@ public sealed class HangarStepItem(HangarStep step, Action changed) : Observable
     private double _timeoutSeconds = step.TimeoutSeconds;
     private bool _enabled = step.Enabled;
     private PriorityOption _priority = PriorityOption.Of(step.Priority);
+    private WindowStateOption _windowState = WindowStateOption.Of(step.Window?.State);
+    private TopmostOption _topmost = TopmostOption.Of(step.Window?.Topmost);
+    private bool _placePosition = step.Window?.HasPosition == true;
+    private int _x = step.Window?.X ?? 0;
+    private int _y = step.Window?.Y ?? 0;
+    private bool _placeSize = step.Window?.HasSize == true;
+    private int _width = step.Window?.Width ?? 1280;
+    private int _height = step.Window?.Height ?? 720;
+    private bool _focus = step.Focus;
     private HangarPresence _presence = HangarPresence.Unknown;
     private string _runText = "";
     private bool _runProblem;
@@ -43,6 +78,17 @@ public sealed class HangarStepItem(HangarStep step, Action changed) : Observable
     public double TimeoutSeconds { get => _timeoutSeconds; set => Edit(ref _timeoutSeconds, Math.Max(0, value)); }
     public bool Enabled { get => _enabled; set => Edit(ref _enabled, value); }
     public PriorityOption Priority { get => _priority; set => Edit(ref _priority, value ?? PriorityOption.All[0]); }
+    public WindowStateOption WindowState { get => _windowState; set => Edit(ref _windowState, value ?? WindowStateOption.All[0]); }
+    public TopmostOption Topmost { get => _topmost; set => Edit(ref _topmost, value ?? TopmostOption.All[0]); }
+    public bool PlacePosition { get => _placePosition; set => Edit(ref _placePosition, value); }
+    public int X { get => _x; set => Edit(ref _x, value); }
+    public int Y { get => _y; set => Edit(ref _y, value); }
+    public bool PlaceSize { get => _placeSize; set => Edit(ref _placeSize, value); }
+    public int Width { get => _width; set => Edit(ref _width, Math.Max(1, value)); }
+    public int Height { get => _height; set => Edit(ref _height, Math.Max(1, value)); }
+
+    /// <summary>Traer al frente al terminar. Solo uno por hangar: lo garantiza HangarItem.</summary>
+    public bool Focus { get => _focus; set => Edit(ref _focus, value); }
 
     public HangarPresence Presence
     {
@@ -80,7 +126,35 @@ public sealed class HangarStepItem(HangarStep step, Action changed) : Observable
         TimeoutSeconds = TimeoutSeconds,
         Enabled = Enabled,
         Priority = Priority.Value,
+        Window = ToWindow(),
+        Focus = Focus,
     };
+
+    private HangarWindow? ToWindow()
+    {
+        var window = new HangarWindow
+        {
+            State = WindowState.Value,
+            Topmost = Topmost.Value,
+            X = PlacePosition ? X : null,
+            Y = PlacePosition ? Y : null,
+            Width = PlaceSize ? Width : null,
+            Height = PlaceSize ? Height : null,
+        };
+        return window.IsEmpty ? null : window;
+    }
+
+    /// <summary>Copia la posición y el tamaño de una ventana abierta (y "maximizada" si lo está).</summary>
+    public void UseWindow(WindowInfo info)
+    {
+        X = info.X;
+        Y = info.Y;
+        Width = info.Width;
+        Height = info.Height;
+        PlacePosition = true;
+        PlaceSize = true;
+        if (info.State == HangarWindowState.Maximized) WindowState = WindowStateOption.Of(HangarWindowState.Maximized);
+    }
 
     private void Edit<T>(ref T field, T value, [CallerMemberName] string? name = null)
     {
@@ -100,7 +174,20 @@ public sealed class HangarItem : ObservableObject
         _changed = changed;
         _name = model.Name;
         _startRun = model.StartRun;
+        Steps.CollectionChanged += (_, e) =>
+        {
+            foreach (HangarStepItem item in e.NewItems ?? Array.Empty<HangarStepItem>()) item.PropertyChanged += OnStepChanged;
+            foreach (HangarStepItem item in e.OldItems ?? Array.Empty<HangarStepItem>()) item.PropertyChanged -= OnStepChanged;
+        };
         foreach (var s in model.Steps) Steps.Add(new HangarStepItem(s, changed));
+    }
+
+    /// <summary>Solo un paso puede traerse al frente: marcar uno desmarca los demás.</summary>
+    private void OnStepChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(HangarStepItem.Focus) || sender is not HangarStepItem { Focus: true } chosen) return;
+        foreach (var other in Steps)
+            if (other != chosen && other.Focus) other.Focus = false;
     }
 
     public ObservableCollection<HangarStepItem> Steps { get; } = [];
@@ -280,6 +367,36 @@ public sealed class HangarViewModel : ObservableObject, IDisposable
         step.Process = "";
         if (step.Name is "" or "Nuevo programa") step.Name = Path.GetFileNameWithoutExtension(path);
         _ = RefreshPresenceAsync();
+    }
+
+    /// <summary>"Usar la posición actual": la de la ventana principal abierta del programa elegido.</summary>
+    public async void CaptureWindow()
+    {
+        if (SelectedStep is not { } step) return;
+        var model = step.ToModel();
+        var process = HangarRunner.ProcessNameOf(model);
+        if (process is null)
+        {
+            Message = "Para copiar la posición hace falta el proceso (se deduce del .exe; en las URI hay que escribirlo).";
+            return;
+        }
+        var info = await Task.Run(() =>
+        {
+            var host = new ProcessHost();
+            var windows = new WindowHost();
+            foreach (var id in host.FindProcesses(process))
+                foreach (var hwnd in windows.MainWindows(id))
+                    if (windows.Describe(hwnd) is { } found) return found;
+            return null;
+        });
+        if (info is null)
+        {
+            Message = $"No hay ninguna ventana visible de {process}: ábrelo, ponlo donde lo quieras y vuelve a pulsar.";
+            return;
+        }
+        step.UseWindow(info);
+        Message = $"Copiada la ventana de {step.Name}: en {info.X},{info.Y} de {info.Width}×{info.Height}" +
+                  (info.State == HangarWindowState.Maximized ? ", maximizada." : ".");
     }
 
     public async void LaunchOrCancel()

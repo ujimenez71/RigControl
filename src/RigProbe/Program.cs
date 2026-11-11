@@ -77,6 +77,8 @@ internal static class Program
                     return DcsSend(args[2], readOnly: true);
                 DcsWatch(args.Length > 1 && int.TryParse(args[1], out var dsecs) ? dsecs : 15);
                 return 0;
+            case "ventanas" when args.Length > 1:
+                return WindowsCommand(string.Join(' ', args.Skip(1)));
             case "hangar":
                 return HangarCommand(args.Skip(1).Where(a => !a.Equals("--dry", StringComparison.OrdinalIgnoreCase)).FirstOrDefault(),
                                      args.Any(a => a.Equals("--dry", StringComparison.OrdinalIgnoreCase)));
@@ -90,7 +92,7 @@ internal static class Program
             default:
                 Console.WriteLine("Uso: RigProbe list [all] | monitor | catalog | bravo-test | check <perfil> | run <perfil>|auto [--dry]");
                 Console.WriteLine("            | sim | sim eventos [filtro] | sim vars <perfil> [s] | dcs [s] | dcs enviar CONTROL [VALOR] | dcs leer CONTROL");
-                Console.WriteLine("            | dcs vigilar [filtro] | hangar [nombre [--dry]]");
+                Console.WriteLine("            | dcs vigilar [filtro] | hangar [nombre [--dry]] | ventanas <proceso>");
                 Console.WriteLine($"  <perfil> es una ruta a un .json o un nombre en {ProfileFile.ProfilesDir}");
                 return 1;
         }
@@ -130,6 +132,12 @@ internal static class Program
                         state += HangarRunner.ProcessNameOf(step) is null
                             ? $"; prioridad {HangarRunner.PriorityText(priority)} IMPOSIBLE: falta \"process\""
                             : $"; prioridad {HangarRunner.PriorityText(priority)}";
+                    if (step.Enabled && step.Window is { IsEmpty: false } window)
+                        state += HangarRunner.ProcessNameOf(step) is null
+                            ? $"; ventana {HangarRunner.WindowText(window)} IMPOSIBLE: falta \"process\""
+                            : $"; ventana {HangarRunner.WindowText(window)}";
+                    if (step.Enabled && step == hangar.Steps.LastOrDefault(s => s.Enabled && s.Focus))
+                        state += "; al frente al terminar";
                     Console.WriteLine($"  {step.Name,-34} {state}");
                 }
             }
@@ -149,10 +157,31 @@ internal static class Program
         });
         if (!runner.Watching.IsCompleted)
         {
-            Console.WriteLine($"Manteniendo la prioridad mientras sigan abiertos (hasta {runner.PriorityWatchSeconds:0} s después de cerrarse; Ctrl+C para salir)…");
+            Console.WriteLine($"Vigilando prioridad y ventanas (prioridad: hasta {runner.PriorityWatchSeconds:0} s después de cerrarse; " +
+                              $"ventanas nuevas: {runner.WindowWatchSeconds:0} s; Ctrl+C para salir)…");
             runner.Watching.GetAwaiter().GetResult();
         }
         return outcome == HangarOutcome.WithProblems ? 1 : 0;
+    }
+
+    /// <summary>"ventanas X": ventanas principales del proceso X con su posición, para copiarla a hangar.json.</summary>
+    private static int WindowsCommand(string process)
+    {
+        if (process.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) process = process[..^4];
+        var windows = new WindowHost();
+        var found = 0;
+        foreach (var p in System.Diagnostics.Process.GetProcessesByName(process))
+            using (p)
+                foreach (var hwnd in windows.MainWindows(p.Id))
+                {
+                    if (windows.Describe(hwnd) is not { } w) continue;
+                    found++;
+                    var state = w.State switch { HangarWindowState.Minimized => "minimizada", HangarWindowState.Maximized => "maximizada", _ => "normal" };
+                    Console.WriteLine($"{process} (pid {p.Id}) \"{p.MainWindowTitle}\": {state}{(w.Topmost ? ", siempre encima" : "")}");
+                    Console.WriteLine($"  \"window\": {{ \"x\": {w.X}, \"y\": {w.Y}, \"width\": {w.Width}, \"height\": {w.Height} }}");
+                }
+        if (found == 0) Console.WriteLine($"No hay ventanas principales visibles de \"{process}\" (¿cerrado o en la bandeja?).");
+        return found == 0 ? 1 : 0;
     }
 
     // ----------------------------------------------------------------- run

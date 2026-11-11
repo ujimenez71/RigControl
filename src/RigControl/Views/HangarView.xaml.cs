@@ -18,6 +18,7 @@ public partial class HangarView : UserControl
     private void RemoveStep_Click(object sender, RoutedEventArgs e) => Vm.RemoveStep();
     private void MoveUp_Click(object sender, RoutedEventArgs e) => Vm.MoveStep(-1);
     private void MoveDown_Click(object sender, RoutedEventArgs e) => Vm.MoveStep(1);
+    private void CaptureWindow_Click(object sender, RoutedEventArgs e) => Vm.CaptureWindow();
 
     private void RemoveHangar_Click(object sender, RoutedEventArgs e)
     {

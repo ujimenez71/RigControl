@@ -73,7 +73,74 @@ internal static class HangarTests
             if (Errors.TryGetValue(target, out var error)) throw error;
             Started.Add(args is null ? target : $"{target} {args}");
             LastWorkingDir = workingDirectory;
-            if (Spawns.TryGetValue(target, out var process)) Add(process);
+            if (Spawns.TryGetValue(target, out var process))
+            {
+                var id = Add(process);
+                OnSpawn?.Invoke(process, id);
+            }
+        }
+
+        /// <summary>Nombre e identificador de cada proceso que aparece al lanzar.</summary>
+        public Action<string, int>? OnSpawn;
+    }
+
+    /// <summary>Ventanas falsas por proceso; el estado de cada una es lo último que se le aplicó.</summary>
+    private sealed class FakeWindows : IWindowHost
+    {
+        public sealed class Win
+        {
+            public int Pid;
+            public int X, Y, Width = 800, Height = 600;
+            public HangarWindowState State = HangarWindowState.Normal;
+            public bool Topmost;
+            public int Applied; // veces que hubo que cambiar algo
+        }
+
+        private readonly Dictionary<nint, Win> _wins = [];
+        private nint _next = 1000;
+        public readonly HashSet<int> ElevatedPids = [];
+        public readonly List<nint> Fronted = [];
+
+        public nint Open(int pid) { lock (_wins) { _wins[++_next] = new Win { Pid = pid }; return _next; } }
+        public void Close(nint hwnd) { lock (_wins) _wins.Remove(hwnd); }
+        public Win Get(nint hwnd) { lock (_wins) return _wins[hwnd]; }
+
+        public IReadOnlyList<nint> MainWindows(int processId)
+        {
+            lock (_wins) return [.. _wins.Where(kv => kv.Value.Pid == processId).Select(kv => kv.Key)];
+        }
+
+        public WindowInfo? Describe(nint window)
+        {
+            lock (_wins) return _wins.TryGetValue(window, out var w) ? new WindowInfo(w.X, w.Y, w.Width, w.Height, w.State, w.Topmost) : null;
+        }
+
+        public WindowApplyResult Apply(nint window, HangarWindow s)
+        {
+            lock (_wins)
+            {
+                if (!_wins.TryGetValue(window, out var w)) throw new InvalidOperationException("ya no está");
+                if (ElevatedPids.Contains(w.Pid)) throw new Win32Exception(5);
+                var before = (w.X, w.Y, w.Width, w.Height, w.State, w.Topmost);
+                var off = s.X is < -10000 or > 10000;
+                if (!off) { w.X = s.X ?? w.X; w.Y = s.Y ?? w.Y; }
+                w.Width = s.Width ?? w.Width; w.Height = s.Height ?? w.Height;
+                w.State = s.State ?? w.State; w.Topmost = s.Topmost ?? w.Topmost;
+                var changed = before != (w.X, w.Y, w.Width, w.Height, w.State, w.Topmost);
+                if (changed) w.Applied++;
+                return off ? WindowApplyResult.OffScreen : changed ? WindowApplyResult.Changed : WindowApplyResult.Unchanged;
+            }
+        }
+
+        public bool BringToFront(nint window)
+        {
+            lock (_wins)
+            {
+                if (!_wins.TryGetValue(window, out var w)) return false;
+                if (w.State == HangarWindowState.Minimized) w.State = HangarWindowState.Normal;
+                Fronted.Add(window);
+                return true;
+            }
         }
     }
 
@@ -243,6 +310,135 @@ internal static class HangarTests
             Check(watching && runner.Watching.Wait(2000), "StopWatching termina la vigilancia");
         }
 
+        // Ventanas: estado/posición al aparecer, también en lo ya abierto; nada en los pasos sin "window".
+        {
+            var host = new FakeHost("YA", "ADMIN");
+            var wins = new FakeWindows();
+            host.Spawns["app://sh"] = "SH";
+            host.Spawns["app://otro"] = "OTRO";
+            host.OnSpawn = (_, pid) => wins.Open(pid);
+            var ya = wins.Open(host.FindProcesses("YA")[0]);
+            wins.Get(ya).State = HangarWindowState.Maximized;
+            var admin = wins.Open(host.FindProcesses("ADMIN")[0]);
+            wins.ElevatedPids.Add(host.FindProcesses("ADMIN")[0]);
+            var sh = Uri("sh", "SH");
+            sh.Window = new HangarWindow { State = HangarWindowState.Minimized };
+            var yaStep = Uri("ya", "YA");
+            yaStep.Window = new HangarWindow { X = -1920, Y = 100, Width = 1280, Height = 720, State = HangarWindowState.Normal, Topmost = true };
+            var otro = Uri("otro", "OTRO");
+            var adminStep = Uri("admin", "ADMIN");
+            adminStep.Window = new HangarWindow { State = HangarWindowState.Minimized };
+            var fuera = Uri("fuera");
+            fuera.Window = new HangarWindow { State = HangarWindowState.Minimized };
+            var runner = new HangarRunner(host, pollMs: 5, priorityWatchSeconds: 0.1, windows: wins, windowWatchSeconds: 0.3);
+            var last = new HangarStepState[5];
+            var details = new string[5];
+            runner.StepChanged += (i, st, d) => { lock (details) { last[i] = st; details[i] = d; } };
+            var outcome = runner.RunAsync(new HangarProfile { Steps = [sh, yaStep, otro, adminStep, fuera] }).GetAwaiter().GetResult();
+            Check(runner.Watching.Wait(5000), "ventanas: la vigilancia acaba sola tras el plazo");
+            var shWin = wins.Get(wins.MainWindows(host.FindProcesses("SH")[0])[0]);
+            Check(shWin.State == HangarWindowState.Minimized && last[0] == HangarStepState.Ready && details[0].Contains("ventana minimizada"),
+                  $"ventanas: la del programa lanzado queda minimizada y se dice ({details[0]})");
+            var y = wins.Get(ya);
+            Check(y.X == -1920 && y.Y == 100 && y.Width == 1280 && y.Height == 720 && y.State == HangarWindowState.Normal && y.Topmost
+                  && details[1].Contains("en -1920,100 de 1280×720") && details[1].Contains("siempre encima"),
+                  "ventanas: lo ya abierto también se coloca (monitor a la izquierda, sin maximizar, siempre encima)");
+            Check(wins.Get(wins.MainWindows(host.FindProcesses("OTRO")[0])[0]).Applied == 0, "ventanas: sin \"window\" no se toca");
+            Check(last[3] == HangarStepState.Warning && details[3].Contains("acceso denegado"), "ventanas: programa elevado = aviso");
+            Check(last[4] == HangarStepState.Warning && details[4].Contains("colocar la ventana"), "ventanas: sin \"process\" = aviso");
+            Check(outcome == HangarOutcome.WithProblems, "ventanas: los avisos cuentan como problema");
+        }
+
+        // Ventanas: una que aparece tarde (relanzado) se coloca; pasados unos segundos ya no se pelea
+        // con lo que se cambie a mano; una posición fuera de las pantallas no se aplica.
+        {
+            var host = new FakeHost();
+            var wins = new FakeWindows();
+            host.Spawns["app://dcs"] = "DCS";
+            host.Spawns["app://lejos"] = "LEJOS";
+            host.OnSpawn = (_, pid) => wins.Open(pid);
+            var dcs = Uri("dcs", "DCS");
+            dcs.Window = new HangarWindow { X = 10, Y = 20 };
+            var lejos = Uri("lejos", "LEJOS");
+            lejos.Window = new HangarWindow { X = 50000, Y = 0, Topmost = true };
+            var runner = new HangarRunner(host, pollMs: 5, priorityWatchSeconds: 0.1, windows: wins, windowWatchSeconds: 1.5);
+            var details = new List<string>();
+            runner.StepChanged += (i, st, d) => { lock (details) details.Add($"{i}:{st}:{d}"); };
+            runner.RunAsync(new HangarProfile { Steps = [dcs, lejos] }).GetAwaiter().GetResult();
+            Thread.Sleep(150); // > settle (12 × 5 ms)
+            var first = wins.MainWindows(host.FindProcesses("DCS")[0])[0];
+            Check(wins.Get(first).X == 10 && wins.Get(first).Y == 20, "ventanas: posición sin tamaño (se conserva el tamaño)");
+            wins.Get(first).X = 500; // a mano
+            var second = wins.Open(host.Restart("DCS"));
+            Thread.Sleep(150);
+            Check(wins.Get(second).X == 10, "ventanas: la del programa relanzado también se coloca");
+            Check(wins.Get(first).X == 500, "ventanas: pasado el arranque no se corrige lo que se cambia a mano");
+            var far = wins.Get(wins.MainWindows(host.FindProcesses("LEJOS")[0])[0]);
+            Check(far.X == 0 && far.Topmost && details.Any(d => d.StartsWith("1:Warning") && d.Contains("ninguna pantalla")),
+                  "ventanas: fuera de las pantallas no se mueve (lo demás sí) y se avisa");
+            runner.StopWatching();
+            Check(runner.Watching.Wait(2000), "ventanas: StopWatching termina la vigilancia");
+        }
+
+        // Foco: el último paso marcado, al acabar la secuencia, la ventana más reciente, una vez.
+        {
+            var host = new FakeHost();
+            var wins = new FakeWindows();
+            host.Spawns["app://a"] = "A";
+            host.Spawns["app://sim"] = "SIM";
+            host.Spawns["app://aux"] = "AUX";
+            host.OnSpawn = (_, pid) => wins.Open(pid);
+            var a = Uri("a", "A");
+            a.Focus = true; // no cuenta: hay otro marcado después
+            var sim = Uri("sim", "SIM");
+            sim.Focus = true;
+            sim.Window = new HangarWindow { State = HangarWindowState.Minimized }; // al traerlo al frente se restaura
+            var aux = Uri("aux", "AUX");
+            aux.WaitSeconds = 0.1;
+            var runner = new HangarRunner(host, pollMs: 5, priorityWatchSeconds: 0.1, windows: wins, windowWatchSeconds: 0.3);
+            var details = new string[3];
+            var frontedBeforeEnd = -1;
+            runner.StepChanged += (i, st, d) => { lock (details) details[i] = d; };
+            var task = runner.RunAsync(new HangarProfile { Steps = [a, sim, aux] });
+            while (!task.IsCompleted) { lock (wins.Fronted) if (wins.Fronted.Count > 0 && frontedBeforeEnd < 0) frontedBeforeEnd = wins.Fronted.Count; Thread.Sleep(2); }
+            Check(runner.Watching.Wait(5000), "foco: la vigilancia acaba sola");
+            var simWin = wins.MainWindows(host.FindProcesses("SIM")[0])[0];
+            Check(frontedBeforeEnd < 0 && wins.Fronted.SequenceEqual([simWin]) && details[1].Contains("traído al frente"),
+                  "foco: solo el último marcado, al acabar la secuencia y una vez");
+        }
+
+        // Foco: si su ventana aún no existe al acabar, se trae al frente cuando aparece; cancelar = nada.
+        {
+            var host = new FakeHost();
+            var wins = new FakeWindows();
+            host.Spawns["app://sim"] = "SIM"; // sin ventana todavía
+            var sim = Uri("sim", "SIM");
+            sim.Focus = true;
+            var runner = new HangarRunner(host, pollMs: 5, priorityWatchSeconds: 0.1, windows: wins, windowWatchSeconds: 2);
+            runner.RunAsync(new HangarProfile { Steps = [sim] }).GetAwaiter().GetResult();
+            Thread.Sleep(50);
+            var none = wins.Fronted.Count == 0;
+            var late = wins.Open(host.FindProcesses("SIM")[0]);
+            Thread.Sleep(100);
+            Check(none && wins.Fronted.SequenceEqual([late]), "foco: la ventana que aparece tras la secuencia se trae al frente");
+            runner.StopWatching();
+
+            var host2 = new FakeHost();
+            var wins2 = new FakeWindows();
+            host2.Spawns["app://sim"] = "SIM";
+            host2.OnSpawn = (_, pid) => wins2.Open(pid);
+            var sim2 = Uri("sim", "SIM");
+            sim2.Focus = true;
+            var slow = Uri("lento", "LENTO");
+            host2.Spawns["app://lento"] = "LENTO";
+            slow.WaitSeconds = 30;
+            var runner2 = new HangarRunner(host2, pollMs: 5, priorityWatchSeconds: 0.1, windows: wins2, windowWatchSeconds: 2);
+            using var cts = new CancellationTokenSource();
+            runner2.StepChanged += (_, st, _) => { if (st == HangarStepState.Waiting) cts.CancelAfter(20); };
+            runner2.RunAsync(new HangarProfile { Steps = [sim2, slow] }, cts.Token).GetAwaiter().GetResult();
+            Check(runner2.Watching.Wait(2000) && wins2.Fronted.Count == 0, "foco: tras cancelar no se trae nada al frente");
+        }
+
         // Nombre del proceso.
         Check(HangarRunner.ProcessNameOf(new HangarStep { Target = @"C:\x\MOZA Cockpit.exe" }) == "MOZA Cockpit", "proceso deducido de la ruta");
         Check(HangarRunner.ProcessNameOf(new HangarStep { Target = "steam://rungameid/1" }) is null, "una URI no da proceso");
@@ -294,6 +490,23 @@ internal static class HangarTests
                 try { HangarFile.Load(path); } catch (Exception) { rejected = true; }
                 Check(rejected, $"prioridad {bad} no se acepta (tiempo real y números fuera)");
             }
+            var withWindow = new HangarFile { Hangars = [new HangarProfile { Name = "v", Steps = [
+                new HangarStep { Name = "x", Target = "x", Focus = true, Window = new HangarWindow { State = HangarWindowState.Maximized, X = -1920, Y = 0, Width = 1920, Height = 1080, Topmost = false } },
+                new HangarStep { Name = "y", Target = "y" }] }] };
+            withWindow.Save(path);
+            var text = File.ReadAllText(path);
+            var w = HangarFile.Load(path).Hangars[0].Steps;
+            Check(w[0].Focus && w[0].Window is { State: HangarWindowState.Maximized, X: -1920, Y: 0, Width: 1920, Height: 1080, Topmost: false }
+                  && !w[1].Focus && w[1].Window is null && text.Contains("\"state\": \"maximized\"")
+                  && text.Split("\"focus\"").Length == 2 && text.Split("\"window\"").Length == 2,
+                  "ventana y foco: se guardan y se leen, y solo en los pasos que los tienen");
+            foreach (var bad in new[] { """{ "x": 1 }""", """{ "width": 100 }""", """{ "width": 0, "height": 10 }""", """{ "state": "hidden" }""" })
+            {
+                File.WriteAllText(path, $$"""{ "hangars": [ { "name": "a", "steps": [ { "name": "x", "target": "x", "window": {{bad}} } ] } ] }""");
+                var rejected = false;
+                try { HangarFile.Load(path); } catch (Exception) { rejected = true; }
+                Check(rejected, $"ventana {bad} no se acepta");
+            }
             File.WriteAllText(path, "{ roto");
             var threw = false;
             try { HangarFile.Load(path); } catch (Exception) { threw = true; }
@@ -308,6 +521,46 @@ internal static class HangarTests
             var sample = HangarFile.Load(Path.Combine(d!.FullName, "profiles", "hangar.json"));
             Check(sample.Hangars.Count >= 2 && sample.Hangars.All(h => h.Steps.Count > 0 && h.Steps.All(s => s.Name != "" && s.Target != "" && HangarRunner.ProcessNameOf(s) is not null)),
                   $"profiles/hangar.json: {sample.Hangars.Count} hangares, todos los pasos con proceso detectable");
+        }
+
+        // Una ventana real, transparente y sin activar (no se ve ni roba el foco), con el WindowHost de verdad.
+        {
+            var hwnd = CreateWindowEx(WsExLayered | WsExNoActivate | WsExAppWindow, "STATIC", "RigControl prueba de ventana",
+                                      WsPopup | WsCaption | WsThickFrame | WsMinimizeBox | WsMaximizeBox, 200, 200, 400, 300, 0, 0, 0, 0);
+            try
+            {
+                SetLayeredWindowAttributes(hwnd, 0, 0, 2); // alfa 0
+                ShowWindow(hwnd, 4); // SW_SHOWNOACTIVATE
+                var real = new WindowHost();
+                var mine = real.MainWindows(Environment.ProcessId);
+                Check(mine.Contains(hwnd), "ventana real: aparece entre las ventanas principales del proceso");
+                var moved = real.Apply(hwnd, new HangarWindow { X = 50, Y = 60, Width = 500, Height = 350 });
+                var d = real.Describe(hwnd);
+                Check(moved == WindowApplyResult.Changed && d is { X: 50, Y: 60, Width: 500, Height: 350, State: HangarWindowState.Normal },
+                      $"ventana real: se mueve y redimensiona ({d})");
+                Check(real.Apply(hwnd, new HangarWindow { X = 50, Y = 60, Width = 500, Height = 350 }) == WindowApplyResult.Unchanged,
+                      "ventana real: aplicar otra vez no cambia nada");
+                real.Apply(hwnd, new HangarWindow { State = HangarWindowState.Minimized });
+                d = real.Describe(hwnd);
+                Check(d is { State: HangarWindowState.Minimized, Width: 500, Height: 350 }, $"ventana real: minimizada conserva su tamaño normal ({d})");
+                real.Apply(hwnd, new HangarWindow { X = 70, Y = 80, State = HangarWindowState.Minimized });
+                d = real.Describe(hwnd);
+                Check(d is { State: HangarWindowState.Minimized, X: 70, Y: 80 }, $"ventana real: se mueve estando minimizada y sigue minimizada ({d})");
+                real.Apply(hwnd, new HangarWindow { State = HangarWindowState.Maximized });
+                Check(real.Describe(hwnd)?.State == HangarWindowState.Maximized, "ventana real: maximizada");
+                real.Apply(hwnd, new HangarWindow { State = HangarWindowState.Normal, Topmost = true });
+                d = real.Describe(hwnd);
+                Check(d is { State: HangarWindowState.Normal, Topmost: true, X: 70, Y: 80 }, $"ventana real: normal y siempre encima ({d})");
+                real.Apply(hwnd, new HangarWindow { Topmost = false });
+                Check(real.Describe(hwnd)?.Topmost == false, "ventana real: se le quita «siempre encima»");
+                Check(real.Apply(hwnd, new HangarWindow { X = 90000, Y = 90000 }) == WindowApplyResult.OffScreen && real.Describe(hwnd)?.X == 70,
+                      "ventana real: fuera de las pantallas no se mueve");
+            }
+            finally
+            {
+                DestroyWindow(hwnd);
+            }
+            Check(new WindowHost().Describe(hwnd) is null, "ventana real: cerrada, Describe da null");
         }
 
         // Un proceso real, oculto: ping a sí mismo.
@@ -339,4 +592,20 @@ internal static class HangarTests
 
         return fails;
     }
+
+    private const uint WsPopup = 0x80000000, WsCaption = 0xC00000, WsThickFrame = 0x40000, WsMinimizeBox = 0x20000, WsMaximizeBox = 0x10000;
+    private const uint WsExLayered = 0x80000, WsExNoActivate = 0x8000000, WsExAppWindow = 0x40000;
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern nint CreateWindowEx(uint exStyle, string className, string title, uint style, int x, int y, int w, int h,
+                                              nint parent, nint menu, nint instance, nint param);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool SetLayeredWindowAttributes(nint hwnd, uint key, byte alpha, uint flags);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool ShowWindow(nint hwnd, int cmd);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool DestroyWindow(nint hwnd);
 }
