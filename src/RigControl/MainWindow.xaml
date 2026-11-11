@@ -23,6 +23,7 @@
                         <ListBoxItem Content="📝  Perfiles" />
                         <ListBoxItem Content="🛫  Hangar" />
                         <ListBoxItem Content="🧩  Mods" />
+                        <ListBoxItem Content="📸  Instantáneas" />
                     </ListBox>
                 </StackPanel>
                 <TextBlock DockPanel.Dock="Bottom" VerticalAlignment="Bottom" Margin="8,0" FontSize="11" Opacity="0.5"
@@ -35,5 +36,6 @@
         <views:ProfilesView Grid.Column="1" x:Name="ProfilesPage" Visibility="Collapsed" />
         <views:HangarView Grid.Column="1" x:Name="HangarPage" Visibility="Collapsed" />
         <views:ModsView Grid.Column="1" x:Name="ModsPage" Visibility="Collapsed" />
+        <views:SnapshotsView Grid.Column="1" x:Name="SnapshotsPage" Visibility="Collapsed" />
     </Grid>
 </Window>

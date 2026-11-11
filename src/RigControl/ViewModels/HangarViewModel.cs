@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Windows.Threading;
 using RigControl.Core.Hangar;
 using RigControl.Core.Mods;
+using RigControl.Core.Snapshots;
 
 namespace RigControl.ViewModels;
 
@@ -460,11 +461,24 @@ public sealed class HangarViewModel : ObservableObject, IDisposable
         using var cts = new CancellationTokenSource();
         _cts = cts;
         IsBusy = true;
-        var modsText = "";
+        Message = "Guardando instantáneas…";
+        var hangarName = model.Name;
+        var modsText = await Task.Run(() =>
+        {
+            try
+            {
+                var snapshots = SnapshotsFile.Load();
+                return SnapshotStore.Describe(new SnapshotStore(keepAuto: snapshots.KeepAuto).AutoAll(snapshots, $"al abrir {hangarName}")) + " ";
+            }
+            catch (Exception ex)
+            {
+                return $"Instantáneas: {ex.Message}. ";
+            }
+        });
         if (model.ModSet is { } setName)
         {
             Message = $"Aplicando los mods «{setName}»…";
-            modsText = await Task.Run(() => ApplyMods(setName));
+            modsText += await Task.Run(() => ApplyMods(setName));
         }
         Message = $"{modsText}Abriendo {hangar.Name}…";
 

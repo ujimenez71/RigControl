@@ -3,6 +3,7 @@ using RigControl.Core;
 using RigControl.Core.Bindings;
 using RigControl.Core.Hangar;
 using RigControl.Core.Mods;
+using RigControl.Core.Snapshots;
 using Vortice.DirectInput;
 
 namespace RigProbe;
@@ -78,6 +79,8 @@ internal static class Program
                     return DcsSend(args[2], readOnly: true);
                 DcsWatch(args.Length > 1 && int.TryParse(args[1], out var dsecs) ? dsecs : 15);
                 return 0;
+            case "instantaneas" or "instantáneas":
+                return SnapshotsCommand([.. args.Skip(1)]);
             case "mods":
                 return ModsCommand([.. args.Skip(1).Where(a => !a.Equals("--dry", StringComparison.OrdinalIgnoreCase))],
                                    args.Any(a => a.Equals("--dry", StringComparison.OrdinalIgnoreCase)));
@@ -98,6 +101,7 @@ internal static class Program
                 Console.WriteLine("            | sim | sim eventos [filtro] | sim vars <perfil> [s] | dcs [s] | dcs enviar CONTROL [VALOR] | dcs leer CONTROL");
                 Console.WriteLine("            | dcs vigilar [filtro] | hangar [nombre [--dry]] | ventanas <proceso>");
                 Console.WriteLine("            | mods | mods <conjunto> [--dry] | mods importar <biblioteca> [--dry]");
+                Console.WriteLine("            | instantaneas | instantaneas crear <grupo|todo> [nombre] | instantaneas comparar|restaurar <grupo> <n>");
                 Console.WriteLine($"  <perfil> es una ruta a un .json o un nombre en {ProfileFile.ProfilesDir}");
                 return 1;
         }
@@ -152,6 +156,15 @@ internal static class Program
 
         using var cts = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+        try
+        {
+            var snapshots = SnapshotsFile.Load();
+            Console.WriteLine("  " + SnapshotStore.Describe(new SnapshotStore(keepAuto: snapshots.KeepAuto).AutoAll(snapshots, $"al abrir {chosen[0].Name}")));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  Instantáneas: {ex.Message}");
+        }
         if (chosen[0].ModSet is { } modSet) ApplyHangarMods(modSet, dryRun: false);
         var steps = chosen[0].Steps;
         runner.StepChanged += (i, _, detail) => Console.WriteLine($"{DateTime.Now:HH:mm:ss}  {steps[i].Name}: {detail}");
@@ -190,6 +203,85 @@ internal static class Program
         {
             Console.WriteLine($"  Mods: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// "instantaneas": grupos y sus instantáneas numeradas. "instantaneas crear G|todo [nombre]".
+    /// "instantaneas comparar G n": qué cambió desde la n. "instantaneas restaurar G n" (pide confirmación).
+    /// </summary>
+    private static int SnapshotsCommand(string[] args)
+    {
+        var file = SnapshotsFile.Load();
+        var store = new SnapshotStore(keepAuto: file.KeepAuto);
+        if (args.Length == 0)
+        {
+            foreach (var g in file.Groups)
+            {
+                var files = SnapshotStore.Collect(g);
+                Console.WriteLine($"=== {g.Name}: {files.Count} archivos en {SnapshotStore.ExpandRoot(g)}{(store.IsLocked(g) ? $"  ({g.Process} ABIERTO: no se puede restaurar)" : "")} ===");
+                var list = store.List(g.Name);
+                for (var i = 0; i < list.Count; i++)
+                {
+                    var s = list[i];
+                    Console.WriteLine($"  {i + 1,3}. {s.Created:dd/MM/yyyy HH:mm:ss}  {(s.Auto ? "auto  " : "manual")}  {s.FileCount,4} arch. {s.Bytes / 1024.0,8:N0} KB  {s.Name}");
+                }
+                if (list.Count == 0) Console.WriteLine("  (ninguna)");
+            }
+            Console.WriteLine($"Carpeta: {store.StoreDir}");
+            return 0;
+        }
+
+        var verb = args[0].ToLowerInvariant();
+        if (verb == "crear" && args.Length > 1)
+        {
+            var groups = args[1].Equals("todo", StringComparison.OrdinalIgnoreCase) ? file.Groups
+                       : file.FindGroup(args[1]) is { } one ? [one] : [];
+            if (groups.Count == 0) { Console.WriteLine($"No existe el grupo «{args[1]}». Hay: {string.Join(", ", file.Groups.Select(g => g.Name))}, todo"); return 1; }
+            var name = string.Join(' ', args.Skip(2));
+            var problems = 0;
+            foreach (var g in groups)
+            {
+                try
+                {
+                    var s = store.Create(g, name, auto: false)!;
+                    Console.WriteLine($"  {g.Name}: {s.FileCount} archivos -> {s.Path}");
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+                {
+                    problems++;
+                    Console.WriteLine($"  {g.Name}: {ex.Message}");
+                }
+            }
+            return problems == 0 ? 0 : 1;
+        }
+
+        if (verb is "comparar" or "restaurar" && args.Length > 2 && file.FindGroup(args[1]) is { } group && int.TryParse(args[2], out var n))
+        {
+            var list = store.List(group.Name);
+            if (n < 1 || n > list.Count) { Console.WriteLine($"{group.Name} tiene {list.Count} instantáneas (1-{list.Count})."); return 1; }
+            var snap = list[n - 1];
+            var diff = store.Compare(group, snap);
+            Console.WriteLine($"{group.Name}, {snap.Created:dd/MM/yyyy HH:mm:ss} «{snap.Name}» frente a lo actual:");
+            foreach (var (rel, state) in diff) Console.WriteLine($"  {state,-34} {rel}");
+            if (diff.Count == 0) Console.WriteLine("  igual que ahora");
+            if (verb == "comparar") return 0;
+            Console.Write("Se sobrescribirán esos archivos (los nuevos se quedan). ¿Restaurar? (s/N) ");
+            if (!string.Equals(Console.ReadLine()?.Trim(), "s", StringComparison.OrdinalIgnoreCase)) { Console.WriteLine("No se ha tocado nada."); return 1; }
+            try
+            {
+                var r = store.Restore(group, snap);
+                Console.WriteLine($"Restaurados {r.Files} archivos.{(r.Before is { } b ? $" Lo de antes está en «{b.Name}»." : "")}");
+                return 0;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or InvalidDataException)
+            {
+                Console.WriteLine($"No se pudo restaurar: {ex.Message}");
+                return 1;
+            }
+        }
+
+        Console.WriteLine("Uso: instantaneas | instantaneas crear <grupo|todo> [nombre] | instantaneas comparar|restaurar <grupo> <n>");
+        return 1;
     }
 
     /// <summary>"mods": estado. "mods X [--dry]": aplica el conjunto X. "mods importar B [--dry]": mete en la biblioteca B lo que hay suelto en su destino.</summary>

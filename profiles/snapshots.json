@@ -1,0 +1,24 @@
+{
+  "keepAuto": 10,
+  "groups": [
+    {
+      "name": "DCS",
+      "root": "%USERPROFILE%\\Saved Games\\DCS.openbeta",
+      "include": [ "Config", "Scripts\\Export.lua", "Scripts\\Hooks" ],
+      "exclude": [ "authdata.bin", "network.vault" ],
+      "process": "DCS"
+    },
+    {
+      "name": "MSFS 2024",
+      "root": "%LOCALAPPDATA%\\Packages\\Microsoft.Limitless_8wekyb3d8bbwe\\LocalCache",
+      "include": [ "UserCfg.opt", "FlightSimulator2024.CFG", "Cameras.CFG", "EXE.xml", "SimConnect.xml" ],
+      "process": "FlightSimulator2024"
+    },
+    {
+      "name": "RigControl",
+      "root": "%APPDATA%\\RigControl",
+      "include": [ "." ],
+      "exclude": [ "snapshots\\*", "*.bak", "*.tmp" ]
+    }
+  ]
+}

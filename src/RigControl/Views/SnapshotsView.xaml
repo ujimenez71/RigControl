@@ -1,0 +1,91 @@
+<UserControl x:Class="RigControl.Views.SnapshotsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <Style x:Key="Grid" TargetType="DataGrid" BasedOn="{StaticResource {x:Type DataGrid}}">
+            <Setter Property="AutoGenerateColumns" Value="False" />
+            <Setter Property="IsReadOnly" Value="True" />
+            <Setter Property="HeadersVisibility" Value="Column" />
+            <Setter Property="GridLinesVisibility" Value="None" />
+            <Setter Property="CanUserReorderColumns" Value="False" />
+            <Setter Property="SelectionMode" Value="Single" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Cabecera -->
+        <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,12">
+            <TextBlock Text="Instantáneas" FontSize="24" FontWeight="SemiBold" />
+            <TextBlock Opacity="0.7" TextWrapping="Wrap">
+                <Run Text="Copias de la configuración (mandos y opciones de DCS, gráficos de MSFS, la propia RigControl). Al abrir un hangar se hace una automática si algo cambió. Restaurar sobrescribe, no borra, y antes guarda lo actual. Se guardan en " /><Run Text="{Binding StoreDir, Mode=OneWay}" FontFamily="Cascadia Mono, Consolas" />
+            </TextBlock>
+        </StackPanel>
+
+        <!-- Grupos -->
+        <DockPanel Grid.Row="1" Grid.Column="0" Margin="0,0,16,0">
+            <Button DockPanel.Dock="Bottom" Content="Crear de todos los grupos" Click="CreateAll_Click" Margin="0,8,0,0"
+                    HorizontalAlignment="Stretch" IsEnabled="{Binding CanWork}"
+                    ToolTip="Una instantánea manual de cada grupo, con el nombre escrito a la derecha." />
+            <ListBox ItemsSource="{Binding Groups}" SelectedItem="{Binding SelectedGroup}" DisplayMemberPath="Name" />
+        </DockPanel>
+
+        <!-- Instantáneas del grupo -->
+        <Grid Grid.Row="1" Grid.Column="1" Visibility="{Binding HasGroup, Converter={StaticResource BoolToVisibility}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="2*" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Text="{Binding GroupText}" Opacity="0.7" FontFamily="Cascadia Mono, Consolas" FontSize="12"
+                       TextWrapping="Wrap" Margin="0,0,0,8" />
+            <TextBlock Grid.Row="1" Text="{Binding LockText}" Foreground="OrangeRed" TextWrapping="Wrap" Margin="0,0,0,8"
+                       Visibility="{Binding IsLocked, Converter={StaticResource BoolToVisibility}}" />
+
+            <DockPanel Grid.Row="2" Margin="0,0,0,8" IsEnabled="{Binding CanWork}">
+                <Button DockPanel.Dock="Right" Content="Crear instantánea" Click="Create_Click" Margin="8,0,0,0" />
+                <TextBlock DockPanel.Dock="Left" Text="Nombre (opcional)" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <TextBox Text="{Binding NewName, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" />
+            </DockPanel>
+
+            <DataGrid Grid.Row="3" ItemsSource="{Binding Snapshots}" SelectedItem="{Binding SelectedSnapshot}" Style="{StaticResource Grid}">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Fecha" Binding="{Binding When}" Width="160" />
+                    <DataGridTextColumn Header="Tipo" Binding="{Binding Kind}" Width="110" />
+                    <DataGridTextColumn Header="Archivos" Binding="{Binding Files}" Width="80" />
+                    <DataGridTextColumn Header="Tamaño" Binding="{Binding Size}" Width="90" />
+                    <DataGridTextColumn Header="Nombre" Binding="{Binding Name}" Width="*" />
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <WrapPanel Grid.Row="4" Margin="0,8,0,8">
+                <Button Content="Comparar con lo actual" Click="Compare_Click" Margin="0,0,6,0" IsEnabled="{Binding HasSnapshot}" />
+                <Button Content="Restaurar…" Click="Restore_Click" Margin="0,0,6,0" IsEnabled="{Binding CanRestore}"
+                        ToolTip="Sobrescribe los archivos de la instantánea (los nuevos se quedan). Antes se guarda lo actual como automática." />
+                <Button Content="Borrar…" Click="Delete_Click" Margin="0,0,6,0" IsEnabled="{Binding HasSnapshot}" />
+                <Button Content="Abrir carpeta" Click="OpenFolder_Click" />
+            </WrapPanel>
+
+            <ListBox Grid.Row="5" ItemsSource="{Binding Differences}" FontFamily="Cascadia Mono, Consolas" FontSize="12"
+                     ToolTip="Diferencias entre la instantánea elegida y lo que hay ahora (pulsa «Comparar con lo actual»)." />
+        </Grid>
+
+        <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding Message}" Margin="0,12,0,0" TextWrapping="Wrap" />
+    </Grid>
+</UserControl>
