@@ -53,7 +53,7 @@ Software propio de control del rig de simulación, inspirado en Hangar Control d
 | MFD izquierdo (CarrierAce) | 4098:BEE1 | jet | output 14 B |
 | MFD derecho (CarrierAce) | 4098:BEE2 | jet | output 14 B |
 | PTO 2 (CarrierAce) | 4098:BF05 | jet | output 14 B |
-| ICP (ViperAce) | 4098:BF06 | jet | output 64 B (misma orden 0x49; texto de la pantalla sin estudiar) |
+| ICP (ViperAce) | 4098:BF06 | jet | output 64 B (misma orden 0x49; pantalla 200x65 con su protocolo) |
 | Colectivo AH-64 (VPC Rotor TCS PLUS) | 3344:832E | helo | interfaz mi_01 = config VPC, NO TOCAR |
 | Yoke Alpha (Honeycomb) | 294B:1900 | ga | sin LEDs, ignorar su output |
 | Bravo (Honeycomb) | 294B:1901 | ga | feature report 5 B = luces anunciadoras |
@@ -164,7 +164,14 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
   1 A-A, 2 A-G). `BF01`/`BF02` = empuñaduras F-15EX: en Linux su LED 0 es el MOTOR DE VIBRACIÓN (no barrer).
   ICP `BF06` (módulo = PID): output report de 64 B con la MISMA orden rellena con ceros (✅ 13/11/2026); 0 retroiluminación,
   1 retroiluminación de la pantalla (`icp:SCREEN_BACKLIGHT`; al soltarla vuelve a 255 como toda luz "...BACKLIGHT"); 2-5 nada.
-  El texto de la pantalla (DED) sigue sin estudiar. Valor 0-255 (retroiluminación) o 0/1. SimAppPro también escribe en ellos.
+  Pantalla del ICP (DED) ✅ 13/11/2026 (`Core/WinWing/IcpDisplay.cs` + `IcpFont.cs`, protocolo de DedSharp,
+  github.com/broosa/DedSharp, MIT): 200x65 px de 1 bit, mismo report de 64 B `F0 <op> <secuencia> <longitud> <60 B>`
+  (op 02 = paquete inicial, 00 = datos); órdenes `<BF06 4 B> <orden 4 B> <FFFF 4 B> 00 <longitud 4 B> <datos>`, 0x102 =
+  memoria (4 ceros + 65 filas de 25 B, bit bajo = izquierda) y 0x103 = refresco. Texto en celdas de 8x13 = 25x5
+  caracteres con la fuente de la DED (72 glifos, de ded_font.bmp de DedSharp; invertido = campo seleccionado). OJO: sin
+  `icp:SCREEN_BACKLIGHT` encendida no se ve nada (el barrido la deja a 0). SimAppPro solo la escribe en misión con el
+  F-16 de DCS (`mainsrc/ICP_LCD/F16_ICP.js`, list_indication(6)). `RigProbe winwing pantalla [prueba|fuente|borrar|
+  texto "línea" ...]` (entre corchetes = invertido). Valor 0-255 (retroiluminación) o 0/1. SimAppPro también escribe en ellos.
   `RigProbe winwing` (lista), `winwing led <disp> <n> <valor> [--modulo XXXX]`, `winwing barrido <disp> [desde]
   [hasta]` (alias throttle, pedales, mfdl, mfdr, pto2 o PID), `winwing luces` (nombres para el perfil).
   Luces desde el perfil (13/11/2026, escenarios con WinWing falsos; ✅ verificado con DCS y el AH-64D el 13/11/2026:

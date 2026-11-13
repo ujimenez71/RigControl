@@ -111,7 +111,15 @@ internal static class LightTests
         Check(WinWingPanel.FindLight("icp:screen_backlight") is { ProductId: 0xBF06, Led: 1, IsBacklight: true, ReleaseValue: 255 },
               "ICP: retroiluminación de la pantalla = LED 1, al soltarla vuelve a 255");
         Check(WinWingPanel.FindLight("pto2:GEAR_NOSE") is { IsBacklight: false, ReleaseValue: 0 }, "una luz normal se suelta apagada");
-        Check(WinWingPanel.DefaultModule(0xBEE2) == 0xBE0D && WinWingPanel.DefaultModule(0xBD64) == 0xBE60 &&
+        // Fuente de la pantalla del ICP (vista correcta en el ICP real el 13/11/2026).
+        Check(IcpFont.Columns == 25 && IcpFont.Rows == 5, "pantalla del ICP: 25 x 5 caracteres");
+        Check(IcpFont.Glyph('a').SequenceEqual(IcpFont.Glyph('A')) && !IcpFont.Glyph('A').SequenceEqual(IcpFont.Glyph('B')),
+              "fuente: minúscula = mayúscula, cada letra distinta");
+        Check(IcpFont.Glyph(' ').ToArray().All(b => b == 0) && IcpFont.Glyph('º').SequenceEqual(IcpFont.Glyph('°')),
+              "fuente: espacio vacío, º = °");
+        Check(!IcpFont.CanDraw('€') && IcpFont.Glyph('€').SequenceEqual(IcpFont.Glyph('ñ')), "fuente: desconocido -> glifo de trama");
+
+        Check(WinWingPanel.DefaultModule(0xBEE2) == 0xBE0D &&WinWingPanel.DefaultModule(0xBD64) == 0xBE60 &&
               WinWingPanel.DefaultModule(0xBF05) == 0xBF05, "módulos: MFD BE0D, acelerador BE60, PTO 2 su PID");
 
         var (pr, errs) = compile("""

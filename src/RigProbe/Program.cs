@@ -671,6 +671,65 @@ internal static class Program
     // ---------------------------------------------------------------- winwing
 
     /// <summary>"winwing": lista. "winwing led D N V": pone un LED. "winwing barrido D": hace parpadear cada LED para identificarlo.</summary>
+    /// <summary>`winwing pantalla [prueba|borrar]`: dibuja en la pantalla del ICP.</summary>
+    private static int IcpScreenCommand(string[] args)
+    {
+        using var screen = IcpDisplay.TryOpen();
+        if (screen is null)
+        {
+            Console.WriteLine("No se encontró o no se pudo abrir el ICP (BF06).");
+            return 1;
+        }
+        var what = args.Length > 0 ? args[0].ToLowerInvariant() : "prueba";
+        screen.Clear();
+        if (what == "prueba")
+        {
+            // Marco, una diagonal y un bloque de 8x8 arriba a la izquierda: para ver orientación y bits.
+            for (var x = 0; x < IcpDisplay.Width; x++) { screen.SetPixel(x, 0); screen.SetPixel(x, IcpDisplay.Height - 1); }
+            for (var y = 0; y < IcpDisplay.Height; y++) { screen.SetPixel(0, y); screen.SetPixel(IcpDisplay.Width - 1, y); }
+            for (var x = 0; x < IcpDisplay.Width; x++) screen.SetPixel(x, x * (IcpDisplay.Height - 1) / (IcpDisplay.Width - 1));
+            for (var y = 3; y < 11; y++) for (var x = 3; x < 11; x++) screen.SetPixel(x, y);
+        }
+        else if (what == "fuente")
+        {
+            // Todos los caracteres, 25 por fila, y una palabra invertida en la última.
+            const string all = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890↕()<>[]+-*/=°|~.,!?:;&_'\"%#@{}";
+            for (var i = 0; i < all.Length; i += IcpFont.Columns)
+                screen.DrawText(0, i / IcpFont.Columns, all[i..Math.Min(all.Length, i + IcpFont.Columns)]);
+            screen.DrawText(0, 4, "INVERTIDO", inverted: true);
+        }
+        else if (what == "texto")
+        {
+            // Cada argumento es una línea; entre corchetes = invertido: "UHF [242.00]".
+            for (var row = 0; row < Math.Min(IcpFont.Rows, args.Length - 1); row++)
+            {
+                var line = args[row + 1];
+                var column = 0;
+                foreach (var part in System.Text.RegularExpressions.Regex.Split(line, @"(\[[^\]]*\])"))
+                {
+                    var inv = part.Length > 1 && part[0] == '[' && part[^1] == ']';
+                    var t = inv ? part[1..^1] : part;
+                    screen.DrawText(column, row, t, inv);
+                    column += t.Length;
+                }
+            }
+        }
+        else if (what != "borrar")
+        {
+            Console.WriteLine("Uso: winwing pantalla [prueba|fuente|borrar|texto \"línea 1\" \"línea 2\" ...]");
+            return 1;
+        }
+        screen.Flush();
+        Console.WriteLine(what switch
+        {
+            "prueba" => "Pantalla del ICP: marco, diagonal de arriba-izquierda a abajo-derecha y un cuadrado arriba a la izquierda.",
+            "fuente" => "Pantalla del ICP: todos los caracteres de la fuente y \"INVERTIDO\" en la última fila.",
+            "texto" => "Pantalla del ICP: texto escrito.",
+            _ => "Pantalla del ICP borrada.",
+        });
+        return 0;
+    }
+
     private static int WinWingCommand(string[] args)
     {
         string? Option(string name)
@@ -698,6 +757,8 @@ internal static class Program
             foreach (var n in WinWingPanel.LightNames) Console.WriteLine($"  {n}");
             return 0;
         }
+        if (plain[0].Equals("pantalla", StringComparison.OrdinalIgnoreCase))
+            return IcpScreenCommand(plain.Skip(1).ToArray());
         if (plain.Length < 2)
         {
             Console.WriteLine("Falta el dispositivo (alias o PID en hexadecimal).");
