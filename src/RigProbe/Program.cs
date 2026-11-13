@@ -4,6 +4,7 @@ using RigControl.Core.Bindings;
 using RigControl.Core.Hangar;
 using RigControl.Core.Mods;
 using RigControl.Core.Snapshots;
+using RigControl.Core.WinWing;
 using Vortice.DirectInput;
 
 namespace RigProbe;
@@ -79,6 +80,8 @@ internal static class Program
                     return DcsSend(args[2], readOnly: true);
                 DcsWatch(args.Length > 1 && int.TryParse(args[1], out var dsecs) ? dsecs : 15);
                 return 0;
+            case "winwing":
+                return WinWingCommand([.. args.Skip(1)]);
             case "instantaneas" or "instantáneas":
                 return SnapshotsCommand([.. args.Skip(1)]);
             case "mods":
@@ -102,6 +105,7 @@ internal static class Program
                 Console.WriteLine("            | dcs vigilar [filtro] | hangar [nombre [--dry]] | ventanas <proceso>");
                 Console.WriteLine("            | mods | mods <conjunto> [--dry] | mods importar <biblioteca> [--dry]");
                 Console.WriteLine("            | instantaneas | instantaneas crear <grupo|todo> [nombre] | instantaneas comparar|restaurar <grupo> <n>");
+                Console.WriteLine("            | winwing | winwing led <disp> <n> <valor> [--modulo XXXX] | winwing barrido <disp> [desde] [hasta] [--modulo XXXX] [--valor N]");
                 Console.WriteLine($"  <perfil> es una ruta a un .json o un nombre en {ProfileFile.ProfilesDir}");
                 return 1;
         }
@@ -663,6 +667,85 @@ internal static class Program
     }
 
     // ---------------------------------------------------------- bravo-test
+
+    // ---------------------------------------------------------------- winwing
+
+    private static readonly Dictionary<string, int> WinWingAliases = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["throttle"] = 0xBD64, ["pedales"] = 0xBEF0, ["mfdl"] = 0xBEE1, ["mfdr"] = 0xBEE2, ["pto2"] = 0xBF05,
+    };
+
+    /// <summary>"winwing": lista. "winwing led D N V": pone un LED. "winwing barrido D": hace parpadear cada LED para identificarlo.</summary>
+    private static int WinWingCommand(string[] args)
+    {
+        string? Option(string name)
+        {
+            var i = Array.FindIndex(args, a => a.Equals(name, StringComparison.OrdinalIgnoreCase));
+            return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
+        }
+        var module = Option("--modulo") is { } ms ? Convert.ToInt32(ms, 16) : (int?)null;
+        var onValue = Option("--valor") is { } vs ? byte.Parse(vs) : (byte)255;
+        var plain = args.Where((a, i) => !a.StartsWith("--") && (i == 0 || !args[i - 1].StartsWith("--"))).ToArray();
+
+        if (plain.Length == 0)
+        {
+            Console.WriteLine("Dispositivos WinWing con el protocolo de LEDs (output de 14 B):");
+            foreach (var (pid, name) in WinWingPanel.List())
+            {
+                var alias = WinWingAliases.FirstOrDefault(a => a.Value == pid).Key ?? "-";
+                Console.WriteLine($"  {pid:X4}  {alias,-9} {name}  (módulo {WinWingPanel.DefaultModule(pid):X4})");
+            }
+            return 0;
+        }
+        if (plain.Length < 2)
+        {
+            Console.WriteLine("Falta el dispositivo (alias o PID en hexadecimal).");
+            return 1;
+        }
+        var device = WinWingAliases.TryGetValue(plain[1], out var known) ? known : Convert.ToInt32(plain[1], 16);
+        using var panel = WinWingPanel.TryOpen(device);
+        if (panel is null)
+        {
+            Console.WriteLine($"No se encontró o no se pudo abrir el WinWing {device:X4}.");
+            return 1;
+        }
+        var mod = module ?? WinWingPanel.DefaultModule(device);
+
+        switch (plain[0].ToLowerInvariant())
+        {
+            case "led" when plain.Length >= 4:
+                panel.Set(byte.Parse(plain[2]), byte.Parse(plain[3]), mod);
+                Console.WriteLine($"{panel.Name}: módulo {mod:X4}, LED {plain[2]} = {plain[3]}");
+                return 0;
+            case "barrido":
+                var from = plain.Length > 2 ? int.Parse(plain[2]) : 0;
+                var to = plain.Length > 3 ? int.Parse(plain[3]) : 63;
+                Console.WriteLine($"{panel.Name}, módulo {mod:X4}: cada LED parpadea; apunta cuál se ve.");
+                Console.WriteLine("Intro = siguiente, r = repetir, número = saltar a ese LED, q = salir. Al pasar, cada LED queda apagado (0).\n");
+                for (var led = from; led <= to; led++)
+                {
+                    Console.Write($"  LED {led,3}: ");
+                    for (var k = 0; k < 3; k++)
+                    {
+                        panel.Set((byte)led, onValue, mod);
+                        Thread.Sleep(400);
+                        panel.Set((byte)led, 0, mod);
+                        Thread.Sleep(250);
+                    }
+                    panel.Set((byte)led, onValue, mod); // se queda encendido mientras decides
+                    var answer = Console.ReadLine()?.Trim() ?? "q";
+                    panel.Set((byte)led, 0, mod);
+                    if (answer.Equals("q", StringComparison.OrdinalIgnoreCase)) break;
+                    if (answer.Equals("r", StringComparison.OrdinalIgnoreCase)) led--;
+                    else if (int.TryParse(answer, out var jump)) led = jump - 1;
+                }
+                Console.WriteLine("Fin. La retroiluminación (LED 0) la vuelve a poner SimAppPro, o: winwing led <disp> 0 <0-255>.");
+                return 0;
+            default:
+                Console.WriteLine("Uso: winwing | winwing led <disp> <n> <valor> [--modulo XXXX] | winwing barrido <disp> [desde] [hasta] [--modulo XXXX] [--valor N]");
+                return 1;
+        }
+    }
 
     private static void BravoTest()
     {

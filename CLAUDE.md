@@ -153,6 +153,18 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
   restaurar"; solo SOBRESCRIBE (lo nuevo se queda; decisión por defecto, el usuario no eligió); rutas con ".." en
   el .zip se rechazan. Crear sí se puede con el simulador abierto.
   ✅ Fase 5 completa.
+- LEDs WinWing (13/11/2026, ✅ cada LED identificado por el usuario con `winwing barrido`; sin Wireshark):
+  `Core/WinWing/WinWingPanel.cs`. Output report de 14 B: `02 <módulo lo> <módulo hi> 00 00 03 49 <LED> <valor>
+  00 00 00 00 00` (del driver hid-winwing de Linux, capturado de SimAppPro). Solo se envía la orden 0x49.
+  El módulo NO siempre es el PID: tabla `PIDByName` dentro de `C:\Program Files (x86)\SimAppPro\resources\app.asar`
+  (SimAppPro 1.17.13, Electron; grep -a). Módulos y LEDs: PTO 2 `BF05` (0 retroiluminación, 1 palanca del tren,
+  4 master caution, 5 jettison, 6-10 estaciones CTR/LI/LO/RO/RI, 11 flaps, 12 tren morro, 13 flaps full,
+  14 tren dcho., 15 tren izq., 16 flaps half, 17 gancho; 2, 3 y >17 nada); MFD izq./dcho. `BE0D` ("MFD1"; solo
+  0 = retroiluminación); pedales `BEF0` (0 pedal izq., 1 pedal dcho.); acelerador `BE60` (0 retroiluminación,
+  1 A-A, 2 A-G). `BF01`/`BF02` = empuñaduras F-15EX: en Linux su LED 0 es el MOTOR DE VIBRACIÓN (no barrer).
+  ICP (64 B) sin estudiar. Valor 0-255 (retroiluminación) o 0/1. SimAppPro también escribe en ellos.
+  `RigProbe winwing` (lista), `winwing led <disp> <n> <valor> [--modulo XXXX]`, `winwing barrido <disp> [desde]
+  [hasta]` (alias throttle, pedales, mfdl, mfdr, pto2 o PID). Falta: luces desde el perfil (como las del Bravo).
 - Fase 4 (en curso, hecho sin el usuario el 01/11/2026; NADA de esto probado aún en vuelo):
   - Luces del Bravo desde MSFS: sección `"lights"` del perfil: nombre de `BravoLed` -> condición o
     lista (AND) sobre `A:VAR[, unidades]` o `L:Var` con `> >= < <= =`, rango `=a..b`, `!` niega;
