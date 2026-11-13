@@ -1,3 +1,5 @@
+using RigControl.Core.WinWing;
+
 namespace RigControl.Core.Bindings;
 
 /// <summary>Valida un ProfileFile y lo compila. Acumula todos los errores en vez de parar en el primero.</summary>
@@ -219,22 +221,33 @@ public sealed class ProfileCompiler
     private LightRule[] CompileLights()
     {
         var rules = new List<LightRule>();
-        var seen = BravoLed.None;
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (name, value) in _file.Lights)
         {
             var where = $"lights.{name}";
-            if (!Enum.TryParse<BravoLed>(name, ignoreCase: true, out var led) || led == BravoLed.None ||
-                !Enum.IsDefined(led))
+            var led = BravoLed.None;
+            WinWingLight? winwing = null;
+            if (name.Contains(':'))
             {
-                _errors.Add($"{where}: luz desconocida. Valen: {string.Join(", ", Enum.GetNames<BravoLed>().Skip(1))}.");
+                winwing = WinWingPanel.FindLight(name);
+                if (winwing is null)
+                {
+                    _errors.Add($"{where}: luz de WinWing desconocida. Valen: {string.Join(", ", WinWingPanel.LightNames)}.");
+                    continue;
+                }
+            }
+            else if (!Enum.TryParse(name, ignoreCase: true, out led) || led == BravoLed.None || !Enum.IsDefined(led))
+            {
+                _errors.Add($"{where}: luz desconocida. Valen las del Bravo ({string.Join(", ", Enum.GetNames<BravoLed>().Skip(1))}) " +
+                            "y las de los WinWing (\"pto2:GEAR_NOSE\"...; lista con RigProbe winwing luces).");
                 continue;
             }
-            if ((seen & led) != 0)
+            var ruleName = winwing?.Name ?? Enum.GetName(led)!;
+            if (!seen.Add(ruleName))
             {
                 _errors.Add($"{where}: la luz está repetida.");
                 continue;
             }
-            seen |= led;
 
             List<string> texts;
             if (value.ValueKind == System.Text.Json.JsonValueKind.String) texts = [value.GetString()!];
@@ -259,7 +272,7 @@ public sealed class ProfileCompiler
                 else _errors.Add($"{where}: {error}");
             }
             if (conditions.Count == texts.Count)
-                rules.Add(new LightRule(led, Enum.GetName(led)!, [.. conditions], string.Join(" Y ", texts)));
+                rules.Add(new LightRule(led, ruleName, [.. conditions], string.Join(" Y ", texts), winwing));
         }
 
         return [.. rules];

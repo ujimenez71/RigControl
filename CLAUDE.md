@@ -164,7 +164,19 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
   1 A-A, 2 A-G). `BF01`/`BF02` = empuñaduras F-15EX: en Linux su LED 0 es el MOTOR DE VIBRACIÓN (no barrer).
   ICP (64 B) sin estudiar. Valor 0-255 (retroiluminación) o 0/1. SimAppPro también escribe en ellos.
   `RigProbe winwing` (lista), `winwing led <disp> <n> <valor> [--modulo XXXX]`, `winwing barrido <disp> [desde]
-  [hasta]` (alias throttle, pedales, mfdl, mfdr, pto2 o PID). Falta: luces desde el perfil (como las del Bravo).
+  [hasta]` (alias throttle, pedales, mfdl, mfdr, pto2 o PID), `winwing luces` (nombres para el perfil).
+  Luces desde el perfil (13/11/2026, escenarios con WinWing falsos; ✅ verificado con DCS y el AH-64D el 13/11/2026:
+  master caution de cabina -> PTO 2, pulsado con `dcs enviar PLT_INTL_MCAUTION_BTN 1/0`. Las luces de jettison
+  `PLT_JETT_*_L` dieron siempre 0 en esa prueba aunque el usuario veía las de cabina: sin aclarar si era por estar
+  en frío o porque DCS-BIOS no las exporta; probar en caliente con `dcs vigilar JETT`): en `"lights"`,
+  además de las del Bravo, `"alias:LUZ"` (`"pto2:MASTER_CAUTION": "D:PLT_MASTER_CAUTION_L"`), misma sintaxis de
+  condiciones. `LightRule.WinWing` (Led = None) y `WinWingLightsOutput` (en `RunSession` junto a `BravoLightsOutput`,
+  que ahora ignora las de WinWing: un perfil solo con luces WinWing no toca el Bravo). Solo escribe los LEDs que
+  nombra el perfil y al cambiar (encendida = 255); al cambiar de perfil o salir suelta los que tocó (apagados; la
+  retroiluminación vuelve a 255). Abre cada dispositivo al hacer falta, reintento cada 5 s. Pantalla Ejecución:
+  tarjeta "Luces de WinWing" con las encendidas; editor: pestaña "Luces" con los nombres de WinWing.
+  `ah64d.json` lleva master caution y las 4 estaciones de jettison (LO/LI/RI/RO) en el PTO 2 (copia del activo
+  antes del cambio: `ah64d.json.antes-de-winwing` en %APPDATA%).
 - Fase 4 (en curso, hecho sin el usuario el 01/11/2026; NADA de esto probado aún en vuelo):
   - Luces del Bravo desde MSFS: sección `"lights"` del perfil: nombre de `BravoLed` -> condición o
     lista (AND) sobre `A:VAR[, unidades]` o `L:Var` con `> >= < <= =`, rango `=a..b`, `!` niega;

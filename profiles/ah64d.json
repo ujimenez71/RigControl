@@ -1,13 +1,20 @@
 {
   "name": "Apache AH-64D",
   "sim": "dcs",
+  "notes": "Colectivo VPC con puño AH-64D, puesto del piloto. Botones según las asignaciones de DCS de abril de 2025 (LEFT VPC Rotor TCS PLUS .diff.lua). Interruptores con muelle: posición al pulsar, Off al soltar. Ejes (colectivo y cursor) siguen en DCS. Completado con monitor el 03/11/2026: b18 Cursor Display, b23 FCR Scan C, b24 Missile Advance, b26 PLRT, b27 B/S, b22 FCR Scan S (no b2 como decía DCS). b19 (gatillo) = Alt Cursor Enter (04/11/2026). Cíclico Moza MH16 (04/11/2026): hat del pulgar en modo botones de Pit House, b28 = Force Trim R/Up asignado en DCS (no duplicar); ejes del cíclico en DCS.",
   "timing": {"longMs":500,"doubleMs":300,"sequenceMs":1000},
   "aircraft": ["dcs:ah-64d_blk_ii"],
   "axisHysteresis": 2,
-  "notes": "Colectivo VPC con puño AH-64D, puesto del piloto. Botones según las asignaciones de DCS de abril de 2025 (LEFT VPC Rotor TCS PLUS .diff.lua). Interruptores con muelle: posición al pulsar, Off al soltar. Ejes (colectivo y cursor) siguen en DCS. Completado con monitor el 03/11/2026: b18 Cursor Display, b23 FCR Scan C, b24 Missile Advance, b26 PLRT, b27 B/S, b22 FCR Scan S (no b2 como decía DCS). b19 (gatillo) = Alt Cursor Enter (04/11/2026). Cíclico Moza MH16 (04/11/2026): hat del pulgar en modo botones de Pit House, b28 = Force Trim R/Up asignado en DCS (no duplicar); ejes del cíclico en DCS.",
   "devices": {
     "colectivo": "3344:832E:080B2200",
     "moza": "346E:1000:470048001251353133383438"
+  },
+  "lights": {
+    "pto2:MASTER_CAUTION": "D:PLT_MASTER_CAUTION_L",
+    "pto2:STA_LO": "D:PLT_JETT_L_OUTBOARD_L",
+    "pto2:STA_LI": "D:PLT_JETT_L_INBOARD_L",
+    "pto2:STA_RI": "D:PLT_JETT_R_INBOARD_L",
+    "pto2:STA_RO": "D:PLT_JETT_R_OUTBOARD_L"
   },
   "bindings": [
     {"input":"colectivo:b28","gesture":"press","action":"D:PLT_COLLECTIVE_SEARCHLIGHT 2","desc":"Foco: ON"},

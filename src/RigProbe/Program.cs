@@ -105,7 +105,7 @@ internal static class Program
                 Console.WriteLine("            | dcs vigilar [filtro] | hangar [nombre [--dry]] | ventanas <proceso>");
                 Console.WriteLine("            | mods | mods <conjunto> [--dry] | mods importar <biblioteca> [--dry]");
                 Console.WriteLine("            | instantaneas | instantaneas crear <grupo|todo> [nombre] | instantaneas comparar|restaurar <grupo> <n>");
-                Console.WriteLine("            | winwing | winwing led <disp> <n> <valor> [--modulo XXXX] | winwing barrido <disp> [desde] [hasta] [--modulo XXXX] [--valor N]");
+                Console.WriteLine("            | winwing | winwing luces | winwing led <disp> <n> <valor> [--modulo XXXX] | winwing barrido <disp> [desde] [hasta] [--modulo XXXX] [--valor N]");
                 Console.WriteLine($"  <perfil> es una ruta a un .json o un nombre en {ProfileFile.ProfilesDir}");
                 return 1;
         }
@@ -670,11 +670,6 @@ internal static class Program
 
     // ---------------------------------------------------------------- winwing
 
-    private static readonly Dictionary<string, int> WinWingAliases = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["throttle"] = 0xBD64, ["pedales"] = 0xBEF0, ["mfdl"] = 0xBEE1, ["mfdr"] = 0xBEE2, ["pto2"] = 0xBF05,
-    };
-
     /// <summary>"winwing": lista. "winwing led D N V": pone un LED. "winwing barrido D": hace parpadear cada LED para identificarlo.</summary>
     private static int WinWingCommand(string[] args)
     {
@@ -692,9 +687,15 @@ internal static class Program
             Console.WriteLine("Dispositivos WinWing con el protocolo de LEDs (output de 14 B):");
             foreach (var (pid, name) in WinWingPanel.List())
             {
-                var alias = WinWingAliases.FirstOrDefault(a => a.Value == pid).Key ?? "-";
+                var alias = WinWingPanel.Aliases.FirstOrDefault(a => a.Value == pid).Key ?? "-";
                 Console.WriteLine($"  {pid:X4}  {alias,-9} {name}  (módulo {WinWingPanel.DefaultModule(pid):X4})");
             }
+            return 0;
+        }
+        if (plain[0].Equals("luces", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine("Luces de WinWing para la sección \"lights\" de un perfil:");
+            foreach (var n in WinWingPanel.LightNames) Console.WriteLine($"  {n}");
             return 0;
         }
         if (plain.Length < 2)
@@ -702,7 +703,7 @@ internal static class Program
             Console.WriteLine("Falta el dispositivo (alias o PID en hexadecimal).");
             return 1;
         }
-        var device = WinWingAliases.TryGetValue(plain[1], out var known) ? known : Convert.ToInt32(plain[1], 16);
+        var device = WinWingPanel.Aliases.TryGetValue(plain[1], out var known) ? known : Convert.ToInt32(plain[1], 16);
         using var panel = WinWingPanel.TryOpen(device);
         if (panel is null)
         {
@@ -742,7 +743,7 @@ internal static class Program
                 Console.WriteLine("Fin. La retroiluminación (LED 0) la vuelve a poner SimAppPro, o: winwing led <disp> 0 <0-255>.");
                 return 0;
             default:
-                Console.WriteLine("Uso: winwing | winwing led <disp> <n> <valor> [--modulo XXXX] | winwing barrido <disp> [desde] [hasta] [--modulo XXXX] [--valor N]");
+                Console.WriteLine("Uso: winwing | winwing luces | winwing led <disp> <n> <valor> [--modulo XXXX] | winwing barrido <disp> [desde] [hasta] [--modulo XXXX] [--valor N]");
                 return 1;
         }
     }

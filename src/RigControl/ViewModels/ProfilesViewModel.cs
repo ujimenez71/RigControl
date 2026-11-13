@@ -165,7 +165,7 @@ public sealed class ProfilesViewModel : ObservableObject, IDisposable
     public string ErrorsText => _selected is null ? "" : string.Join("\n", _selected.Errors);
 
     public string BindingsHeader => $"Bindings ({_selected?.Bindings.Count ?? 0})";
-    public string LightsHeader => $"Luces del Bravo ({_selected?.Lights.Count ?? 0})";
+    public string LightsHeader => $"Luces ({_selected?.Lights.Count ?? 0})";
     public string DevicesHeader => $"Dispositivos ({_selected?.Devices.Count ?? 0})";
     public string FindingsHeader => _selected is null ? "Conflict Guard"
         : $"Conflict Guard ({_selected.Findings.Count})";

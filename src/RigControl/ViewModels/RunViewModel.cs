@@ -76,6 +76,15 @@ public sealed class RunViewModel : ObservableObject, IDisposable
     /// <summary>El perfil activo define luces (si no, el panel se oculta).</summary>
     public bool LightsActive { get => _lightsActive; private set => Set(ref _lightsActive, value); }
 
+    private bool _winwingActive;
+    private string _winwingText = "";
+
+    /// <summary>El perfil activo define luces de WinWing.</summary>
+    public bool WinWingActive { get => _winwingActive; private set => Set(ref _winwingActive, value); }
+
+    /// <summary>Luces de WinWing encendidas ahora ("pto2:GEAR_NOSE, ...") o "ninguna".</summary>
+    public string WinWingText { get => _winwingText; private set => Set(ref _winwingText, value); }
+
     public ObservableCollection<string> Targets { get; } = [];
     public ObservableCollection<LogItem> Entries { get; } = [];
 
@@ -200,6 +209,9 @@ public sealed class RunViewModel : ObservableObject, IDisposable
         var lit = s?.Lights ?? BravoLed.None;
         foreach (var l in Lights) l.IsOn = (lit & l.Led) != 0;
         LightsActive = s?.LightsActive ?? false;
+        WinWingActive = s?.WinWingActive ?? false;
+        var ww = s?.WinWingLights ?? [];
+        WinWingText = ww.Count == 0 ? "Ninguna encendida" : "Encendidas: " + string.Join(", ", ww);
 
         if (s is null)
         {

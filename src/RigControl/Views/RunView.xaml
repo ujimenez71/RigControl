@@ -113,7 +113,8 @@
         </Grid>
 
         <!-- Luces del Bravo (solo si el perfil activo las define) -->
-        <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,0,0,16"
+        <StackPanel Grid.Row="3">
+        <Border Style="{StaticResource Card}" Margin="0,0,0,16"
                 Visibility="{Binding LightsActive, Converter={StaticResource BoolToVisibility}}">
             <StackPanel>
                 <TextBlock Text="LUCES DEL BRAVO" Style="{StaticResource CardTitle}" />
@@ -174,6 +175,16 @@
                 </ItemsControl>
             </StackPanel>
         </Border>
+
+        <!-- Luces de WinWing (solo si el perfil activo las define): las encendidas ahora -->
+        <Border Style="{StaticResource Card}" Margin="0,0,0,16"
+                Visibility="{Binding WinWingActive, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <TextBlock Text="LUCES DE WINWING" Style="{StaticResource CardTitle}" />
+                <TextBlock Text="{Binding WinWingText}" TextWrapping="Wrap" FontFamily="Cascadia Mono, Consolas" FontSize="12" />
+            </StackPanel>
+        </Border>
+        </StackPanel>
 
         <!-- Registro -->
         <DockPanel Grid.Row="4">

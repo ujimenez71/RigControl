@@ -41,8 +41,12 @@ public readonly record struct LightCondition(int Var, LightOp Op, double A, doub
     }
 }
 
-/// <summary>Una luz del Bravo y las condiciones que deben cumplirse todas para encenderla.</summary>
-public sealed record LightRule(BravoLed Led, string Name, LightCondition[] Conditions, string Text)
+/// <summary>
+/// Una luz y las condiciones que deben cumplirse todas para encenderla: del Bravo (<paramref name="Led"/>)
+/// o de un WinWing (<paramref name="WinWing"/>, y entonces Led = None).
+/// </summary>
+public sealed record LightRule(BravoLed Led, string Name, LightCondition[] Conditions, string Text,
+                               RigControl.Core.WinWing.WinWingLight? WinWing = null)
 {
     public bool Evaluate(double[] values)
     {

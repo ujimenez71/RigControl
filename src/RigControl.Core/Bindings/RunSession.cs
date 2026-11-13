@@ -75,12 +75,21 @@ public sealed class RunSession : IDisposable
         using var dispatcher = new ActionDispatcher(keyboard, _sim, _dryRun, _dcs);
         // Las luces son realimentación local (no envían nada al simulador): funcionan también en simulación.
         using var lights = new BravoLightsOutput();
+        using var winwing = new WinWingLightsOutput();
         _lights = lights;
-        try { BindingRunner.Run(di, _source, new TrackingSink(this, dispatcher, lights), stop, _window); }
-        finally { _lights = null; }
+        _winwing = winwing;
+        try { BindingRunner.Run(di, _source, new TrackingSink(this, dispatcher, lights, winwing), stop, _window); }
+        finally { _lights = null; _winwing = null; }
     }
 
     private volatile BravoLightsOutput? _lights;
+    private volatile WinWingLightsOutput? _winwing;
+
+    /// <summary>Luces de WinWing encendidas ahora mismo por el perfil ("pto2:GEAR_NOSE"...).</summary>
+    public IReadOnlyList<string> WinWingLights => _winwing?.Lit ?? [];
+
+    /// <summary>El perfil activo define luces de WinWing.</summary>
+    public bool WinWingActive => _winwing?.Active ?? false;
 
     /// <summary>Luces del Bravo encendidas ahora mismo por el perfil.</summary>
     public BravoLed Lights => _lights?.Current ?? BravoLed.None;
@@ -124,8 +133,9 @@ public sealed class RunSession : IDisposable
         _cts?.Dispose();
     }
 
-    /// <summary>Pasa todo al dispatcher, apunta qué perfil está activo y actualiza las luces del Bravo.</summary>
-    private sealed class TrackingSink(RunSession session, ActionDispatcher inner, BravoLightsOutput lights) : IActionSink
+    /// <summary>Pasa todo al dispatcher, apunta qué perfil está activo y actualiza las luces (Bravo y WinWing).</summary>
+    private sealed class TrackingSink(RunSession session, ActionDispatcher inner, BravoLightsOutput lights,
+                                       WinWingLightsOutput winwing) : IActionSink
     {
         public void OnAction(Binding binding, ActionPhase phase, long timeMs) => inner.OnAction(binding, phase, timeMs);
 
@@ -134,7 +144,9 @@ public sealed class RunSession : IDisposable
         public void Tick(long timeMs)
         {
             inner.Tick(timeMs); // incluye SimConnect y DCS-BIOS: aquí llegan los valores nuevos
-            lights.Update(inner.Values, session._sim.IsConnected || session._dcs.HasState, timeMs);
+            var connected = session._sim.IsConnected || session._dcs.HasState;
+            lights.Update(inner.Values, connected, timeMs);
+            winwing.Update(inner.Values, connected, timeMs);
         }
 
         public void ProfileLoaded(CompiledProfile profile)
@@ -142,6 +154,7 @@ public sealed class RunSession : IDisposable
             session._profile = profile;
             inner.ProfileLoaded(profile); // SimConnect pide las variables del perfil nuevo
             lights.SetProfile(profile);
+            winwing.SetProfile(profile);
         }
     }
 }

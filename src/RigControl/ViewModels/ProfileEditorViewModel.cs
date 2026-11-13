@@ -92,7 +92,7 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
     public ObservableCollection<string> LayerNames { get; } = [];
 
     public string LayersHeader => $"Capas ({Layers.Count})";
-    public string LightsHeader => $"Luces del Bravo ({Lights.Count})";
+    public string LightsHeader => $"Luces ({Lights.Count})";
     public string BindingsHeader => $"Bindings ({Bindings.Count})";
 
     public static ModeOption[] BindingModes => ConditionEditViewModel.BindingModes;

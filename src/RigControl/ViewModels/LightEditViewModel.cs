@@ -128,11 +128,12 @@ public sealed partial class LightTermViewModel(LightEditViewModel owner) : Obser
     }
 }
 
-/// <summary>Una luz del Bravo y sus condiciones (deben cumplirse todas).</summary>
+/// <summary>Una luz (del Bravo o de un WinWing) y sus condiciones (deben cumplirse todas).</summary>
 public sealed class LightEditViewModel : ObservableObject
 {
-    /// <summary>Nombres de las luces tal como van en el perfil (los de BravoLed).</summary>
-    public static readonly string[] LedNames = [.. Enum.GetNames<BravoLed>().Where(n => n != nameof(BravoLed.None))];
+    /// <summary>Nombres de las luces tal como van en el perfil: los de BravoLed y "pto2:GEAR_NOSE"... de los WinWing.</summary>
+    public static readonly string[] LedNames =
+        [.. Enum.GetNames<BravoLed>().Where(n => n != nameof(BravoLed.None)), .. RigControl.Core.WinWing.WinWingPanel.LightNames];
 
     private string _led;
     private string _liveState = "";

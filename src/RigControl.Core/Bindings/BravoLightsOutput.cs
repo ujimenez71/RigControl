@@ -25,7 +25,7 @@ public sealed class BravoLightsOutput : IDisposable
 
     public void SetProfile(CompiledProfile profile)
     {
-        _rules = profile.Lights;
+        _rules = [.. profile.Lights.Where(r => r.WinWing is null)]; // las de WinWing van aparte
         _dirty = true;
         if (_rules.Length > 0)
             Log.Info($"Luces del Bravo: {_rules.Length} regla(s) ({string.Join(", ", _rules.Select(r => r.Name))}).");

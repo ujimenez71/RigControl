@@ -11,7 +11,21 @@ namespace RigControl.Core.WinWing;
 /// En los demás dispositivos el módulo es, por hipótesis, su propio PID (como en los paneles Airbus).
 /// Solo escribe la orden 0x49 (LED); nunca firmware ni nada más.
 /// </summary>
-public sealed class WinWingPanel : IDisposable
+/// <summary>Escritura de LEDs de un WinWing abierto (interfaz para poder probar sin el dispositivo).</summary>
+public interface IWinWingLeds : IDisposable
+{
+    void Set(byte led, byte value, int? module = null);
+}
+
+/// <summary>Una luz con nombre: "pto2:GEAR_NOSE" -> PID BF05, LED 12.</summary>
+public sealed record WinWingLight(int ProductId, byte Led, string Name)
+{
+    /// <summary>Retroiluminación: al soltarla vuelve a 255 (encendida), no a 0.</summary>
+    public bool IsBacklight => Name.EndsWith(":BACKLIGHT", StringComparison.OrdinalIgnoreCase);
+    public byte ReleaseValue => IsBacklight ? (byte)255 : (byte)0;
+}
+
+public sealed class WinWingPanel : IWinWingLeds
 {
     public const int VendorId = 0x4098;
     public const int ReportLength = 14;
@@ -50,6 +64,30 @@ public sealed class WinWingPanel : IDisposable
         // Pedales Orion metal (módulo = PID): LED 0 = pedal izquierdo, 1 = pedal derecho (13/11/2026).
         [0xBEF0] = new(StringComparer.OrdinalIgnoreCase) { ["LEFT_PEDAL"] = 0, ["RIGHT_PEDAL"] = 1 },
     };
+
+    /// <summary>Alias cortos de los dispositivos (los mismos en RigProbe y en "lights" del perfil).</summary>
+    public static readonly Dictionary<string, int> Aliases = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["throttle"] = 0xBD64, ["pedales"] = 0xBEF0, ["mfdl"] = 0xBEE1, ["mfdr"] = 0xBEE2, ["pto2"] = 0xBF05,
+    };
+
+    /// <summary>Todas las luces con nombre, "alias:LUZ", en el orden de los LEDs.</summary>
+    public static IEnumerable<string> LightNames =>
+        from a in Aliases
+        where KnownLeds.ContainsKey(a.Value)
+        from l in KnownLeds[a.Value].OrderBy(l => l.Value)
+        select $"{a.Key}:{l.Key}";
+
+    /// <summary>"pto2:GEAR_NOSE" (sin distinguir mayúsculas) -> la luz; null si no existe.</summary>
+    public static WinWingLight? FindLight(string name)
+    {
+        var colon = name.IndexOf(':');
+        if (colon <= 0 || !Aliases.TryGetValue(name[..colon].Trim(), out var pid)) return null;
+        if (!KnownLeds.TryGetValue(pid, out var leds) || !leds.TryGetValue(name[(colon + 1)..].Trim(), out var led)) return null;
+        var alias = Aliases.First(a => a.Value == pid).Key;
+        var ledName = leds.First(l => l.Value == led).Key;
+        return new WinWingLight(pid, led, $"{alias}:{ledName}");
+    }
 
     private readonly HidStream _stream;
     private readonly byte[] _report = new byte[ReportLength];
