@@ -74,7 +74,7 @@ Simuladores: DCS World (jets y helicópteros) y MSFS 2024 (aviación general). V
 Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <perfil>`, `run <perfil>|auto [--dry]`,
 `sim [eventos [filtro]]`, `sim vars <perfil> [s]`, `dcs [s]`, `dcs enviar CONTROL [VALOR]`, `dcs leer CONTROL`,
 `dcs vigilar [filtro]` (cada cambio de los mandos de la cabina con su posición y descripción: para
-comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez),
+comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez; con filtro también luces y salidas, con su valor inicial),
 `hangar` (estado de todos, no lanza nada), `hangar <nombre> --dry` (qué haría), `hangar <nombre>` (abre; Ctrl+C cancela), `ventanas <proceso>` (posición de sus ventanas, para `"window"`),
 `mods` (estado de cada biblioteca), `mods <conjunto> [--dry]`, `mods importar <biblioteca> [--dry]`,
 `instantaneas` (grupos e instantáneas numeradas), `instantaneas crear <grupo|todo> [nombre]`,
@@ -187,9 +187,11 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
   `RigProbe winwing` (lista), `winwing led <disp> <n> <valor> [--modulo XXXX]`, `winwing barrido <disp> [desde]
   [hasta]` (alias throttle, pedales, mfdl, mfdr, pto2 o PID), `winwing luces` (nombres para el perfil).
   Luces desde el perfil (13/11/2026, escenarios con WinWing falsos; ✅ verificado con DCS y el AH-64D el 13/11/2026:
-  master caution de cabina -> PTO 2, pulsado con `dcs enviar PLT_INTL_MCAUTION_BTN 1/0`. Las luces de jettison
-  `PLT_JETT_*_L` dieron siempre 0 en esa prueba aunque el usuario veía las de cabina: sin aclarar si era por estar
-  en frío o porque DCS-BIOS no las exporta; probar en caliente con `dcs vigilar JETT`): en `"lights"`,
+  master caution de cabina -> PTO 2, pulsado con `dcs enviar PLT_INTL_MCAUTION_BTN 1/0`. Luces de jettison
+  ✅ verificadas el 13/11/2026: `PLT_JETT_L_OUTBOARD_L` pasa a 1 al armar la estación, se ve en cabina y en el PTO 2.
+  El "siempre 0" de la primera prueba era porque `dcs vigilar` solo vigilaba mandos con entrada, nunca las luces;
+  ahora con filtro vigila también luces y salidas y enseña el valor inicial. OJO: DCS-BIOS da una luz por encendida
+  si su argumento de cabina es >= 0,3 (`defineIndicatorLight`), una luz muy atenuada podría leerse 0): en `"lights"`,
   además de las del Bravo, `"alias:LUZ"` (`"pto2:MASTER_CAUTION": "D:PLT_MASTER_CAUTION_L"`), misma sintaxis de
   condiciones. `LightRule.WinWing` (Led = None) y `WinWingLightsOutput` (en `RunSession` junto a `BravoLightsOutput`,
   que ahora ignora las de WinWing: un perfil solo con luces WinWing no toca el Bravo). Solo escribe los LEDs que

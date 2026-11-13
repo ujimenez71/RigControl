@@ -448,9 +448,11 @@ internal static class Program
             if (dcs.Aircraft is { } a && a != aircraft)
             {
                 aircraft = a;
-                controls = [.. DcsBiosCatalog.ForAircraft(a).Where(c => c.Address is not null && c.Inputs.Length > 0 &&
-                    (filter is null || c.Name.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
-                     c.Description.Contains(filter, StringComparison.OrdinalIgnoreCase)))];
+                // Sin filtro, solo los mandos (con entrada); con filtro también las luces y demás salidas.
+                controls = [.. DcsBiosCatalog.ForAircraft(a).Where(c => c.Address is not null &&
+                    (filter is null ? c.Inputs.Length > 0
+                        : c.Name.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
+                          c.Description.Contains(filter, StringComparison.OrdinalIgnoreCase)))];
                 last = new int?[controls.Count];
                 baseline = 0;
                 Console.WriteLine($"Avión: {a}. Vigilando {controls.Count} mandos; los cambios salen en cuanto llega el estado de cada uno.");
@@ -463,7 +465,9 @@ internal static class Program
                 last[i] = v;
                 if (first)
                 {
-                    // Primer valor: es el estado de partida, no un cambio.
+                    // Primer valor: es el estado de partida, no un cambio (con filtro se enseña).
+                    if (filter is not null)
+                        Console.WriteLine($"  inicio  {controls[i].Name,-34} = {v}  {controls[i].Description}");
                     if (++baseline == controls.Count) Console.WriteLine("(ya ha llegado el estado de todos los mandos)");
                     continue;
                 }
