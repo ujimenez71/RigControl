@@ -20,8 +20,8 @@ public interface IWinWingLeds : IDisposable
 /// <summary>Una luz con nombre: "pto2:GEAR_NOSE" -> PID BF05, LED 12.</summary>
 public sealed record WinWingLight(int ProductId, byte Led, string Name)
 {
-    /// <summary>Retroiluminación: al soltarla vuelve a 255 (encendida), no a 0.</summary>
-    public bool IsBacklight => Name.EndsWith(":BACKLIGHT", StringComparison.OrdinalIgnoreCase);
+    /// <summary>Retroiluminación (también la de pantalla, "icp:SCREEN_BACKLIGHT"): al soltarla vuelve a 255, no a 0.</summary>
+    public bool IsBacklight => Name.EndsWith("BACKLIGHT", StringComparison.OrdinalIgnoreCase);
     public byte ReleaseValue => IsBacklight ? (byte)255 : (byte)0;
 }
 
@@ -29,6 +29,10 @@ public sealed class WinWingPanel : IWinWingLeds
 {
     public const int VendorId = 0x4098;
     public const int ReportLength = 14;
+    /// <summary>El ICP usa un output report de 64 B: la misma orden, rellena con ceros (a comprobar).</summary>
+    public const int LongReportLength = 64;
+
+    private static bool IsLedInterface(HidDevice d) => SafeOutputLength(d) is ReportLength or LongReportLength;
 
     /// <summary>Módulo conocido por PID cuando no coincide con el PID (base Orion 2 con empuñaduras F-15EX).</summary>
     private static readonly Dictionary<int, int> KnownModules = new()
@@ -63,12 +67,15 @@ public sealed class WinWingPanel : IWinWingLeds
         [0xBEE2] = new(StringComparer.OrdinalIgnoreCase) { ["BACKLIGHT"] = 0 },
         // Pedales Orion metal (módulo = PID): LED 0 = pedal izquierdo, 1 = pedal derecho (13/11/2026).
         [0xBEF0] = new(StringComparer.OrdinalIgnoreCase) { ["LEFT_PEDAL"] = 0, ["RIGHT_PEDAL"] = 1 },
+        // ICP ViperAce (módulo = PID, output report de 64 B con la misma orden): LED 0 = retroiluminación, 1 = la de la pantalla LCD; 2-5 nada (13/11/2026).
+        [0xBF06] = new(StringComparer.OrdinalIgnoreCase) { ["BACKLIGHT"] = 0, ["SCREEN_BACKLIGHT"] = 1 },
     };
 
     /// <summary>Alias cortos de los dispositivos (los mismos en RigProbe y en "lights" del perfil).</summary>
     public static readonly Dictionary<string, int> Aliases = new(StringComparer.OrdinalIgnoreCase)
     {
         ["throttle"] = 0xBD64, ["pedales"] = 0xBEF0, ["mfdl"] = 0xBEE1, ["mfdr"] = 0xBEE2, ["pto2"] = 0xBF05,
+        ["icp"] = 0xBF06,
     };
 
     /// <summary>Todas las luces con nombre, "alias:LUZ", en el orden de los LEDs.</summary>
@@ -90,14 +97,15 @@ public sealed class WinWingPanel : IWinWingLeds
     }
 
     private readonly HidStream _stream;
-    private readonly byte[] _report = new byte[ReportLength];
+    private readonly byte[] _report;
 
     public int ProductId { get; }
     public string Name { get; }
 
-    private WinWingPanel(HidStream stream, int productId, string name)
+    private WinWingPanel(HidStream stream, int productId, string name, int reportLength)
     {
         _stream = stream;
+        _report = new byte[reportLength];
         ProductId = productId;
         Name = name;
     }
@@ -105,19 +113,19 @@ public sealed class WinWingPanel : IWinWingLeds
     /// <summary>Módulo por defecto de un PID: el conocido o el propio PID.</summary>
     public static int DefaultModule(int productId) => KnownModules.TryGetValue(productId, out var m) ? m : productId;
 
-    /// <summary>Dispositivos WinWing con output report de 14 bytes (los de este protocolo).</summary>
+    /// <summary>Dispositivos WinWing con output report de 14 B (o 64 B, el ICP): los de este protocolo.</summary>
     public static IEnumerable<(int ProductId, string Name)> List() =>
         DeviceList.Local.GetHidDevices(VendorId)
-            .Where(d => SafeOutputLength(d) == ReportLength)
+            .Where(IsLedInterface)
             .Select(d => (d.ProductID, SafeName(d)))
             .DistinctBy(x => x.ProductID);
 
     public static WinWingPanel? TryOpen(int productId)
     {
         var device = DeviceList.Local.GetHidDevices(VendorId, productId)
-            .FirstOrDefault(d => SafeOutputLength(d) == ReportLength);
+            .FirstOrDefault(IsLedInterface);
         // HidSharp abre en modo compartido: SimAppPro sigue funcionando a la vez.
-        return device is not null && device.TryOpen(out var stream) ? new WinWingPanel(stream, productId, SafeName(device)) : null;
+        return device is not null && device.TryOpen(out var stream) ? new WinWingPanel(stream, productId, SafeName(device), SafeOutputLength(device)) : null;
     }
 
     /// <summary>Pone un LED (o la retroiluminación) al valor dado en el módulo indicado (por defecto el del PID).</summary>

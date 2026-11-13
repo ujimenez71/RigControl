@@ -684,7 +684,7 @@ internal static class Program
 
         if (plain.Length == 0)
         {
-            Console.WriteLine("Dispositivos WinWing con el protocolo de LEDs (output de 14 B):");
+            Console.WriteLine("Dispositivos WinWing con el protocolo de LEDs (output de 14 B; el ICP, 64 B):");
             foreach (var (pid, name) in WinWingPanel.List())
             {
                 var alias = WinWingPanel.Aliases.FirstOrDefault(a => a.Value == pid).Key ?? "-";

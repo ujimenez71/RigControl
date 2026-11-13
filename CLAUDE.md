@@ -53,7 +53,7 @@ Software propio de control del rig de simulación, inspirado en Hangar Control d
 | MFD izquierdo (CarrierAce) | 4098:BEE1 | jet | output 14 B |
 | MFD derecho (CarrierAce) | 4098:BEE2 | jet | output 14 B |
 | PTO 2 (CarrierAce) | 4098:BF05 | jet | output 14 B |
-| ICP (ViperAce) | 4098:BF06 | jet | output 64 B, dejar para el final |
+| ICP (ViperAce) | 4098:BF06 | jet | output 64 B (misma orden 0x49; texto de la pantalla sin estudiar) |
 | Colectivo AH-64 (VPC Rotor TCS PLUS) | 3344:832E | helo | interfaz mi_01 = config VPC, NO TOCAR |
 | Yoke Alpha (Honeycomb) | 294B:1900 | ga | sin LEDs, ignorar su output |
 | Bravo (Honeycomb) | 294B:1901 | ga | feature report 5 B = luces anunciadoras |
@@ -162,7 +162,9 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
   14 tren dcho., 15 tren izq., 16 flaps half, 17 gancho; 2, 3 y >17 nada); MFD izq./dcho. `BE0D` ("MFD1"; solo
   0 = retroiluminación); pedales `BEF0` (0 pedal izq., 1 pedal dcho.); acelerador `BE60` (0 retroiluminación,
   1 A-A, 2 A-G). `BF01`/`BF02` = empuñaduras F-15EX: en Linux su LED 0 es el MOTOR DE VIBRACIÓN (no barrer).
-  ICP (64 B) sin estudiar. Valor 0-255 (retroiluminación) o 0/1. SimAppPro también escribe en ellos.
+  ICP `BF06` (módulo = PID): output report de 64 B con la MISMA orden rellena con ceros (✅ 13/11/2026); 0 retroiluminación,
+  1 retroiluminación de la pantalla (`icp:SCREEN_BACKLIGHT`; al soltarla vuelve a 255 como toda luz "...BACKLIGHT"); 2-5 nada.
+  El texto de la pantalla (DED) sigue sin estudiar. Valor 0-255 (retroiluminación) o 0/1. SimAppPro también escribe en ellos.
   `RigProbe winwing` (lista), `winwing led <disp> <n> <valor> [--modulo XXXX]`, `winwing barrido <disp> [desde]
   [hasta]` (alias throttle, pedales, mfdl, mfdr, pto2 o PID), `winwing luces` (nombres para el perfil).
   Luces desde el perfil (13/11/2026, escenarios con WinWing falsos; ✅ verificado con DCS y el AH-64D el 13/11/2026:

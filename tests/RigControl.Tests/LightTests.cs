@@ -107,7 +107,10 @@ internal static class LightTests
 
         Check(WinWingPanel.FindLight("PTO2:gear_nose") is { ProductId: 0xBF05, Led: 12, Name: "pto2:GEAR_NOSE" },
               "\"PTO2:gear_nose\" -> BF05, LED 12, nombre normalizado");
-        Check(WinWingPanel.FindLight("pto2:TURBO") is null && WinWingPanel.FindLight("icp:BACKLIGHT") is null, "luz o dispositivo desconocido -> null");
+        Check(WinWingPanel.FindLight("pto2:TURBO") is null && WinWingPanel.FindLight("nadie:BACKLIGHT") is null, "luz o dispositivo desconocido -> null");
+        Check(WinWingPanel.FindLight("icp:screen_backlight") is { ProductId: 0xBF06, Led: 1, IsBacklight: true, ReleaseValue: 255 },
+              "ICP: retroiluminación de la pantalla = LED 1, al soltarla vuelve a 255");
+        Check(WinWingPanel.FindLight("pto2:GEAR_NOSE") is { IsBacklight: false, ReleaseValue: 0 }, "una luz normal se suelta apagada");
         Check(WinWingPanel.DefaultModule(0xBEE2) == 0xBE0D && WinWingPanel.DefaultModule(0xBD64) == 0xBE60 &&
               WinWingPanel.DefaultModule(0xBF05) == 0xBF05, "módulos: MFD BE0D, acelerador BE60, PTO 2 su PID");
 
