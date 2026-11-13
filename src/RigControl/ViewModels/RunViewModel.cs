@@ -4,6 +4,7 @@ using System.IO;
 using System.Windows.Threading;
 using RigControl.Core;
 using RigControl.Core.Bindings;
+using RigControl.Core.WinWing;
 
 namespace RigControl.ViewModels;
 
@@ -84,6 +85,19 @@ public sealed class RunViewModel : ObservableObject, IDisposable
 
     /// <summary>Luces de WinWing encendidas ahora ("pto2:GEAR_NOSE, ...") o "ninguna".</summary>
     public string WinWingText { get => _winwingText; private set => Set(ref _winwingText, value); }
+
+    private bool _icpActive;
+    private string _icpStatus = "";
+    private IcpSnapshot? _icpShown;
+
+    /// <summary>El perfil activo escribe en la pantalla del ICP.</summary>
+    public bool IcpActive { get => _icpActive; private set => Set(ref _icpActive, value); }
+
+    /// <summary>Aviso bajo la pantalla (p. ej. si aún no se ha podido escribir en el ICP).</summary>
+    public string IcpStatus { get => _icpStatus; private set => Set(ref _icpStatus, value); }
+
+    /// <summary>Las 5 líneas de la pantalla del ICP tal como están escritas (la misma vista que el editor).</summary>
+    public IcpLineViewModel[] IcpLines { get; } = [.. Enumerable.Range(1, IcpFont.Rows).Select(n => new IcpLineViewModel(n))];
 
     public ObservableCollection<string> Targets { get; } = [];
     public ObservableCollection<LogItem> Entries { get; } = [];
@@ -203,6 +217,24 @@ public sealed class RunViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>Copia la pantalla del ICP solo cuando la sesión ha escrito una nueva.</summary>
+    private void RefreshIcp(RunSession? s)
+    {
+        IcpActive = s?.IcpActive ?? false;
+        var shown = s?.IcpShown;
+        IcpStatus = IcpActive && shown is null ? "Aún sin escribir en el ICP (¿está conectado? se reintenta cada 5 s)" : "";
+        if (ReferenceEquals(shown, _icpShown)) return;
+        _icpShown = shown;
+        for (var r = 0; r < IcpLines.Length; r++)
+        {
+            var at = r * IcpFont.Columns;
+            if (shown is not null)
+                IcpLines[r].SetPreview(shown.Cells.AsSpan(at, IcpFont.Columns), shown.Inverted.AsSpan(at, IcpFont.Columns));
+            else
+                IcpLines[r].SetPreview(new string(' ', IcpFont.Columns), new bool[IcpFont.Columns]);
+        }
+    }
+
     private void RefreshStatus()
     {
         var s = _session;
@@ -212,6 +244,7 @@ public sealed class RunViewModel : ObservableObject, IDisposable
         WinWingActive = s?.WinWingActive ?? false;
         var ww = s?.WinWingLights ?? [];
         WinWingText = ww.Count == 0 ? "Ninguna encendida" : "Encendidas: " + string.Join(", ", ww);
+        RefreshIcp(s);
 
         if (s is null)
         {

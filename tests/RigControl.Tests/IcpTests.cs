@@ -145,6 +145,9 @@ internal static class IcpTests
         Check(screen.Shown.Count == 1 && screen.Shown[0][0] == "UHF 242.000" && screen.Shown[0][1] == "mc",
               $"primera escritura ({string.Join(" | ", screen.Shown.LastOrDefault() ?? [])})");
         Check(output.Text is ["UHF 242.000", "MC"], "Text = lo que hay en pantalla");
+        var snap = output.Shown;
+        Check(snap is not null && snap.Cells.Length == IcpFont.Columns * IcpFont.Rows && snap.Inverted[IcpFont.Columns] && !snap.Inverted[0]
+              && new string(snap.Cells, IcpFont.Columns, 2) == "MC", "Shown = celdas y marca de invertido (para la pantalla Ejecución)");
         output.Update(ctx, 1050);
         output.Update(ctx, 1200);
         Check(screen.Shown.Count == 1, "sin cambios no se vuelve a escribir");
@@ -153,6 +156,10 @@ internal static class IcpTests
         Check(screen.Shown.Count == 1, "antes de RenderMs no se dibuja");
         output.Update(ctx, 1300);
         Check(screen.Shown.Count == 2 && screen.Shown[1][0] == "UHF 251.000", "al cambiar la frecuencia se reescribe");
+        Check(!ReferenceEquals(snap, output.Shown), "Shown es un objeto nuevo al cambiar la pantalla");
+        snap = output.Shown;
+        output.Update(ctx, 1400 - 1); // sin cambios (y antes de RenderMs)
+        Check(ReferenceEquals(snap, output.Shown), "sin cambios, el mismo Shown");
 
         screen.Fail = true;
         dcs["UHF_RADIO"] = ("225.000", double.NaN);

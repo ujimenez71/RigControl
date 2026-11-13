@@ -8,6 +8,9 @@ namespace RigControl.Core.Bindings;
 /// Al cambiar a un perfil sin "icp", o al salir, la deja en blanco una vez. El ICP se abre al hacer falta y, si no
 /// está, se reintenta cada RetryMs.
 /// </summary>
+/// <summary>Lo que hay en la pantalla: IcpFont.Columns x IcpFont.Rows celdas por filas y su marca de invertido.</summary>
+public sealed record IcpSnapshot(char[] Cells, bool[] Inverted);
+
 public sealed class IcpTextOutput : IDisposable
 {
     public const int RenderMs = 100;
@@ -37,6 +40,9 @@ public sealed class IcpTextOutput : IDisposable
     /// <summary>Texto que hay ahora en la pantalla, una cadena por línea (lista nueva solo al cambiar).</summary>
     public IReadOnlyList<string> Text { get; private set; } = [];
 
+    /// <summary>La pantalla escrita ahora (objeto nuevo solo al cambiar); null si aún no se ha escrito con este perfil.</summary>
+    public IcpSnapshot? Shown { get; private set; }
+
     public void SetProfile(CompiledProfile profile)
     {
         if (_lines.Length > 0 && profile.Icp.Length == 0 && _shown) _clearPending = true;
@@ -44,6 +50,7 @@ public sealed class IcpTextOutput : IDisposable
         _shown = false; // perfil nuevo: se vuelve a escribir aunque coincida
         _nextRender = 0;
         Text = [];
+        Shown = null;
         if (_lines.Length > 0) Log.Info($"Pantalla del ICP: {_lines.Length} línea(s).");
     }
 
@@ -79,6 +86,7 @@ public sealed class IcpTextOutput : IDisposable
         _inverted.CopyTo(_shownInverted, 0);
         _shown = true;
         _clearPending = false;
+        Shown = new IcpSnapshot([.. _cells], [.. _inverted]);
         Text = [.. Enumerable.Range(0, Math.Min(_lines.Length, IcpFont.Rows))
                              .Select(r => new string(_cells, r * IcpFont.Columns, IcpFont.Columns).TrimEnd())];
     }

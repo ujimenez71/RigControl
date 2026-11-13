@@ -89,6 +89,9 @@ public sealed class RunSession : IDisposable
     /// <summary>Texto que hay ahora en la pantalla del ICP (una cadena por línea).</summary>
     public IReadOnlyList<string> IcpText => _icp?.Text ?? [];
 
+    /// <summary>La pantalla del ICP tal como está escrita ahora (con los invertidos); null si aún no se ha escrito.</summary>
+    public IcpSnapshot? IcpShown => _icp?.Shown;
+
     /// <summary>El perfil activo escribe en la pantalla del ICP.</summary>
     public bool IcpActive => _icp?.Active ?? false;
 
