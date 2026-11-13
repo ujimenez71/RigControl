@@ -91,6 +91,30 @@ public partial class ProfileEditorView : UserControl
         if (Ctx<LightTermViewModel>(sender) is { } t) t.Owner.RemoveTerm(t);
     }
 
+    // ---- pantalla del ICP
+
+    private TextBox? _lastIcpBox;
+
+    private void IcpLine_GotFocus(object sender, RoutedEventArgs e) => _lastIcpBox = sender as TextBox;
+
+    /// <summary>Inserta el valor elegido donde estaba el cursor en la última línea editada (o al final de la primera libre).</summary>
+    private void IcpInsert_Click(object sender, RoutedEventArgs e)
+    {
+        var text = IcpFieldBox.SelectedItem is IcpFieldOption o ? o.Text
+            : IcpFieldBox.Text.Split(" · ")[0].Trim();
+        if (text.Length == 0) return;
+        if (_lastIcpBox is { } box)
+        {
+            var at = box.SelectionStart;
+            box.SelectedText = text;
+            box.Focus();
+            box.CaretIndex = at + text.Length;
+            return;
+        }
+        var line = Vm.IcpLines.FirstOrDefault(l => l.Text.Trim().Length == 0) ?? Vm.IcpLines[^1];
+        line.Text += text;
+    }
+
     private void Suggestion_Click(object sender, MouseButtonEventArgs e)
     {
         if (sender is ListBox { SelectedItem: string name }) Vm.PickSuggestion(name);

@@ -92,18 +92,6 @@ public sealed class RunSession : IDisposable
     /// <summary>El perfil activo escribe en la pantalla del ICP.</summary>
     public bool IcpActive => _icp?.Active ?? false;
 
-    /// <summary>Control de DCS-BIOS para la pantalla del ICP: texto si lo tiene, si no su valor entero.</summary>
-    private bool ReadDcs(string name, out string? text, out double number)
-    {
-        text = null;
-        number = double.NaN;
-        if (!_dcs.HasState || _dcs.Find(name) is not { } c) return false;
-        if (c.TextAddress is not null) return (text = _dcs.ReadText(c)) is not null;
-        if (_dcs.Read(c) is not { } v) return false;
-        number = v;
-        return true;
-    }
-
     /// <summary>Avión para la pantalla del ICP: el de DCS o la carpeta del de MSFS ("asobo_c172sp_g1000").</summary>
     private string AircraftLabel()
     {
@@ -189,7 +177,7 @@ public sealed class RunSession : IDisposable
         }
 
         private long _nextIcp;
-        private readonly IcpContext.DcsReader _readDcs = session.ReadDcs;
+        private readonly IcpContext.DcsReader _readDcs = session._dcs.ReadForDisplay;
 
         public void ProfileLoaded(CompiledProfile profile)
         {

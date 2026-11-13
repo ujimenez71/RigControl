@@ -183,7 +183,7 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
   Textos del AH-64D en DCS-BIOS: `UHF_RADIO`, `VHF_AM_RADIO` (7), `FM1_RADIO`, `FM2_RADIO`, `HF_RADIO` (6),
   `PLT_KU_DISPLAY` (22), `PLT_EUFD_LINE1..14` (56), `PLT_CMWS_FLARE_COUNT`/`CHAFF_COUNT` (3). `ah64d.json` lleva 5
   líneas (radios, CMWS, KU y hora; copia previa `ah64d.json.antes-de-icp` en %APPDATA%). OJO: con el F-16 SimAppPro
-  también escribe en ella. El editor de la app conserva "icp" pero aún no lo edita. Valor 0-255 (retroiluminación) o 0/1. SimAppPro también escribe en ellos.
+  también escribe en ella. Editor (13/11/2026, comprobado fuera de pantalla con DCS abierto; ✅ verificado por el usuario en la app): pestaña "Pantalla ICP" con vista previa en vivo (verde sobre negro, invertido incluido; MSFS o DCS por `DcsBiosOutput.ReadForDisplay`, la misma lectura que la ejecución), 5 líneas con su error al lado, y "Insertar en la línea" (valores fijos + controles de DCS-BIOS del avión, primero los de texto) en el cursor de la última línea editada. Al guardar se quitan las líneas vacías del final. Valor 0-255 (retroiluminación) o 0/1. SimAppPro también escribe en ellos.
   `RigProbe winwing` (lista), `winwing led <disp> <n> <valor> [--modulo XXXX]`, `winwing barrido <disp> [desde]
   [hasta]` (alias throttle, pedales, mfdl, mfdr, pto2 o PID), `winwing luces` (nombres para el perfil).
   Luces desde el perfil (13/11/2026, escenarios con WinWing falsos; ✅ verificado con DCS y el AH-64D el 13/11/2026:

@@ -169,6 +169,21 @@ public sealed class DcsBiosOutput : IDisposable
         return control.ReadText(_image);
     }
 
+    /// <summary>
+    /// Para la pantalla del ICP (IcpContext.DcsReader): texto si el control tiene salida de texto, si no su valor
+    /// entero. false si no hay estado, si el control no existe o si su valor aún no ha llegado.
+    /// </summary>
+    public bool ReadForDisplay(string name, out string? text, out double number)
+    {
+        text = null;
+        number = double.NaN;
+        if (!HasState || Find(name) is not { } c) return false;
+        if (c.TextAddress is not null) return (text = ReadText(c)) is not null;
+        if (Read(c) is not { } v) return false;
+        number = v;
+        return true;
+    }
+
     /// <summary>Valor actual de un control, o null si no tiene salida numérica o aún no ha llegado.</summary>
     public int? Read(DcsControl control) =>
         control.Address is { } a && HasArrived(a) ? control.Read(_image) : null;

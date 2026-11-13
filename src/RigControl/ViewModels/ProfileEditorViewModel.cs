@@ -4,6 +4,7 @@ using System.IO;
 using System.Windows.Threading;
 using RigControl.Core;
 using RigControl.Core.Bindings;
+using RigControl.Core.WinWing;
 using Vortice.DirectInput;
 
 namespace RigControl.ViewModels;
@@ -64,6 +65,11 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         Selected = Bindings.FirstOrDefault();
         foreach (var (name, def) in file.Layers) AddLayer(new LayerEditViewModel(name, ConditionEditViewModel.FromFile(def, isLayer: true)));
         foreach (var (led, value) in file.Lights) AddLight(LightFromJson(led, value));
+        for (var i = 0; i < IcpLines.Length; i++)
+        {
+            if (i < file.Icp.Count) IcpLines[i].Text = file.Icp[i];
+            IcpLines[i].Changed += () => { Raise(nameof(IcpHeader)); Touch(); };
+        }
         RefreshLayerNames();
 
         _validateTimer.Tick += (_, _) => { _validateTimer.Stop(); Validate(); };
@@ -93,6 +99,13 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
 
     public string LayersHeader => $"Capas ({Layers.Count})";
     public string LightsHeader => $"Luces ({Lights.Count})";
+    public string IcpHeader => $"Pantalla ICP ({IcpLines.Count(l => l.Text.Trim().Length > 0)})";
+
+    /// <summary>Las 5 líneas de la pantalla del ICP ("icp" del perfil).</summary>
+    public IcpLineViewModel[] IcpLines { get; } = [.. Enumerable.Range(1, IcpTemplate.MaxLines).Select(n => new IcpLineViewModel(n))];
+
+    /// <summary>Valores que se pueden insertar en una línea del ICP: los fijos y los del avión (DCS-BIOS) o de MSFS.</summary>
+    public IcpFieldOption[] IcpFields { get; private set; } = IcpFieldOption.Fixed;
     public string BindingsHeader => $"Bindings ({Bindings.Count})";
 
     public static ModeOption[] BindingModes => ConditionEditViewModel.BindingModes;
@@ -305,6 +318,8 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         var dcsVars = _dcsControls.Where(c => c.Address is not null).Select(c => "D:" + c.Name).Distinct().Order().ToArray();
         LightVars = dcsVars.Length > 0 ? dcsVars : LightTermViewModel.CommonVars;
         Raise(nameof(LightVars));
+        IcpFields = IcpFieldOption.For(_dcsControls);
+        Raise(nameof(IcpFields));
         RefreshSuggestions();
     }
 
@@ -446,6 +461,7 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         if (_dcs.IsActive) SimStatus += $" · {_dcsControls.Count} controles de DCS-BIOS";
         RefreshDcsControls();
         UpdateLiveLights();
+        UpdateIcpPreview();
     }
 
     /// <summary>Añade el avión cargado ahora (MSFS o DCS) a la lista de aviones del perfil.</summary>
@@ -497,8 +513,15 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
                        .ToDictionary(g => g.Key, g => g.First().Condition.ToFile() ?? new ConditionFile()),
         Bindings = [.. Bindings.Select(b => b.ToFile())],
         Lights = LightsToJson(),
-        Icp = _original.Icp, // la pantalla del ICP aún no se edita aquí: se conserva tal cual
+        Icp = IcpToList(),
     };
+
+    /// <summary>Las líneas del ICP hasta la última con texto (las vacías de en medio se quedan: son líneas en blanco).</summary>
+    private List<string> IcpToList()
+    {
+        var last = Array.FindLastIndex(IcpLines, l => l.Text.Trim().Length > 0);
+        return [.. IcpLines.Take(last + 1).Select(l => l.Text.TrimEnd())];
+    }
 
     /// <summary>Los dispositivos del perfil, menos los añadidos por captura que ya no usa nadie.</summary>
     private Dictionary<string, string> UsedDevices()
@@ -525,13 +548,17 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
     /// </summary>
     private void PrepareLiveLights(ProfileFile file)
     {
-        var key = System.Text.Json.JsonSerializer.Serialize(file.Lights);
+        // Las líneas del ICP con error se dejan en blanco para que las demás se vean igual en la vista previa.
+        var icp = file.Icp.Select(l => IcpTemplate.TryParse(l, _ => 0, out _, out _) ? l : "").ToList();
+        var key = System.Text.Json.JsonSerializer.Serialize(file.Lights) + System.Text.Json.JsonSerializer.Serialize(icp);
         if (key == _liveKey) return;
         _liveKey = key;
-        var (profile, _) = ProfileCompiler.Compile(new ProfileFile
+        ProfileFile Live(Dictionary<string, System.Text.Json.JsonElement> lights) => new()
         {
-            Name = "luces", Lights = file.Lights, Sim = file.Sim, Aircraft = file.Aircraft, // D: se buscan en el avión del perfil
-        });
+            Name = "en vivo", Lights = lights, Icp = icp, Sim = file.Sim, Aircraft = file.Aircraft, // D: se buscan en el avión del perfil
+        };
+        var (profile, _) = ProfileCompiler.Compile(Live(file.Lights));
+        profile ??= ProfileCompiler.Compile(Live([])).Profile; // luces con errores: al menos la vista previa del ICP
         _liveProfile = profile;
         if (profile is null) return;
         _sim.Prepare(profile);
@@ -570,6 +597,23 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         }
     }
 
+    private readonly char[] _icpCells = new char[IcpFont.Columns];
+    private readonly bool[] _icpInverted = new bool[IcpFont.Columns];
+
+    /// <summary>Vista previa del ICP con los valores de ahora (sin simulador: el texto fijo, la hora y el perfil).</summary>
+    private void UpdateIcpPreview()
+    {
+        var lines = _liveProfile?.Icp ?? [];
+        var aircraft = _dcs.HasState && _dcs.Aircraft is { } d ? d : AircraftFolder(_sim.Aircraft) ?? "";
+        var ctx = new IcpContext(_liveValues, _dcs.ReadForDisplay, _name.Trim(), aircraft, DateTime.Now);
+        for (var i = 0; i < IcpLines.Length; i++)
+        {
+            if (i < lines.Length) IcpTemplate.Render(lines[i], ctx, _icpCells, _icpInverted);
+            else { Array.Fill(_icpCells, ' '); Array.Clear(_icpInverted); }
+            IcpLines[i].SetPreview(_icpCells, _icpInverted);
+        }
+    }
+
     /// <summary>Compila el perfil en memoria y reparte el resultado: textos de cada fila y lista de problemas.</summary>
     public void Validate()
     {
@@ -600,7 +644,11 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         foreach (var light in Lights)
             light.Error = string.Join("\n", report.Errors.Where(e => e.StartsWith($"lights.{light.Led}", StringComparison.OrdinalIgnoreCase))
                                                           .Select(e => e[(e.IndexOf(':') + 1)..].Trim()));
-        if (report.Errors.Count == 0) PrepareLiveLights(file);
+        // Errores de cada línea del ICP, junto a ella.
+        foreach (var line in IcpLines)
+            line.Error = string.Join("\n", report.Errors.Where(e => e.StartsWith($"icp, línea {line.Number}:", StringComparison.Ordinal))
+                                                           .Select(e => e[(e.IndexOf(':') + 1)..].Trim()));
+        PrepareLiveLights(file);
         Raise(nameof(BindingsHeader));
 
         Ok = report.Ok;
