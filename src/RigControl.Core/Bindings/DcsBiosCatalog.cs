@@ -4,8 +4,19 @@ namespace RigControl.Core.Bindings;
 
 /// <summary>Un control de DCS-BIOS: nombre (para "D:"), descripción y cómo se lee su estado.</summary>
 public sealed record DcsControl(string Name, string Category, string Description, string[] Inputs,
-                                int? Address, int Mask, int Shift, int MaxValue, string[] Positions)
+                                int? Address, int Mask, int Shift, int MaxValue, string[] Positions,
+                                int? TextAddress = null, int TextLength = 0)
 {
+    /// <summary>Texto actual (salida "string": frecuencias, pantallas...), sin los ceros/espacios del final; null si no tiene.</summary>
+    public string? ReadText(ReadOnlySpan<byte> image)
+    {
+        if (TextAddress is not { } a || TextLength <= 0 || a + TextLength > image.Length) return null;
+        var bytes = image.Slice(a, TextLength);
+        var end = bytes.IndexOf((byte)0);
+        if (end >= 0) bytes = bytes[..end];
+        return System.Text.Encoding.Latin1.GetString(bytes).TrimEnd();
+    }
+
     /// <summary>Valor actual en la imagen de la cabina (null si el control no tiene salida entera).</summary>
     public int? Read(ReadOnlySpan<byte> image) =>
         Address is { } a && a + 1 < image.Length ? ((image[a] | image[a + 1] << 8) & Mask) >> Shift : null;
@@ -105,12 +116,25 @@ public static class DcsBiosCatalog
         var positions = c.TryGetProperty("positions", out var pos) && pos.ValueKind == JsonValueKind.Array
             ? pos.EnumerateArray().Select(p => p.GetString() ?? "").ToArray()
             : [];
+        int? address = null, textAddress = null;
+        int mask = 0, shift = 0, max = 0, textLength = 0;
         if (c.TryGetProperty("outputs", out var outs))
             foreach (var o in outs.EnumerateArray())
-                if (o.TryGetProperty("type", out var t) && t.GetString() == "integer")
-                    return new DcsControl(name, category, description, inputs, o.GetProperty("address").GetInt32(),
-                        o.GetProperty("mask").GetInt32(), o.GetProperty("shift_by").GetInt32(),
-                        o.TryGetProperty("max_value", out var mv) ? mv.GetInt32() : 0, positions);
-        return new DcsControl(name, category, description, inputs, null, 0, 0, 0, positions);
+            {
+                var type = o.TryGetProperty("type", out var t) ? t.GetString() : null;
+                if (type == "integer" && address is null)
+                {
+                    address = o.GetProperty("address").GetInt32();
+                    mask = o.GetProperty("mask").GetInt32();
+                    shift = o.GetProperty("shift_by").GetInt32();
+                    max = o.TryGetProperty("max_value", out var mv) ? mv.GetInt32() : 0;
+                }
+                else if (type == "string" && textAddress is null && o.TryGetProperty("max_length", out var ml))
+                {
+                    textAddress = o.GetProperty("address").GetInt32();
+                    textLength = ml.GetInt32();
+                }
+            }
+        return new DcsControl(name, category, description, inputs, address, mask, shift, max, positions, textAddress, textLength);
     }
 }

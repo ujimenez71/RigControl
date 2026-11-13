@@ -497,6 +497,7 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
                        .ToDictionary(g => g.Key, g => g.First().Condition.ToFile() ?? new ConditionFile()),
         Bindings = [.. Bindings.Select(b => b.ToFile())],
         Lights = LightsToJson(),
+        Icp = _original.Icp, // la pantalla del ICP aún no se edita aquí: se conserva tal cual
     };
 
     /// <summary>Los dispositivos del perfil, menos los añadidos por captura que ya no usa nadie.</summary>

@@ -110,6 +110,7 @@ public sealed class ProfileCompiler
             if (b is not null) bindings.Add(b);
         }
 
+        var icp = CompileIcp(sim);
         CheckVarsMatchSim(sim);
 
         return new CompiledProfile
@@ -120,6 +121,7 @@ public sealed class ProfileCompiler
             Sim = sim,
             Aircraft = [.. _file.Aircraft.Select(a => a.Trim().Replace('/', '\\').ToLowerInvariant())],
             Lights = lights,
+            Icp = icp,
             WatchedVars = [.. _vars],
             DeviceAliases = [.. _aliases],
             DeviceKeys = [.. _keys],
@@ -276,6 +278,26 @@ public sealed class ProfileCompiler
         }
 
         return [.. rules];
+    }
+
+    /// <summary>"icp": ["línea", ...] -> líneas de la pantalla del ICP (las variables A:/L: van a _vars).</summary>
+    private IcpLine[] CompileIcp(SimKind sim)
+    {
+        if (_file.Icp.Count > IcpTemplate.MaxLines)
+            _errors.Add($"icp: la pantalla tiene {IcpTemplate.MaxLines} líneas y hay {_file.Icp.Count}.");
+        var lines = new List<IcpLine>();
+        for (var i = 0; i < _file.Icp.Count && i < IcpTemplate.MaxLines; i++)
+        {
+            if (!IcpTemplate.TryParse(_file.Icp[i] ?? "", VarIndex, out var line, out var error))
+            {
+                _errors.Add($"icp, línea {i + 1}: {error}");
+                continue;
+            }
+            if (sim == SimKind.Msfs && line!.Fields.FirstOrDefault(f => f.Kind == IcpFieldKind.Dcs) is { } d)
+                _errors.Add($"icp, línea {i + 1}: D:{d.Text} es un control de DCS-BIOS y el perfil es de MSFS.");
+            lines.Add(line!);
+        }
+        return [.. lines];
     }
 
     private static bool TryParseGesture(string? text, out Gesture gesture)

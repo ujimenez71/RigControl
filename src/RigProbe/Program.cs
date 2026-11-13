@@ -486,9 +486,13 @@ internal static class Program
 
         // Estado del control antes y después (si está en las definiciones JSON de DCS-BIOS).
         var output = FindDcsOutput(action.Name);
-        string Read() => output is { } o && dcs.IsActive
-            ? ((dcs.Image[o.Address] | dcs.Image[o.Address + 1] << 8) & o.Mask) >> o.Shift is var v ? $"{v} (de 0 a {o.Max})" : ""
-            : "(sin datos de DCS)";
+        string Read() => !dcs.IsActive ? "(sin datos de DCS)"
+            : output is { } o
+                ? ((dcs.Image[o.Address] | dcs.Image[o.Address + 1] << 8) & o.Mask) >> o.Shift is var v ? $"{v} (de 0 a {o.Max})" : ""
+                // Controles de texto (frecuencias, pantallas): entre comillas, tal cual para "icp" del perfil.
+                : dcs.Find(action.Name) is { TextAddress: not null } c
+                    ? (dcs.ReadText(c) is { } t ? $"\"{t}\" ({t.Length} car.)" : "(texto aún sin llegar)")
+                    : "(no encuentro el control en las definiciones de DCS-BIOS)";
         // DCS-BIOS manda los cambios al momento, pero el estado completo lo repite poco a poco (2 palabras
         // por envío, ~30 envíos/s: el AH-64D tarda ~16 s en dar la vuelta). Al arrancar, una dirección
         // vale 0 hasta que llega su turno o cambia. Por eso "enviar" no enseña el "antes".

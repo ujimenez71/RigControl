@@ -11,7 +11,14 @@ namespace RigControl.Core.WinWing;
 /// 0x102 = escribir la memoria de la pantalla (4 ceros + 65 filas de 25 B, bit bajo = píxel de la izquierda),
 /// 0x103 = refrescar (1 B a 0). Todo en little endian. Solo se dibuja: nada de firmware.
 /// </summary>
-public sealed class IcpDisplay : IDisposable
+/// <summary>Pantalla del ICP vista como texto (interfaz para poder probar sin el dispositivo).</summary>
+public interface IIcpScreen : IDisposable
+{
+    /// <summary>Muestra IcpFont.Columns x IcpFont.Rows celdas (por filas) con su marca de invertido.</summary>
+    void Show(ReadOnlySpan<char> cells, ReadOnlySpan<bool> inverted);
+}
+
+public sealed class IcpDisplay : IIcpScreen
 {
     public const int ProductId = 0xBF06;
     public const int Width = 200;
@@ -53,7 +60,7 @@ public sealed class IcpDisplay : IDisposable
     /// Escribe texto con la fuente de la DED en la celda (columna 0-24, fila 0-4); lo que no cabe se corta.
     /// Invertido = fondo encendido y letras apagadas (los campos seleccionados de la DED).
     /// </summary>
-    public void DrawText(int column, int row, string text, bool inverted = false)
+    public void DrawText(int column, int row, ReadOnlySpan<char> text, bool inverted = false)
     {
         for (var i = 0; i < text.Length && column + i < IcpFont.Columns; i++)
         {
@@ -63,6 +70,19 @@ public sealed class IcpDisplay : IDisposable
             for (var x = 0; x < IcpFont.CharWidth; x++)
                 SetPixel(x0 + x, y0 + y, ((glyph[y] >> x & 1) != 0) != inverted);
         }
+    }
+
+    public void Show(ReadOnlySpan<char> cells, ReadOnlySpan<bool> inverted)
+    {
+        Clear();
+        Span<char> one = stackalloc char[1];
+        for (var i = 0; i < cells.Length && i < IcpFont.Columns * IcpFont.Rows; i++)
+        {
+            if (cells[i] == ' ' && !inverted[i]) continue;
+            one[0] = cells[i];
+            DrawText(i % IcpFont.Columns, i / IcpFont.Columns, one, inverted[i]);
+        }
+        Flush();
     }
 
     /// <summary>Manda la imagen a la pantalla (memoria + refresco).</summary>

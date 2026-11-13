@@ -143,6 +143,32 @@ public sealed class DcsBiosOutput : IDisposable
     /// <summary>Ya ha llegado el valor de esa dirección (y de la siguiente: los controles son palabras de 16 bits).</summary>
     public bool HasArrived(int address) => (uint)address + 1 < (uint)_seen.Length && _seen[address] && _seen[address + 1];
 
+    private readonly Dictionary<string, DcsControl?> _lookup = new(StringComparer.OrdinalIgnoreCase);
+    private string? _lookupFor;
+
+    /// <summary>
+    /// Control por nombre ("UHF_RADIO") en el avión cargado (o el primer "dcs:" del perfil); null si no existe.
+    /// Se guarda en caché hasta que cambia el avión.
+    /// </summary>
+    public DcsControl? Find(string name)
+    {
+        var aircraft = Aircraft ?? _profile?.Aircraft.FirstOrDefault(a => a.StartsWith("dcs:", StringComparison.Ordinal));
+        if (aircraft is null) return null;
+        if (aircraft != _lookupFor) { _lookup.Clear(); _lookupFor = aircraft; }
+        if (!_lookup.TryGetValue(name, out var c))
+            _lookup[name] = c = _catalog(aircraft).FirstOrDefault(x => x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        return c;
+    }
+
+    /// <summary>Texto actual de un control con salida de texto; null sin estado, si aún no ha llegado o si no tiene.</summary>
+    public string? ReadText(DcsControl control)
+    {
+        if (!HasState || control.TextAddress is not { } a || control.TextLength <= 0) return null;
+        if ((uint)(a + control.TextLength) > (uint)_seen.Length) return null;
+        for (var i = a; i < a + control.TextLength; i++) if (!_seen[i]) return null;
+        return control.ReadText(_image);
+    }
+
     /// <summary>Valor actual de un control, o null si no tiene salida numérica o aún no ha llegado.</summary>
     public int? Read(DcsControl control) =>
         control.Address is { } a && HasArrived(a) ? control.Read(_image) : null;

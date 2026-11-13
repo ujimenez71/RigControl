@@ -55,6 +55,8 @@ public static class ProfileLoader
                 Log.Info($"  aviones   -> {string.Join(", ", profile.Aircraft)}");
             foreach (var r in profile.Lights)
                 Log.Info($"  luz {r.Name,-15} <- {r.Text}");
+            for (var i = 0; i < profile.Icp.Length; i++)
+                Log.Info($"  icp {i + 1}         <- {profile.Icp[i].Source}");
         }
 
         var findings = ConflictGuard.Check(profile);

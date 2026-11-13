@@ -76,10 +76,41 @@ public sealed class RunSession : IDisposable
         // Las luces son realimentación local (no envían nada al simulador): funcionan también en simulación.
         using var lights = new BravoLightsOutput();
         using var winwing = new WinWingLightsOutput();
+        using var icp = new IcpTextOutput();
         _lights = lights;
         _winwing = winwing;
-        try { BindingRunner.Run(di, _source, new TrackingSink(this, dispatcher, lights, winwing), stop, _window); }
-        finally { _lights = null; _winwing = null; }
+        _icp = icp;
+        try { BindingRunner.Run(di, _source, new TrackingSink(this, dispatcher, lights, winwing, icp), stop, _window); }
+        finally { _lights = null; _winwing = null; _icp = null; }
+    }
+
+    private volatile IcpTextOutput? _icp;
+
+    /// <summary>Texto que hay ahora en la pantalla del ICP (una cadena por línea).</summary>
+    public IReadOnlyList<string> IcpText => _icp?.Text ?? [];
+
+    /// <summary>El perfil activo escribe en la pantalla del ICP.</summary>
+    public bool IcpActive => _icp?.Active ?? false;
+
+    /// <summary>Control de DCS-BIOS para la pantalla del ICP: texto si lo tiene, si no su valor entero.</summary>
+    private bool ReadDcs(string name, out string? text, out double number)
+    {
+        text = null;
+        number = double.NaN;
+        if (!_dcs.HasState || _dcs.Find(name) is not { } c) return false;
+        if (c.TextAddress is not null) return (text = _dcs.ReadText(c)) is not null;
+        if (_dcs.Read(c) is not { } v) return false;
+        number = v;
+        return true;
+    }
+
+    /// <summary>Avión para la pantalla del ICP: el de DCS o la carpeta del de MSFS ("asobo_c172sp_g1000").</summary>
+    private string AircraftLabel()
+    {
+        if (_dcs.HasState && _dcs.Aircraft is { } d) return d;
+        if (_sim.Aircraft is not { } m) return "";
+        var parts = m.Split('\\', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 3 && parts[0].Equals("simobjects", StringComparison.OrdinalIgnoreCase) ? parts[2] : m;
     }
 
     private volatile BravoLightsOutput? _lights;
@@ -135,7 +166,7 @@ public sealed class RunSession : IDisposable
 
     /// <summary>Pasa todo al dispatcher, apunta qué perfil está activo y actualiza las luces (Bravo y WinWing).</summary>
     private sealed class TrackingSink(RunSession session, ActionDispatcher inner, BravoLightsOutput lights,
-                                       WinWingLightsOutput winwing) : IActionSink
+                                       WinWingLightsOutput winwing, IcpTextOutput icp) : IActionSink
     {
         public void OnAction(Binding binding, ActionPhase phase, long timeMs) => inner.OnAction(binding, phase, timeMs);
 
@@ -147,7 +178,18 @@ public sealed class RunSession : IDisposable
             var connected = session._sim.IsConnected || session._dcs.HasState;
             lights.Update(inner.Values, connected, timeMs);
             winwing.Update(inner.Values, connected, timeMs);
+            // El contexto (nombre del avión, hora) solo se arma cuando toca dibujar; sin "icp", solo un borrado pendiente.
+            if (timeMs >= _nextIcp)
+            {
+                _nextIcp = timeMs + IcpTextOutput.RenderMs;
+                icp.Update(icp.Active
+                    ? new IcpContext(inner.Values, _readDcs, session._profile?.Name ?? "", session.AircraftLabel(), DateTime.Now)
+                    : new IcpContext([], null, "", "", default), timeMs);
+            }
         }
+
+        private long _nextIcp;
+        private readonly IcpContext.DcsReader _readDcs = session.ReadDcs;
 
         public void ProfileLoaded(CompiledProfile profile)
         {
@@ -155,6 +197,8 @@ public sealed class RunSession : IDisposable
             inner.ProfileLoaded(profile); // SimConnect pide las variables del perfil nuevo
             lights.SetProfile(profile);
             winwing.SetProfile(profile);
+            icp.SetProfile(profile);
+            _nextIcp = 0;
         }
     }
 }

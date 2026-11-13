@@ -171,7 +171,19 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
   caracteres con la fuente de la DED (72 glifos, de ded_font.bmp de DedSharp; invertido = campo seleccionado). OJO: sin
   `icp:SCREEN_BACKLIGHT` encendida no se ve nada (el barrido la deja a 0). SimAppPro solo la escribe en misión con el
   F-16 de DCS (`mainsrc/ICP_LCD/F16_ICP.js`, list_indication(6)). `RigProbe winwing pantalla [prueba|fuente|borrar|
-  texto "línea" ...]` (entre corchetes = invertido). Valor 0-255 (retroiluminación) o 0/1. SimAppPro también escribe en ellos.
+  texto "línea" ...]` (entre corchetes = invertido).
+  Pantalla del ICP desde el perfil (13/11/2026, escenarios con pantalla falsa; ✅ verificado por el usuario con DCS y el AH-64D con `run ah64d`: radios, CMWS, KU y hora, "funciona a la perfección"): `"icp": ["línea",
+  ...]` (máx. 5, se cortan a 25 caracteres), `IcpTemplate` + `IcpTextOutput` (en `RunSession`, junto a las luces). Texto
+  tal cual, `[texto]` invertido, `{D:CONTROL}` (DCS-BIOS: TEXTO si el control tiene salida "string" -frecuencias,
+  pantallas-, si no su valor entero), `{A:VAR, unidades}`/`{L:Var}` (MSFS), `{perfil}`, `{avion}`, `{hora}`;
+  `{X|formato}` = número ("0.0"), hora ("HH:mm:ss") o recorte "desde..hasta" (base 1); "[[", "{{" = el carácter. Sin
+  dato = en blanco. Sin "icp" no toca la pantalla; al quitarla o al salir la deja en blanco. Dibuja como mucho cada
+  100 ms y solo escribe si cambia; reintento de apertura cada 5 s. `DcsControl` lee ahora también las salidas de texto
+  (`TextAddress`/`TextLength`, `DcsBiosOutput.Find/ReadText`); `RigProbe dcs leer CONTROL` las muestra entre comillas.
+  Textos del AH-64D en DCS-BIOS: `UHF_RADIO`, `VHF_AM_RADIO` (7), `FM1_RADIO`, `FM2_RADIO`, `HF_RADIO` (6),
+  `PLT_KU_DISPLAY` (22), `PLT_EUFD_LINE1..14` (56), `PLT_CMWS_FLARE_COUNT`/`CHAFF_COUNT` (3). `ah64d.json` lleva 5
+  líneas (radios, CMWS, KU y hora; copia previa `ah64d.json.antes-de-icp` en %APPDATA%). OJO: con el F-16 SimAppPro
+  también escribe en ella. El editor de la app conserva "icp" pero aún no lo edita. Valor 0-255 (retroiluminación) o 0/1. SimAppPro también escribe en ellos.
   `RigProbe winwing` (lista), `winwing led <disp> <n> <valor> [--modulo XXXX]`, `winwing barrido <disp> [desde]
   [hasta]` (alias throttle, pedales, mfdl, mfdr, pto2 o PID), `winwing luces` (nombres para el perfil).
   Luces desde el perfil (13/11/2026, escenarios con WinWing falsos; ✅ verificado con DCS y el AH-64D el 13/11/2026:

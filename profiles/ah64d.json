@@ -16,6 +16,13 @@
     "pto2:STA_RI": "D:PLT_JETT_R_INBOARD_L",
     "pto2:STA_RO": "D:PLT_JETT_R_OUTBOARD_L"
   },
+  "icp": [
+    "UHF {D:UHF_RADIO} VHF {D:VHF_AM_RADIO}",
+    "FM1 {D:FM1_RADIO} FM2 {D:FM2_RADIO}",
+    "HF {D:HF_RADIO} F{D:PLT_CMWS_FLARE_COUNT} C{D:PLT_CMWS_CHAFF_COUNT}",
+    "KU {D:PLT_KU_DISPLAY}",
+    "{hora|HH:mm:ss}"
+  ],
   "bindings": [
     {"input":"colectivo:b28","gesture":"press","action":"D:PLT_COLLECTIVE_SEARCHLIGHT 2","desc":"Foco: ON"},
     {"input":"colectivo:b28","gesture":"release","action":"D:PLT_COLLECTIVE_SEARCHLIGHT 1","desc":"Foco: Off"},

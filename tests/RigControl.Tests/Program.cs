@@ -22,6 +22,7 @@ internal static class Program
                      ("Acciones", ActionTests.Run),
                      ("Repetición", RepeatTests.Run),
                      ("Luces", LightTests.Run),
+                     ("Pantalla del ICP", IcpTests.Run),
                      ("DCS-BIOS", DcsTests.Run),
                      ("Estado del simulador", StateTests.Run),
                      ("Descripciones", DescribeTests.Run),

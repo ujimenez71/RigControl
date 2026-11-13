@@ -90,6 +90,9 @@ public sealed class CompiledProfile
     /// <summary>Luces del Bravo que dependen del simulador.</summary>
     public LightRule[] Lights { get; init; } = [];
 
+    /// <summary>Líneas de la pantalla del ICP ("icp"); vacío = no se toca.</summary>
+    public IcpLine[] Icp { get; init; } = [];
+
     /// <summary>Variables del simulador que hay que vigilar para las luces (el índice es el de LightCondition.Var).</summary>
     public SimVarSpec[] WatchedVars { get; init; } = [];
 

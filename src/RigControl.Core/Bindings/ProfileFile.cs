@@ -53,6 +53,13 @@ public sealed class ProfileFile
     /// </summary>
     public Dictionary<string, JsonElement> Lights { get; set; } = [];
 
+    /// <summary>
+    /// Pantalla del ICP (hasta 5 líneas de 25 caracteres): texto con valores entre llaves, p. ej.
+    /// "UHF {D:UHF_RADIO}", "FUEL {A:FUEL TOTAL QUANTITY, gallons|0}", "{perfil}"; entre corchetes = invertido.
+    /// Ver IcpTemplate. Vacía = no se toca la pantalla.
+    /// </summary>
+    public List<string> Icp { get; set; } = [];
+
     public static string ProfilesDir { get; } =
         Path.Combine(Path.GetDirectoryName(DeviceCatalog.DefaultPath)!, "profiles");
 
@@ -96,6 +103,7 @@ public sealed class ProfileFile
         var node = JsonSerializer.SerializeToNode(this, WriteOptions)!.AsObject();
         foreach (var empty in new[] { "layers", "lights" })
             if (node[empty] is JsonObject { Count: 0 }) node.Remove(empty);
+        if (node["icp"] is JsonArray { Count: 0 }) node.Remove("icp");
 
         const string NL = "\r\n";
         var sb = new StringBuilder("{" + NL);
