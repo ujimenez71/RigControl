@@ -31,6 +31,7 @@ internal static class Program
                      ("Hangar", HangarTests.Run),
                      ("Mods", ModTests.Run),
                      ("Instantáneas", SnapshotTests.Run),
+                     ("Generar con IA", AiTests.Run),
                  })
         {
             Console.WriteLine($"\n===== {name} =====");

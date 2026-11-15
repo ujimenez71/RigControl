@@ -1,5 +1,6 @@
 using HidSharp;
 using RigControl.Core;
+using RigControl.Core.Ai;
 using RigControl.Core.Bindings;
 using RigControl.Core.Hangar;
 using RigControl.Core.Mods;
@@ -82,6 +83,8 @@ internal static class Program
                 return 0;
             case "winwing":
                 return WinWingCommand([.. args.Skip(1)]);
+            case "ia":
+                return AiCommand([.. args.Skip(1)], instances);
             case "instantaneas" or "instantáneas":
                 return SnapshotsCommand([.. args.Skip(1)]);
             case "mods":
@@ -105,10 +108,132 @@ internal static class Program
                 Console.WriteLine("            | dcs vigilar [filtro] | hangar [nombre [--dry]] | ventanas <proceso>");
                 Console.WriteLine("            | mods | mods <conjunto> [--dry] | mods importar <biblioteca> [--dry]");
                 Console.WriteLine("            | instantaneas | instantaneas crear <grupo|todo> [nombre] | instantaneas comparar|restaurar <grupo> <n>");
+                Console.WriteLine("            | ia | ia clave [borrar] | ia contexto <avión|actual> | ia <avión|actual> \"lo que quieres\" [--base <perfil>]");
                 Console.WriteLine("            | winwing | winwing luces | winwing led <disp> <n> <valor> [--modulo XXXX] | winwing barrido <disp> [desde] [hasta] [--modulo XXXX] [--valor N]");
                 Console.WriteLine($"  <perfil> es una ruta a un .json o un nombre en {ProfileFile.ProfilesDir}");
                 return 1;
         }
+    }
+
+    // ----------------------------------------------------------------- ia
+
+    /// <summary>
+    /// "ia": genera un perfil con Claude. El resultado es un borrador en %APPDATA%\RigControl\borradores
+    /// (nunca en profiles\): se revisa y se copia a mano o se abre en la app.
+    /// </summary>
+    private static int AiCommand(string[] args, List<DeviceInstance> instances)
+    {
+        if (args.Length == 0)
+        {
+            var key = ApiKeyStore.Load();
+            Console.WriteLine(key is null ? "Sin clave de la API: \"ia clave\" para guardarla (cifrada con DPAPI)."
+                : $"Clave: {ApiKeyStore.Mask(key)} ({(ApiKeyStore.HasStoredKey ? "guardada" : "de ANTHROPIC_API_KEY")}).");
+            Console.WriteLine($"Notas para la IA: {ProfileGenerator.NotesPath}{(File.Exists(ProfileGenerator.NotesPath) ? "" : " (no existe)")}");
+            Console.WriteLine("Uso: ia clave [borrar] | ia contexto <avión|actual> | ia <avión|actual> \"lo que quieres\" [--base <perfil>]");
+            Console.WriteLine("  <avión>: \"dcs:ah-64d_blk_ii\" (DCS) o la carpeta del avión de MSFS; \"actual\" = el cargado ahora.");
+            return 0;
+        }
+
+        if (args[0].Equals("clave", StringComparison.OrdinalIgnoreCase))
+        {
+            if (args.Length > 1 && args[1].Equals("borrar", StringComparison.OrdinalIgnoreCase))
+            {
+                ApiKeyStore.Delete();
+                Console.WriteLine("Clave borrada.");
+                return 0;
+            }
+            Console.Write("Clave de la API de Anthropic (no se ve al escribirla): ");
+            var sb = new System.Text.StringBuilder();
+            for (ConsoleKeyInfo k; (k = Console.ReadKey(true)).Key != ConsoleKey.Enter;)
+                if (k.Key == ConsoleKey.Backspace) { if (sb.Length > 0) sb.Length--; }
+                else if (!char.IsControl(k.KeyChar)) sb.Append(k.KeyChar);
+            Console.WriteLine();
+            if (sb.Length == 0) { Console.WriteLine("Nada que guardar."); return 1; }
+            ApiKeyStore.Save(sb.ToString());
+            Console.WriteLine($"Guardada en {ApiKeyStore.KeyPath} (cifrada para este usuario de Windows).");
+            return 0;
+        }
+
+        var onlyContext = args[0].Equals("contexto", StringComparison.OrdinalIgnoreCase);
+        var rest = onlyContext ? args.Skip(1).ToList() : [.. args];
+        string? baseProfile = null;
+        var bi = rest.FindIndex(a => a.Equals("--base", StringComparison.OrdinalIgnoreCase));
+        if (bi >= 0)
+        {
+            if (bi + 1 >= rest.Count) { Console.WriteLine("Falta el perfil después de --base."); return 1; }
+            var path = ProfileFile.Resolve(rest[bi + 1]);
+            if (!File.Exists(path)) { Console.WriteLine($"No existe {path}"); return 1; }
+            baseProfile = File.ReadAllText(path);
+            rest.RemoveRange(bi, 2);
+        }
+        if (rest.Count == 0) { Console.WriteLine("Falta el avión (o \"actual\")."); return 1; }
+
+        var aircraft = rest[0];
+        IReadOnlyCollection<string>? events = null;
+        if (aircraft.Equals("actual", StringComparison.OrdinalIgnoreCase) || !aircraft.StartsWith("dcs:", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine("Buscando el avión cargado en DCS o MSFS (máx. 8 s)...");
+            var snap = SimSnapshot.Read(8000);
+            if (aircraft.Equals("actual", StringComparison.OrdinalIgnoreCase))
+            {
+                if (snap.Aircraft is null) { Console.WriteLine("No hay ningún avión cargado en DCS ni en MSFS."); return 1; }
+                aircraft = snap.Aircraft;
+            }
+            if (snap.Sim == "msfs") events = snap.InputEvents;
+            Console.WriteLine($"Avión: {aircraft}" + (events is null ? "" : $" · {events.Count} controles B:"));
+        }
+        var sim = aircraft.StartsWith("dcs:", StringComparison.OrdinalIgnoreCase) ? "dcs" : "msfs";
+        var connected = instances.Select(i => DeviceScanner.FromProductGuid(i.ProductGuid))
+            .Select(v => $"{v.Vid:X4}:{v.Pid:X4}").ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var catalog = DeviceCatalog.Load();
+        var connectedKeys = catalog.Devices.Where(d => connected.Contains($"{d.Vid}:{d.Pid}")).Select(d => d.Key).ToHashSet();
+
+        var request = new GenerationRequest(sim, aircraft, string.Join(' ', rest.Skip(1)), events, baseProfile, connectedKeys);
+        if (onlyContext)
+        {
+            var dcs = sim == "dcs" ? DcsBiosCatalog.ForAircraft(aircraft) : null;
+            var text = ProfileGenerator.BuildContext(request, catalog, dcs);
+            Console.WriteLine(text);
+            Console.WriteLine($"--- {text.Length:N0} caracteres (~{text.Length / 3.5:N0} tokens) + instrucciones; controles del avión: {dcs?.Count ?? events?.Count ?? 0}");
+            return 0;
+        }
+
+        var apiKey = ApiKeyStore.Load();
+        if (apiKey is null) { Console.WriteLine("Sin clave de la API: usa \"ia clave\"."); return 1; }
+        if (string.IsNullOrWhiteSpace(request.Preferences) && baseProfile is null)
+            Console.WriteLine("(Sin preferencias: la IA hará un perfil con lo que sepa de los mandos.)");
+
+        using var cts = new CancellationTokenSource();
+        Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+        var progress = new Progress<string>(m => Console.WriteLine($"{DateTime.Now:HH:mm:ss}  {m}"));
+        GenerationResult result;
+        try
+        {
+            result = new ProfileGenerator(apiKey).GenerateAsync(request, progress, cts.Token).GetAwaiter().GetResult();
+        }
+        catch (OperationCanceledException)
+        {
+            Console.WriteLine("Cancelado.");
+            return 1;
+        }
+        catch (InvalidOperationException ex)
+        {
+            Console.WriteLine(ex.Message);
+            return 1;
+        }
+
+        Console.WriteLine();
+        Console.WriteLine(result.Summary);
+        Console.WriteLine("\n" + result.UsageText);
+        if (result.Json is null) return 1;
+
+        Directory.CreateDirectory(ProfileGenerator.DraftsDir);
+        var safe = string.Concat(aircraft.Replace("dcs:", "").Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' ? c : '_')).ToLowerInvariant();
+        var draft = Path.Combine(ProfileGenerator.DraftsDir, $"{safe}-{DateTime.Now:yyyyMMdd-HHmmss}.json");
+        File.WriteAllText(draft, result.Json);
+        Console.WriteLine($"Borrador: {draft}");
+        Console.WriteLine(result.Validation?.Ok == true ? "Validación: OK." : $"Validación con problemas:\n{result.Validation?.Text}");
+        return 0;
     }
 
     // ----------------------------------------------------------------- hangar

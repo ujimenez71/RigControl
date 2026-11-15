@@ -1,0 +1,97 @@
+<Window x:Class="RigControl.Views.AiGenerateWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Generar perfil con IA" Width="760" Height="760" MinWidth="560" MinHeight="560"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <Style x:Key="Label" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,12,0,4" />
+        </Style>
+        <Style x:Key="Small" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Opacity" Value="0.7" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="Generar perfil con IA" FontSize="22" FontWeight="SemiBold" />
+            <TextBlock Style="{StaticResource Small}" Margin="0,4,0,0"
+                       Text="Claude escribe un borrador con tus mandos (catálogo, ia-notas.md y tus perfiles), los controles del avión y lo que pidas. Se valida solo y se abre en el editor: no se guarda hasta que pulses Guardar." />
+
+            <!-- Clave -->
+            <Border Margin="0,12,0,0" Padding="12,8" CornerRadius="6"
+                    BorderThickness="1" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}">
+                <StackPanel>
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="Olvidar clave" Click="ForgetKey_Click"
+                                Visibility="{Binding HasKey, Converter={StaticResource BoolToVisibility}}" />
+                        <TextBlock Text="{Binding KeyText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <DockPanel Margin="0,8,0,0" Visibility="{Binding NeedsKey, Converter={StaticResource BoolToVisibility}}">
+                        <Button DockPanel.Dock="Right" Content="Guardar clave" Click="SaveKey_Click" Margin="8,0,0,0" />
+                        <PasswordBox x:Name="KeyBox" />
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+
+            <TextBlock Style="{StaticResource Label}" Text="Avión" />
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="Usar el avión actual" Click="Detect_Click" Margin="8,0,0,0"
+                        IsEnabled="{Binding NotBusy}" />
+                <TextBox Text="{Binding Aircraft, UpdateSourceTrigger=PropertyChanged}" FontFamily="Cascadia Mono, Consolas"
+                         ToolTip="DCS: &quot;dcs:&quot; + nombre del avión (p. ej. dcs:ah-64d_blk_ii). MSFS: carpeta del avión (p. ej. asobo_c172sp_g1000)." />
+            </DockPanel>
+
+            <TextBlock Style="{StaticResource Label}" Text="Partir de" />
+            <ComboBox ItemsSource="{Binding BaseProfiles}" SelectedItem="{Binding BaseProfile}" />
+            <TextBlock Style="{StaticResource Small}" Margin="0,4,0,0"
+                       Text="Al modificar un perfil, Guardar en el editor lo sobrescribe (queda la copia .json.bak)." />
+
+            <TextBlock Style="{StaticResource Label}" Text="Qué quieres" />
+            <TextBox Text="{Binding Preferences, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap"
+                     MinHeight="90" MaxHeight="160" VerticalScrollBarVisibility="Auto"
+                     ToolTip="Por ejemplo: &quot;Luces exteriores y radios en el hat de la izquierda del Moza; master caution en el PTO 2&quot;." />
+        </StackPanel>
+
+        <!-- Progreso y resultado -->
+        <Grid Grid.Row="1" Margin="0,12,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <StackPanel>
+                <TextBlock Text="{Binding Status}" Style="{StaticResource Small}" />
+                <ProgressBar IsIndeterminate="True" Height="4" Margin="0,6,0,0"
+                             Visibility="{Binding Busy, Converter={StaticResource BoolToVisibility}}" />
+                <ItemsControl ItemsSource="{Binding Progress}" Margin="0,6,0,0" FontFamily="Cascadia Mono, Consolas" FontSize="12" />
+            </StackPanel>
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
+                <StackPanel>
+                    <TextBox Text="{Binding Summary, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0"
+                             Background="Transparent" Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBox Text="{Binding Validation, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0"
+                             Background="Transparent" Margin="0,8,0,0" FontFamily="Cascadia Mono, Consolas" FontSize="12" />
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="Cancelar" Click="Cancel_Click" Margin="0,0,8,0"
+                    Visibility="{Binding Busy, Converter={StaticResource BoolToVisibility}}" />
+            <Button Content="✨  Generar" Click="Generate_Click" Margin="0,0,8,0" MinWidth="110" IsEnabled="{Binding CanGenerate}" />
+            <Button Content="Abrir en el editor" Click="Open_Click" Margin="0,0,8,0" Style="{DynamicResource AccentButtonStyle}"
+                    Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}}" IsEnabled="{Binding NotBusy}" />
+            <Button Content="Cerrar" Click="Close_Click" IsCancel="True" />
+        </StackPanel>
+    </Grid>
+</Window>

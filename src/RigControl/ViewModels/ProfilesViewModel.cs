@@ -106,6 +106,34 @@ public sealed class ProfilesViewModel : ObservableObject, IDisposable
         BeginEdit();
     }
 
+    /// <summary>
+    /// Abre en el editor un perfil generado con IA, sin guardarlo: se escribe en <paramref name="path"/>
+    /// solo si se pulsa Guardar (si ya existía, queda la copia .json.bak de siempre).
+    /// </summary>
+    public void OpenDraft(ProfileFile file, string path)
+    {
+        var editor = new ProfileEditorViewModel(path, file, _window);
+        editor.MarkAsDraft();
+        editor.Closed += _ =>
+        {
+            editor.Dispose();
+            Editor = null;
+            Refresh();
+            Selected = Profiles.FirstOrDefault(p => p.Path == path) ?? Selected;
+        };
+        Editor = editor;
+    }
+
+    /// <summary>Ruta libre en la carpeta de perfiles para un borrador nuevo ("ah-64d_blk_ii.json", "-2"...).</summary>
+    public string FreeProfilePath(string baseName)
+    {
+        var safe = string.Concat(baseName.Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' ? char.ToLowerInvariant(c) : '-')).Trim('-');
+        if (safe.Length == 0) safe = "perfil-ia";
+        var path = Path.Combine(ProfilesDir, safe + ".json");
+        for (var n = 2; File.Exists(path); n++) path = Path.Combine(ProfilesDir, $"{safe}-{n}.json");
+        return path;
+    }
+
     /// <summary>Borra el perfil seleccionado (queda una copia en .json.bak).</summary>
     public void DeleteSelected()
     {
@@ -235,7 +263,7 @@ public sealed class ProfilesViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Claves VID:PID de lo conectado ahora. Si DirectInput falla, null (= "no se sabe").</summary>
-    private static HashSet<string>? ConnectedKeys()
+    public static HashSet<string>? ConnectedKeys()
     {
         try
         {

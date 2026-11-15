@@ -234,7 +234,17 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
     public bool HasSelected => _selected is not null;
 
     public bool Dirty { get => _dirty; private set { if (Set(ref _dirty, value)) Raise(nameof(Title)); } }
-    public string Title => $"Editando {FileName}{(_dirty ? "  ·  cambios sin guardar" : "")}";
+    public string Title => (_draft ? $"Borrador de la IA: {FileName}" : $"Editando {FileName}") + (_dirty ? "  ·  cambios sin guardar" : "");
+
+    private bool _draft;
+
+    /// <summary>Perfil generado con IA y aún no guardado: el editor lo trata como cambios pendientes.</summary>
+    public void MarkAsDraft()
+    {
+        _draft = true;
+        Dirty = true;
+        Raise(nameof(Title));
+    }
 
     public bool IsCapturing { get => _isCapturing; private set { if (Set(ref _isCapturing, value)) Raise(nameof(CaptureButtonText)); } }
     public string CaptureButtonText => _isCapturing ? "Cancelar" : "🎯 Capturar";

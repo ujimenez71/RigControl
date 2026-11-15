@@ -78,8 +78,11 @@ public sealed class ProfileFile
         return Path.Combine(ProfilesDir, fileName);
     }
 
-    public static ProfileFile Load(string path) =>
-        JsonSerializer.Deserialize<ProfileFile>(File.ReadAllText(path), JsonOptions)
+    public static ProfileFile Load(string path) => Parse(File.ReadAllText(path));
+
+    /// <summary>Perfil a partir del texto JSON (admite // comentarios y comas finales).</summary>
+    public static ProfileFile Parse(string json) =>
+        JsonSerializer.Deserialize<ProfileFile>(json, JsonOptions)
         ?? throw new InvalidDataException("El perfil está vacío.");
 
     private static readonly JsonSerializerOptions WriteOptions = new()

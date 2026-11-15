@@ -18,6 +18,15 @@ public partial class ProfilesView : UserControl
 
     private void New_Click(object sender, RoutedEventArgs e) => Vm.NewProfile();
 
+    private void Generate_Click(object sender, RoutedEventArgs e)
+    {
+        var ai = new AiGenerateViewModel();
+        var window = new AiGenerateWindow(ai) { Owner = Window.GetWindow(this) };
+        if (window.ShowDialog() != true || ai.Result?.Profile is not { } file) return;
+        var path = ai.TargetPath ?? Vm.FreeProfilePath(file.Aircraft.FirstOrDefault()?.Replace("dcs:", "") ?? file.Name);
+        Vm.OpenDraft(file, path);
+    }
+
     private void Edit_Click(object sender, RoutedEventArgs e)
     {
         if (Vm.SelectedHasComments() && MessageBox.Show(Window.GetWindow(this)!,

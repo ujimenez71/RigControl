@@ -7,8 +7,8 @@ Software propio de control del rig de simulación, inspirado en Hangar Control d
 
 - `src/RigControl.Core/`: biblioteca con todo lo que no es interfaz: dispositivos (`DeviceScanner`,
   `DeviceCatalog`, `DeviceMonitor`), `BravoLights`, y `Bindings/` (motor, perfiles, salidas teclado
-  y SimConnect), `Hangar/` (secuencias, prioridad, ventanas), `Mods/` (biblioteca de mods con uniones) y
-  `Snapshots/` (instantáneas de configuración en .zip).
+  y SimConnect), `Hangar/` (secuencias, prioridad, ventanas), `Mods/` (biblioteca de mods con uniones),
+  `Snapshots/` (instantáneas de configuración en .zip) y `Ai/` (generar perfiles con Claude).
   Copia `SimConnect.dll` del SDK a la salida de quien la referencia.
 - `src/RigProbe/`: consola de sondeo y pruebas (`Program.cs`, `ConsoleInput.cs`).
   `dotnet run --project src/RigProbe -- <comando>`; exe en `src/RigProbe/bin/Debug/net10.0/RigProbe.exe`.
@@ -78,7 +78,8 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
 `hangar` (estado de todos, no lanza nada), `hangar <nombre> --dry` (qué haría), `hangar <nombre>` (abre; Ctrl+C cancela), `ventanas <proceso>` (posición de sus ventanas, para `"window"`),
 `mods` (estado de cada biblioteca), `mods <conjunto> [--dry]`, `mods importar <biblioteca> [--dry]`,
 `instantaneas` (grupos e instantáneas numeradas), `instantaneas crear <grupo|todo> [nombre]`,
-`instantaneas comparar <grupo> <n>`, `instantaneas restaurar <grupo> <n>` (pide confirmación).
+`instantaneas comparar <grupo> <n>`, `instantaneas restaurar <grupo> <n>` (pide confirmación),
+`ia` (generar perfiles con Claude, ver "Generar perfiles con IA").
 - Fase 5, App Hangar (08/11/2026; escenarios con host falso + ping real, pantalla comprobada fuera de
   pantalla; ✅ verificado por el usuario con los programas reales: ningún paso en rojo, MSFS arranca,
   HapticSeat aparece en la bandeja y SimAppPro abre sin aviso de UAC): `Core/Hangar/`
@@ -460,18 +461,34 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
 4. (en curso) DCS por UDP (Export.lua / DCS-BIOS), bidireccional; feedback a LEDs WinWing (requiere
    capturar el protocolo con Wireshark + USBPcap) y al Bravo. Hecho: luces del Bravo desde MSFS
    y cliente DCS-BIOS, ✅ verificado con DCS y el AH-64D (ver "Fase 4" arriba); luces y
-   condiciones desde el estado de DCS (`D:`, ✅ verificado con el AH-64D). Falta: LEDs WinWing.
+   condiciones desde el estado de DCS (`D:`, ✅ verificado con el AH-64D); ✅ LEDs WinWing y pantalla del ICP.
 5. ✅ App Hangar (lanzar apps en secuencia); prioridad de CPU por paso;
    ✅ gestor de ventanas; ✅ mods con uniones de directorio; ✅ instantáneas
 
-Idea pendiente (propuesta el 02/11/2026, a decidir con el usuario): **generar perfiles con IA**
-(Claude por la API de Anthropic). Botón "Generar con IA" en Perfiles: se envían los mandos con sus
-nombres de entrada (devices.json `Inputs`), los controles del avión (B: enumerados por SimConnect o
-`DcsBiosCatalog` con descripciones/posiciones) y las preferencias escritas por el usuario; se pide
-un ProfileFile en JSON, se valida con ProfileCompiler + ConflictGuard (devolviendo los errores para
-que los corrija) y se abre como borrador en el editor (nunca se guarda solo). Necesita clave de API
-(guardarla cifrada, DPAPI). Antes de escribir código con la API, cargar la skill claude-api.
-Alternativa sin integración: pedírselo a Claude Code en la sesión.
+Generar perfiles con IA (15/11/2026; escenarios sin API en `AiTests`, ventana comprobada fuera de pantalla;
+clave del usuario guardada el 15/11/2026, vencimiento 90 días aprox.; ✅ primera prueba real con `RigProbe ia dcs:uh-1h`
+"solo luces exteriores en el hat izquierdo del Moza": 20 s, 2 turnos, ~37 000 tokens de entrada casi todos de caché y
+2 000 de salida (unos 0,15 $), borrador OK con NAV_LTS_SW/POS_LTS_SW/ANTICOLL_LTS_SW correctos y dudas bien señaladas;
+falta probarlo desde la app y en DCS): `Core/Ai/`.
+`ProfileGenerator` (SDK oficial `Anthropic` 13.8.0, `claude-opus-5-5`, esfuerzo high, `fallbacks: "default"` con la beta
+`server-side-fallback-2026-07-01`, caché automática del prompt): prompt de sistema fijo (`ProfileGuide`: formato
+completo del perfil y reglas, p. ej. NO inventar qué hace un botón) + un mensaje con el catálogo de mandos (claves,
+nombres de entradas, conectados), `%APPDATA%\RigControl\ia-notas.md` (mapas de botones que no están en el catálogo:
+Bravo, MH16, colectivo...; copia de `profiles/ia-notas.md`, editable), TODOS los perfiles actuales tal cual (con sus
+comentarios), las luces disponibles, los controles del avión (DCS-BIOS: nombre | categoría | descripción |
+entradas | posiciones; MSFS: los B: del avión cargado, si MSFS está abierto, + K: frecuentes), un perfil de partida
+opcional y lo que pide el usuario. ~30 000 tokens con el AH-64D (714 controles). Una herramienta, `validar_perfil`
+(texto JSON): `ProfileGenerator.Validate` = compilar + Conflict Guard + nombres D:/B: contra el avión + claves de
+dispositivo contra el catálogo; el modelo corrige hasta "OK" (máx. 10 turnos). El ÚLTIMO JSON validado es el
+borrador (aunque tenga errores). Clave: `ApiKeyStore` (DPAPI, `%APPDATA%\RigControl\anthropic.key`; si no, la
+variable ANTHROPIC_API_KEY). `SimSnapshot.Read` = avión cargado en DCS o MSFS (+ lista de B:).
+App: botón "Generar con IA" en Perfiles -> ventana (`AiGenerateWindow`/`AiGenerateViewModel`): clave, avión ("Usar el
+avión actual"), "Partir de" (nuevo o modificar un perfil), qué quieres; "Abrir en el editor" abre el borrador SIN
+guardar (`ProfileEditorViewModel.MarkAsDraft`; nuevo = `profiles\<avión>.json` libre, modificar = el mismo archivo,
+con .bak al guardar). RigProbe: `ia` (estado), `ia clave [borrar]`, `ia contexto <avión|actual> [texto]` (lo que se
+enviaría, sin llamar a la API), `ia <avión|actual> "texto" [--base <perfil>]` -> borrador en
+`%APPDATA%\RigControl\borradores\` (fuera de profiles\: `run auto` no lo carga). Coste aproximado: medio dólar por
+generación con Opus 5.5 (sin medir aún).
 
 Otros pendientes (02/11/2026): (el Bravo NO se usará con DCS, decisión del usuario del 04/11/2026:
 no hace falta probar luces `D:` en él; la función sigue disponible); renombrar archivo de perfil en

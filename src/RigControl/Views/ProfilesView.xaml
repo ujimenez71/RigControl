@@ -37,6 +37,8 @@
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top"
                         Visibility="{Binding IsViewing, Converter={StaticResource BoolToVisibility}}">
                 <Button Content="＋  Nuevo perfil" Click="New_Click" Margin="0,0,8,0" />
+                <Button Content="✨  Generar con IA" Click="Generate_Click" Margin="0,0,8,0"
+                        ToolTip="Claude escribe un borrador de perfil (o cambia uno) con tus mandos y el avión; lo revisas en el editor." />
                 <Button Content="Abrir carpeta" Click="OpenFolder_Click" Margin="0,0,8,0" />
                 <Button Content="Recargar" Click="Refresh_Click" />
             </StackPanel>
