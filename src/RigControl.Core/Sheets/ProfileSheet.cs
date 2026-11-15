@@ -250,8 +250,8 @@ h2 { margin: 24px 0 8px; font-size: 19px; border-bottom: 2px solid var(--accent)
 .photo { position: relative; }
 .release { color: var(--muted); font-size: 12px; }
 .photo img { display: block; width: 100%; height: auto; border-radius: 6px; }
-.marker { position: absolute; transform: translate(-50%, -50%); min-width: 24px; height: 24px; padding: 0 5px;
-  border-radius: 12px; background: var(--accent); color: #fff; font: bold 13px/24px "Segoe UI", sans-serif;
+.marker { position: absolute; transform: translate(-50%, -50%); min-width: 20px; height: 20px; padding: 0 4px;
+  border-radius: 10px; background: var(--accent); color: #fff; font: bold 11px/20px "Segoe UI", sans-serif;
   text-align: center; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.5); cursor: default; }
 .nophoto { color: var(--muted); font-style: italic; margin: 0; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
