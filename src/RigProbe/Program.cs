@@ -1,6 +1,7 @@
 using HidSharp;
 using RigControl.Core;
 using RigControl.Core.Ai;
+using RigControl.Core.Sheets;
 using RigControl.Core.Bindings;
 using RigControl.Core.Hangar;
 using RigControl.Core.Mods;
@@ -85,6 +86,8 @@ internal static class Program
                 return WinWingCommand([.. args.Skip(1)]);
             case "ia":
                 return AiCommand([.. args.Skip(1)], instances);
+            case "hoja" when args.Length > 1:
+                return SheetCommand(args[1], args.Any(x => x.Equals("--pdf", StringComparison.OrdinalIgnoreCase)));
             case "instantaneas" or "instantáneas":
                 return SnapshotsCommand([.. args.Skip(1)]);
             case "mods":
@@ -108,10 +111,38 @@ internal static class Program
                 Console.WriteLine("            | dcs vigilar [filtro] | hangar [nombre [--dry]] | ventanas <proceso>");
                 Console.WriteLine("            | mods | mods <conjunto> [--dry] | mods importar <biblioteca> [--dry]");
                 Console.WriteLine("            | instantaneas | instantaneas crear <grupo|todo> [nombre] | instantaneas comparar|restaurar <grupo> <n>");
-                Console.WriteLine("            | ia | ia clave [borrar] | ia contexto <avión|actual> | ia <avión|actual> \"lo que quieres\" [--base <perfil>]");
+                Console.WriteLine("            | hoja <perfil> [--pdf] | ia | ia clave [borrar] | ia contexto <avión|actual> | ia <avión|actual> \"lo que quieres\" [--base <perfil>]");
                 Console.WriteLine("            | winwing | winwing luces | winwing led <disp> <n> <valor> [--modulo XXXX] | winwing barrido <disp> [desde] [hasta] [--modulo XXXX] [--valor N]");
                 Console.WriteLine($"  <perfil> es una ruta a un .json o un nombre en {ProfileFile.ProfilesDir}");
                 return 1;
+        }
+    }
+
+    // ----------------------------------------------------------------- hoja
+
+    /// <summary>"hoja": hoja de mandos del perfil (fotos con números + tabla) en HTML y, con --pdf, en PDF.</summary>
+    private static int SheetCommand(string profile, bool pdf)
+    {
+        var path = ProfileFile.Resolve(profile);
+        if (!File.Exists(path)) { Console.WriteLine($"No existe {path}"); return 1; }
+        try
+        {
+            var catalog = DeviceCatalog.Load();
+            var (_, devices) = ProfileSheet.Collect(ProfileFile.Load(path), path, catalog);
+            foreach (var d in devices)
+            {
+                var placed = d.Inputs.Count(i => i.Position is not null);
+                Console.WriteLine($"{d.Name}: {d.Inputs.Count} entradas · " +
+                                  (d.ImagePath is null ? $"sin foto ({DeviceLayout.PathFor(d.Key)})" : $"foto, {placed} colocadas"));
+            }
+            var output = pdf ? ProfileSheet.WritePdf(path, catalog) : ProfileSheet.WriteHtml(path, catalog);
+            Console.WriteLine($"Hoja: {output}");
+            return 0;
+        }
+        catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException or IOException or TimeoutException)
+        {
+            Console.WriteLine(ex.Message);
+            return 1;
         }
     }
 
@@ -209,7 +240,21 @@ internal static class Program
         GenerationResult result;
         try
         {
-            result = new ProfileGenerator(apiKey).GenerateAsync(request, progress, cts.Token).GetAwaiter().GetResult();
+            var generator = new ProfileGenerator(apiKey)
+            {
+                // Claude pide abrir el simulador: Intro = ya está, "n" = seguir sin él.
+                AskForSim = (ask, token) => Task.Run(() =>
+                {
+                    Console.WriteLine();
+                    Console.WriteLine($">>> Claude necesita {ask.SimName} abierto con el avión {ask.Aircraft} cargado (en la cabina).");
+                    if (ask.Reason.Length > 0) Console.WriteLine($"    Motivo: {ask.Reason}");
+                    Console.Write("    Intro cuando esté listo, \"n\" + Intro para seguir sin él: ");
+                    var line = Console.ReadLine();
+                    token.ThrowIfCancellationRequested();
+                    return line is not null && !line.Trim().Equals("n", StringComparison.OrdinalIgnoreCase);
+                }, token),
+            };
+            result = generator.GenerateAsync(request, progress, cts.Token).GetAwaiter().GetResult();
         }
         catch (OperationCanceledException)
         {

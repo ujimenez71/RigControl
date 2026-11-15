@@ -39,6 +39,8 @@
                 <Button Content="＋  Nuevo perfil" Click="New_Click" Margin="0,0,8,0" />
                 <Button Content="✨  Generar con IA" Click="Generate_Click" Margin="0,0,8,0"
                         ToolTip="Claude escribe un borrador de perfil (o cambia uno) con tus mandos y el avión; lo revisas en el editor." />
+                <Button Content="📷  Fotos de los mandos" Click="Photos_Click" Margin="0,0,8,0"
+                        ToolTip="Foto de cada mando y dónde está cada botón, para la hoja de mandos" />
                 <Button Content="Abrir carpeta" Click="OpenFolder_Click" Margin="0,0,8,0" />
                 <Button Content="Recargar" Click="Refresh_Click" />
             </StackPanel>
@@ -113,6 +115,10 @@
                     <Button Content="✏  Editar" Click="Edit_Click" Margin="0,0,8,0" MinWidth="100"
                             Background="{DynamicResource {x:Static SystemColors.AccentColorBrushKey}}" Foreground="White"
                             ToolTip="Editor gráfico: capturar entradas, elegir acciones, validar y guardar" />
+                    <Button Content="🖨  Hoja de mandos" Click="Sheet_Click" Margin="0,0,8,0"
+                            ToolTip="Fotos de los mandos con un número en cada entrada usada y la tabla de lo que hace (HTML, se abre en el navegador; se puede imprimir)" />
+                    <Button x:Name="PdfButton" Content="PDF" Click="Pdf_Click" Margin="0,0,8,0"
+                            ToolTip="La hoja de mandos en PDF (la hace Edge sin abrir ventana)" />
                     <Button Content="Abrir el JSON" Click="OpenSelected_Click" Margin="0,0,8,0"
                             ToolTip="Abre el archivo con el programa asociado; al guardar, esta pantalla y la ejecución se actualizan" />
                     <Button Content="Borrar" Click="Delete_Click" ToolTip="Borra el perfil (queda una copia .json.bak en la carpeta)" />

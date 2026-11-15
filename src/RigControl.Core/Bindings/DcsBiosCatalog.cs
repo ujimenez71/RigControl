@@ -65,6 +65,23 @@ public static class DcsBiosCatalog
         }
     }
 
+    /// <summary>Nombres de avión que conoce DCS-BIOS (claves de AircraftAliases.json), vacío si no está instalado.</summary>
+    public static IReadOnlyList<string> AircraftNames()
+    {
+        var dir = JsonDir();
+        var aliases = dir is null ? null : Path.Combine(dir, "AircraftAliases.json");
+        if (aliases is null || !File.Exists(aliases)) return [];
+        try
+        {
+            using var doc = JsonDocument.Parse(File.ReadAllText(aliases));
+            return [.. doc.RootElement.EnumerateObject().Select(p => p.Name).Where(n => n.Length > 0).Order(StringComparer.OrdinalIgnoreCase)];
+        }
+        catch (Exception ex) when (ex is JsonException or IOException)
+        {
+            return [];
+        }
+    }
+
     private static IReadOnlyList<DcsControl> Load(string aircraft)
     {
         var dir = JsonDir();

@@ -89,6 +89,14 @@ internal static class AiTests
         var ctxMsfs = ProfileGenerator.BuildContext(new GenerationRequest("msfs", "c172", "", events), catalog, null);
         Check(ctxMsfs.Contains("Controles B: del avión cargado en MSFS (1)") && ctxMsfs.Contains("ELECTRICAL_BATTERY_1"),
               "contexto MSFS: lista de B:");
+        var noEvents = new GenerationRequest("msfs", "c172", "");
+        Check(ProfileGenerator.BuildContext(noEvents, catalog, null, canAskForSim: true).Contains("pídela con pedir_simulador"),
+              "contexto MSFS sin B:: ofrece pedir_simulador si se puede");
+        Check(!ProfileGenerator.BuildContext(noEvents, catalog, null).Contains("pedir_simulador"),
+              "contexto MSFS sin B:: no la nombra si no se puede (RigProbe sin consola, pruebas)");
+        Check(ProfileGenerator.BuildContext(new GenerationRequest("dcs", "dcs:no-existe", ""), catalog, [], canAskForSim: true)
+                  .Contains("con pedir_simulador se lee el avión cargado en DCS"),
+              "contexto DCS sin controles: ofrece pedir_simulador");
 
         Check(SimSnapshot.AircraftFolder(@"SimObjects\Airplanes\Asobo_C172SP_G1000\aircraft.cfg") == "asobo_c172sp_g1000",
               $"carpeta del avión de MSFS: {SimSnapshot.AircraftFolder(@"SimObjects\Airplanes\Asobo_C172SP_G1000\aircraft.cfg")}");

@@ -1,0 +1,114 @@
+<Window x:Class="RigControl.Views.DeviceLayoutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Fotos de los mandos" Width="1200" Height="820" MinWidth="800" MinHeight="560"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="320" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Cabecera -->
+        <StackPanel Grid.ColumnSpan="2" Margin="0,0,0,12">
+            <TextBlock Text="Fotos de los mandos" FontSize="22" FontWeight="SemiBold" />
+            <TextBlock FontSize="12" Opacity="0.7" TextWrapping="Wrap"
+                       Text="Una foto por mando y dónde está cada entrada: sirve para la hoja de mandos de todos los perfiles. Elige la entrada (o pulsa «Pulsar en el mando» y pulsa el botón) y haz clic en la foto. Se guarda solo." />
+        </StackPanel>
+
+        <!-- Mando y entradas -->
+        <DockPanel Grid.Row="1" Grid.Column="0" Margin="0,0,16,0">
+            <ComboBox DockPanel.Dock="Top" ItemsSource="{Binding Devices}" SelectedItem="{Binding Device}" IsEnabled="{Binding NotCapturing}">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock><Run Text="{Binding Alias, Mode=OneWay}" FontWeight="SemiBold" /><Run Text="  " /><Run Text="{Binding ProductName, Mode=OneWay}" Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" /></TextBlock>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,8,0,8">
+                <Button Content="Cargar foto…" Click="LoadImage_Click" Margin="0,0,8,0" />
+                <Button Content="🎮  Pulsar en el mando" Click="Capture_Click" IsEnabled="{Binding NotCapturing}"
+                        ToolTip="Pulsa un botón o mueve un hat/eje del mando: se elige esa entrada en la lista" />
+            </StackPanel>
+            <TextBlock DockPanel.Dock="Bottom" FontSize="12" Opacity="0.7" TextWrapping="Wrap" Margin="0,8,0,0"
+                       Text="● colocada · ○ sin colocar. Debajo, los perfiles que la usan." />
+            <ListBox ItemsSource="{Binding Inputs}" SelectedItem="{Binding SelectedInput}"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Left" Text="{Binding Mark}" Width="20"
+                                       Foreground="{DynamicResource {x:Static SystemColors.AccentColorBrushKey}}" />
+                            <StackPanel>
+                                <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding UsedIn}" FontSize="11" Opacity="0.6" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </DockPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </DockPanel>
+
+        <!-- Foto con los marcadores (coordenadas en píxeles de la imagen; el Viewbox la escala) -->
+        <Border Grid.Row="1" Grid.Column="1" CornerRadius="6" BorderThickness="1"
+                BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}">
+            <Grid>
+                <TextBlock Text="Sin foto: «Cargar foto…»" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.6"
+                           Visibility="{Binding NoImage, Converter={StaticResource BoolToVisibility}}" />
+                <Viewbox Stretch="Uniform" Margin="8" Visibility="{Binding HasImage, Converter={StaticResource BoolToVisibility}}">
+                    <Grid x:Name="PhotoArea" Width="{Binding ImageWidth}" Height="{Binding ImageHeight}"
+                          Background="Transparent" Cursor="Cross" MouseLeftButtonDown="Photo_MouseLeftButtonDown">
+                        <Image Source="{Binding Image}" Stretch="Fill" />
+                        <ItemsControl ItemsSource="{Binding Markers}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <Canvas />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemContainerStyle>
+                                <Style TargetType="ContentPresenter">
+                                    <Setter Property="Canvas.Left" Value="{Binding Left}" />
+                                    <Setter Property="Canvas.Top" Value="{Binding Top}" />
+                                </Style>
+                            </ItemsControl.ItemContainerStyle>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border x:Name="MarkerBorder" Height="{Binding Size}" MinWidth="{Binding Size}" CornerRadius="999" Background="#D9480F"
+                                            BorderBrush="White" BorderThickness="2" Padding="4,0" Cursor="Hand"
+                                            ToolTip="Clic: elegir · clic derecho: quitar"
+                                            MouseLeftButtonDown="Marker_MouseLeftButtonDown" MouseRightButtonDown="Marker_MouseRightButtonDown">
+                                        <TextBlock Text="{Binding Part}" Foreground="White" FontWeight="Bold" FontSize="{Binding FontSize}"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding Selected}" Value="True">
+                                            <Setter TargetName="MarkerBorder" Property="Background" Value="#1971C2" />
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+                </Viewbox>
+            </Grid>
+        </Border>
+
+        <!-- Pie -->
+        <DockPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,12,0,0">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button Content="Abrir carpeta" Click="OpenFolder_Click" Margin="0,0,8,0" />
+                <Button Content="Cerrar" Click="Close_Click" IsCancel="True" />
+            </StackPanel>
+            <TextBlock Text="{Binding Status}" VerticalAlignment="Center" TextWrapping="Wrap" />
+        </DockPanel>
+    </Grid>
+</Window>

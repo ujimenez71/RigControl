@@ -32,6 +32,7 @@ internal static class Program
                      ("Mods", ModTests.Run),
                      ("Instantáneas", SnapshotTests.Run),
                      ("Generar con IA", AiTests.Run),
+                     ("Hoja de mandos", SheetTests.Run),
                  })
         {
             Console.WriteLine($"\n===== {name} =====");

@@ -32,6 +32,10 @@ public partial class AiGenerateWindow : Window
 
     private async void Generate_Click(object sender, RoutedEventArgs e) => await Vm.GenerateAsync();
 
+    private void SimReady_Click(object sender, RoutedEventArgs e) => Vm.SimReady();
+
+    private void SimSkip_Click(object sender, RoutedEventArgs e) => Vm.SimSkip();
+
     private void Cancel_Click(object sender, RoutedEventArgs e) => Vm.Cancel();
 
     private void Open_Click(object sender, RoutedEventArgs e) => DialogResult = true;

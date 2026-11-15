@@ -1,7 +1,7 @@
 <Window x:Class="RigControl.Views.AiGenerateWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Generar perfil con IA" Width="760" Height="760" MinWidth="560" MinHeight="560"
+        Title="Generar perfil con IA" Width="760" Height="820" MinWidth="560" MinHeight="560"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
@@ -44,13 +44,42 @@
                 </StackPanel>
             </Border>
 
-            <TextBlock Style="{StaticResource Label}" Text="Avión" />
-            <DockPanel>
-                <Button DockPanel.Dock="Right" Content="Usar el avión actual" Click="Detect_Click" Margin="8,0,0,0"
+            <Grid Margin="0,12,0,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="200" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Simulador" FontWeight="SemiBold" />
+                <TextBlock Grid.Column="2" Text="Avión" FontWeight="SemiBold" />
+            </Grid>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="200" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ComboBox ItemsSource="{Binding SimNames}" SelectedItem="{Binding SimName}" IsEnabled="{Binding NotBusy}" />
+                <ComboBox Grid.Column="2" IsEditable="True" IsTextSearchEnabled="True" ItemsSource="{Binding AircraftSuggestions}"
+                          Text="{Binding Aircraft, UpdateSourceTrigger=PropertyChanged}" FontFamily="Cascadia Mono, Consolas"
+                          IsEnabled="{Binding NotBusy}" />
+                <Button Grid.Column="3" Content="Usar el avión actual" Click="Detect_Click" Margin="8,0,0,0"
                         IsEnabled="{Binding NotBusy}" />
-                <TextBox Text="{Binding Aircraft, UpdateSourceTrigger=PropertyChanged}" FontFamily="Cascadia Mono, Consolas"
-                         ToolTip="DCS: &quot;dcs:&quot; + nombre del avión (p. ej. dcs:ah-64d_blk_ii). MSFS: carpeta del avión (p. ej. asobo_c172sp_g1000)." />
-            </DockPanel>
+            </Grid>
+            <TextBlock Style="{StaticResource Small}" Margin="0,4,0,0" Text="{Binding AircraftHint}" />
+            <TextBlock Margin="0,2,0,0" Text="{Binding AircraftInfo}" FontWeight="SemiBold">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource Small}">
+                        <Setter Property="Opacity" Value="0.9" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding AircraftInfo}" Value="">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
 
             <TextBlock Style="{StaticResource Label}" Text="Partir de" />
             <ComboBox ItemsSource="{Binding BaseProfiles}" SelectedItem="{Binding BaseProfile}" />
@@ -74,6 +103,18 @@
                 <ProgressBar IsIndeterminate="True" Height="4" Margin="0,6,0,0"
                              Visibility="{Binding Busy, Converter={StaticResource BoolToVisibility}}" />
                 <ItemsControl ItemsSource="{Binding Progress}" Margin="0,6,0,0" FontFamily="Cascadia Mono, Consolas" FontSize="12" />
+                <!-- Claude pide abrir el simulador -->
+                <Border Margin="0,10,0,0" Padding="12,10" CornerRadius="6" BorderThickness="2"
+                        BorderBrush="{DynamicResource {x:Static SystemColors.AccentColorBrushKey}}"
+                        Visibility="{Binding WaitingForSim, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <TextBlock Text="{Binding SimAsk}" TextWrapping="Wrap" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                            <Button Content="Seguir sin él" Click="SimSkip_Click" Margin="0,0,8,0" />
+                            <Button Content="Ya está" Click="SimReady_Click" MinWidth="90" Style="{DynamicResource AccentButtonStyle}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
             </StackPanel>
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
                 <StackPanel>

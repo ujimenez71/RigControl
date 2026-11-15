@@ -34,6 +34,12 @@ public sealed record GenerationResult(ProfileFile? Profile, string? Json, Valida
         $"{OutputTokens:N0} de salida · unos {CostUsd:0.00} $";
 }
 
+/// <summary>Lo que pide la IA con pedir_simulador: arrancar <paramref name="Sim"/> ("dcs"/"msfs") con ese avión cargado.</summary>
+public sealed record SimRequest(string Sim, string Aircraft, string Reason)
+{
+    public string SimName => Sim == "dcs" ? "DCS World" : "MSFS 2024";
+}
+
 /// <summary>Lo que devuelve la herramienta validar_perfil (y lo que ve el usuario).</summary>
 public sealed record ValidationResult(ProfileFile? File, ProfileReport? Report, bool Ok, string Text);
 
@@ -47,7 +53,7 @@ public sealed record ValidationResult(ProfileFile? File, ProfileReport? Report, 
 public sealed partial class ProfileGenerator
 {
     public const string Model = "claude-opus-5-5";
-    private const int MaxTurns = 10;
+    private const int MaxTurns = 12;
 
     /// <summary>Notas libres del usuario para la IA (mapas de botones, costumbres...).</summary>
     public static string NotesPath { get; } =
@@ -64,15 +70,23 @@ public sealed partial class ProfileGenerator
         _client = new AnthropicClient { ApiKey = apiKey };
     }
 
+    /// <summary>
+    /// Si no es null, la IA puede pedir (herramienta pedir_simulador) que se arranque el simulador con el
+    /// avión, para leer sus controles. Devuelve true cuando el usuario dice que ya está; false = seguir sin él.
+    /// </summary>
+    public Func<SimRequest, CancellationToken, Task<bool>>? AskForSim { get; init; }
+
     public async Task<GenerationResult> GenerateAsync(GenerationRequest request, IProgress<string>? progress = null,
                                                       CancellationToken cancel = default)
     {
         var catalog = DeviceCatalog.Load();
-        var dcs = request.Sim == "dcs" ? DcsBiosCatalog.ForAircraft(request.Aircraft) : null;
+        IReadOnlyList<DcsControl>? dcs = request.Sim == "dcs" ? DcsBiosCatalog.ForAircraft(request.Aircraft) : null;
         var bNames = request.MsfsInputEvents is { Count: > 0 } ev
             ? new HashSet<string>(ev, StringComparer.OrdinalIgnoreCase) : null;
 
-        var context = BuildContext(request, catalog, dcs);
+        List<BetaToolUnion> tools = AskForSim is null ? [ValidateTool] : [ValidateTool, SimTool];
+
+        var context = BuildContext(request, catalog, dcs, AskForSim is not null);
         List<BetaMessageParam> messages = [new BetaUserMessageParam { Content = context }];
 
         ValidationResult? last = null;
@@ -97,7 +111,7 @@ public sealed partial class ProfileGenerator
                     OutputConfig = new BetaOutputConfig { Effort = Effort.High },
                     CacheControl = new BetaCacheControlEphemeral(),
                     System = ProfileGuide.System,
-                    Tools = [ValidateTool],
+                    Tools = tools,
                     Messages = messages,
                 }, cancel);
             }
@@ -153,7 +167,15 @@ public sealed partial class ProfileGenerator
                     echo.Add(new BetaToolUseBlockParam { ID = tu.ID, Name = tu.Name, Input = tu.Input });
                     string resultText;
                     var isError = false;
-                    if (tu.Name != ValidateToolName || !tu.Input.TryGetValue("perfil_json", out var pj)
+                    if (tu.Name == SimToolName && AskForSim is not null)
+                    {
+                        var reason = tu.Input.TryGetValue("motivo", out var m) && m.ValueKind == JsonValueKind.String ? m.GetString()! : "";
+                        var (simText, newDcs, newEvents) = await AskSimAsync(request, reason, progress, cancel);
+                        if (newDcs is not null) dcs = newDcs;
+                        if (newEvents is not null) bNames = newEvents;
+                        resultText = simText;
+                    }
+                    else if (tu.Name != ValidateToolName || !tu.Input.TryGetValue("perfil_json", out var pj)
                         || pj.ValueKind != JsonValueKind.String)
                     {
                         resultText = "Herramienta o parámetros no válidos: llama a validar_perfil con perfil_json (texto).";
@@ -188,6 +210,79 @@ public sealed partial class ProfileGenerator
         return new GenerationResult(last?.File, lastJson is null ? null : Reformat(last?.File, lastJson), last,
                                     summary, inTokens, outTokens, cacheRead, cacheWrite);
     }
+
+    /// <summary>pedir_simulador: espera al usuario, lee el simulador y devuelve el texto para la IA y los controles nuevos.</summary>
+    private async Task<(string Text, IReadOnlyList<DcsControl>? Dcs, HashSet<string>? Events)> AskSimAsync(
+        GenerationRequest request, string reason, IProgress<string>? progress, CancellationToken cancel)
+    {
+        var ask = new SimRequest(request.Sim, request.Aircraft, reason);
+        progress?.Report($"Claude pide abrir {ask.SimName} con {request.Aircraft}.");
+        if (!await AskForSim!(ask, cancel))
+        {
+            progress?.Report("Sin simulador: Claude sigue sin esa información.");
+            return ("El usuario no puede abrir el simulador ahora. Sigue sin la lista de controles y dilo en el resumen.", null, null);
+        }
+        progress?.Report($"Leyendo {ask.SimName}…");
+        var snap = await Task.Run(() => SimSnapshot.Read(15000, cancel), cancel);
+        cancel.ThrowIfCancellationRequested();
+        var wanted = request.Aircraft.StartsWith("dcs:", StringComparison.OrdinalIgnoreCase) ? request.Aircraft[4..] : request.Aircraft;
+
+        if (snap.Sim != request.Sim || snap.Aircraft is null)
+        {
+            progress?.Report($"{ask.SimName} no responde o no tiene un avión cargado.");
+            var other = snap.Sim is not null && snap.Sim != request.Sim
+                ? $" (está abierto {(snap.Sim == "dcs" ? "DCS World" : "MSFS 2024")} con {snap.Aircraft})" : "";
+            return ($"{ask.SimName} no responde o no tiene ningún avión cargado{other}. Puedes pedirlo una vez más o seguir sin la lista.", null, null);
+        }
+        if (!snap.Aircraft.Contains(wanted, StringComparison.OrdinalIgnoreCase))
+        {
+            progress?.Report($"Hay otro avión cargado: {snap.Aircraft}.");
+            return ($"En {ask.SimName} está cargado \"{snap.Aircraft}\", no \"{request.Aircraft}\". Puedes pedirlo una vez más " +
+                    "(dilo en el motivo) o seguir sin la lista.", null, null);
+        }
+
+        if (request.Sim == "dcs")
+        {
+            var controls = DcsBiosCatalog.ForAircraft(snap.Aircraft);
+            if (controls.Count == 0)
+                return ($"DCS tiene cargado {snap.Aircraft}, pero DCS-BIOS no tiene definiciones de controles para él. Sigue sin lista.", null, null);
+            progress?.Report($"{controls.Count} controles de DCS-BIOS.");
+            var sb = new StringBuilder($"DCS tiene cargado {snap.Aircraft}.\n");
+            AppendDcsControls(sb, controls);
+            return (sb.ToString(), controls, null);
+        }
+        if (snap.InputEvents is not { Count: > 0 } ev)
+        {
+            progress?.Report("MSFS no da la lista de controles B: (¿aún en el menú?).");
+            return ($"MSFS tiene cargado {snap.Aircraft} pero no ha dado la lista de controles B: (suele llegar al estar ya en la cabina). " +
+                    "Puedes pedirlo una vez más o seguir sin la lista.", null, null);
+        }
+        progress?.Report($"{ev.Count} controles B:.");
+        return ($"MSFS tiene cargado {snap.Aircraft}. Controles B: ({ev.Count}):\n" + string.Join(", ", ev.Order(StringComparer.OrdinalIgnoreCase)),
+                null, new HashSet<string>(ev, StringComparer.OrdinalIgnoreCase));
+    }
+
+    private const string SimToolName = "pedir_simulador";
+
+    private static readonly BetaTool SimTool = new()
+    {
+        Name = SimToolName,
+        Description = "Pide al usuario que arranque el simulador del perfil con el avión cargado (en la cabina) y " +
+                      "devuelve la lista de controles del avión (B: de MSFS o D: de DCS-BIOS). Úsala solo si falta esa " +
+                      "lista y la necesitas; el usuario puede tardar minutos o decir que no.",
+        InputSchema = new()
+        {
+            Properties = new Dictionary<string, JsonElement>
+            {
+                ["motivo"] = JsonSerializer.SerializeToElement(new
+                {
+                    type = "string",
+                    description = "Para qué lo necesitas, en una frase en español (se le enseña al usuario).",
+                }),
+            },
+            Required = ["motivo"],
+        },
+    };
 
     private const string ValidateToolName = "validar_perfil";
 
@@ -303,7 +398,8 @@ public sealed partial class ProfileGenerator
     // ------------------------------------------------------------------ contexto
 
     /// <summary>Todo lo que el modelo necesita saber, en un solo mensaje (público para RigProbe "ia contexto").</summary>
-    public static string BuildContext(GenerationRequest request, DeviceCatalog catalog, IReadOnlyList<DcsControl>? dcs)
+    public static string BuildContext(GenerationRequest request, DeviceCatalog catalog, IReadOnlyList<DcsControl>? dcs,
+                                      bool canAskForSim = false)
     {
         var sb = new StringBuilder();
 
@@ -341,20 +437,10 @@ public sealed partial class ProfileGenerator
         if (request.Sim == "dcs")
         {
             if (dcs is null or { Count: 0 })
-                sb.AppendLine("No se han encontrado los controles de DCS-BIOS de este avión: no uses nombres D: que no conozcas.");
+                sb.AppendLine("No se han encontrado los controles de DCS-BIOS de este avión (¿nombre mal escrito?): no uses nombres D: que no conozcas" +
+                              (canAskForSim ? "; con pedir_simulador se lee el avión cargado en DCS." : "."));
             else
-            {
-                sb.AppendLine($"Controles de DCS-BIOS ({dcs.Count}). Formato: NOMBRE | categoría | descripción | entradas | posiciones (0, 1, ...) o valor máximo | texto");
-                foreach (var c in dcs)
-                {
-                    sb.Append(c.Name).Append(" | ").Append(c.Category).Append(" | ").Append(c.Description);
-                    sb.Append(" | ").Append(c.Inputs.Length == 0 ? "solo salida" : string.Join(",", c.Inputs.Distinct()));
-                    if (c.Positions.Length > 0) sb.Append(" | ").Append(string.Join(", ", c.Positions.Select((p, i) => $"{i}={p}")));
-                    else if (c.MaxValue > 1) sb.Append(" | máx ").Append(c.MaxValue);
-                    if (c.TextLength > 0) sb.Append(" | texto de ").Append(c.TextLength);
-                    sb.AppendLine();
-                }
-            }
+                AppendDcsControls(sb, dcs);
         }
         else
         {
@@ -364,8 +450,9 @@ public sealed partial class ProfileGenerator
                 sb.AppendLine(string.Join(", ", ev.Order(StringComparer.OrdinalIgnoreCase)));
             }
             else
-                sb.AppendLine("No hay lista de controles B: (MSFS no está abierto con este avión): usa eventos K: estándar " +
-                              "y, si hace falta B:, solo los que aparezcan en los perfiles existentes; dilo en el resumen.");
+                sb.AppendLine("No hay lista de controles B: (MSFS no está abierto con este avión). " +
+                              (canAskForSim ? "Si la necesitas, pídela con pedir_simulador; si no, usa " : "Usa ") +
+                              "eventos K: estándar y, si hace falta B:, solo los que aparezcan en los perfiles existentes; dilo en el resumen.");
             sb.AppendLine("Eventos K: frecuentes: " + string.Join(", ", ActionDescriber.CommonSimEvents));
         }
         sb.AppendLine();
@@ -382,5 +469,19 @@ public sealed partial class ProfileGenerator
         sb.AppendLine("# Lo que pide el usuario");
         sb.AppendLine(string.IsNullOrWhiteSpace(request.Preferences) ? "(nada concreto: un perfil razonable con lo que se sepa de los mandos)" : request.Preferences.Trim());
         return sb.ToString();
+    }
+
+    private static void AppendDcsControls(StringBuilder sb, IReadOnlyList<DcsControl> dcs)
+    {
+        sb.AppendLine($"Controles de DCS-BIOS ({dcs.Count}). Formato: NOMBRE | categoría | descripción | entradas | posiciones (0, 1, ...) o valor máximo | texto");
+        foreach (var c in dcs)
+        {
+            sb.Append(c.Name).Append(" | ").Append(c.Category).Append(" | ").Append(c.Description);
+            sb.Append(" | ").Append(c.Inputs.Length == 0 ? "solo salida" : string.Join(",", c.Inputs.Distinct()));
+            if (c.Positions.Length > 0) sb.Append(" | ").Append(string.Join(", ", c.Positions.Select((p, i) => $"{i}={p}")));
+            else if (c.MaxValue > 1) sb.Append(" | máx ").Append(c.MaxValue);
+            if (c.TextLength > 0) sb.Append(" | texto de ").Append(c.TextLength);
+            sb.AppendLine();
+        }
     }
 }

@@ -8,7 +8,7 @@ Software propio de control del rig de simulación, inspirado en Hangar Control d
 - `src/RigControl.Core/`: biblioteca con todo lo que no es interfaz: dispositivos (`DeviceScanner`,
   `DeviceCatalog`, `DeviceMonitor`), `BravoLights`, y `Bindings/` (motor, perfiles, salidas teclado
   y SimConnect), `Hangar/` (secuencias, prioridad, ventanas), `Mods/` (biblioteca de mods con uniones),
-  `Snapshots/` (instantáneas de configuración en .zip) y `Ai/` (generar perfiles con Claude).
+  `Snapshots/` (instantáneas de configuración en .zip), `Ai/` (generar perfiles con Claude) y `Sheets/` (hoja de mandos).
   Copia `SimConnect.dll` del SDK a la salida de quien la referencia.
 - `src/RigProbe/`: consola de sondeo y pruebas (`Program.cs`, `ConsoleInput.cs`).
   `dotnet run --project src/RigProbe -- <comando>`; exe en `src/RigProbe/bin/Debug/net10.0/RigProbe.exe`.
@@ -79,7 +79,7 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
 `mods` (estado de cada biblioteca), `mods <conjunto> [--dry]`, `mods importar <biblioteca> [--dry]`,
 `instantaneas` (grupos e instantáneas numeradas), `instantaneas crear <grupo|todo> [nombre]`,
 `instantaneas comparar <grupo> <n>`, `instantaneas restaurar <grupo> <n>` (pide confirmación),
-`ia` (generar perfiles con Claude, ver "Generar perfiles con IA").
+`ia` (generar perfiles con Claude, ver "Generar perfiles con IA"), `hoja <perfil> [--pdf]` (hoja de mandos, ver abajo).
 - Fase 5, App Hangar (08/11/2026; escenarios con host falso + ping real, pantalla comprobada fuera de
   pantalla; ✅ verificado por el usuario con los programas reales: ningún paso en rojo, MSFS arranca,
   HapticSeat aparece en la bandeja y SimAppPro abre sin aviso de UAC): `Core/Hangar/`
@@ -482,13 +482,35 @@ opcional y lo que pide el usuario. ~30 000 tokens con el AH-64D (714 controles).
 dispositivo contra el catálogo; el modelo corrige hasta "OK" (máx. 10 turnos). El ÚLTIMO JSON validado es el
 borrador (aunque tenga errores). Clave: `ApiKeyStore` (DPAPI, `%APPDATA%\RigControl\anthropic.key`; si no, la
 variable ANTHROPIC_API_KEY). `SimSnapshot.Read` = avión cargado en DCS o MSFS (+ lista de B:).
-App: botón "Generar con IA" en Perfiles -> ventana (`AiGenerateWindow`/`AiGenerateViewModel`): clave, avión ("Usar el
+Simulador elegido por el usuario (15/11/2026; antes se deducía del prefijo "dcs:" y un avión de DCS escrito sin él salía
+como MSFS): desplegable DCS World / MSFS 2024 + avión con sugerencias (DCS: claves de `AircraftAliases.json` de DCS-BIOS,
+`DcsBiosCatalog.AircraftNames`; MSFS: aviones de los perfiles de MSFS); "Usar el avión actual" y "Partir de" eligen también
+el simulador. Herramienta `pedir_simulador` (motivo): si falta la lista de controles (B: de MSFS, que solo se leen con MSFS
+abierto y el avión en cabina, o D: de un avión que DCS-BIOS no encuentra), la IA pide arrancar el simulador con ese avión;
+la ventana enseña el aviso con "Ya está" / "Seguir sin él" (`ProfileGenerator.AskForSim`), y al confirmar se lee el
+simulador (15 s) y se devuelve la lista (también vale para validar). Otro avión cargado = se le dice a la IA, que puede
+pedirlo otra vez. RigProbe: Intro = ya está, "n" = sin él. Sin probar aún con la API.
+App: botón "Generar con IA" en Perfiles -> ventana (`AiGenerateWindow`/`AiGenerateViewModel`): clave, simulador, avión ("Usar el
 avión actual"), "Partir de" (nuevo o modificar un perfil), qué quieres; "Abrir en el editor" abre el borrador SIN
 guardar (`ProfileEditorViewModel.MarkAsDraft`; nuevo = `profiles\<avión>.json` libre, modificar = el mismo archivo,
 con .bak al guardar). RigProbe: `ia` (estado), `ia clave [borrar]`, `ia contexto <avión|actual> [texto]` (lo que se
 enviaría, sin llamar a la API), `ia <avión|actual> "texto" [--base <perfil>]` -> borrador en
 `%APPDATA%\RigControl\borradores\` (fuera de profiles\: `run auto` no lo carga). Coste aproximado: medio dólar por
 generación con Opus 5.5 (sin medir aún).
+
+Hoja de mandos (15/11/2026; escenarios en `SheetTests`, HTML y PDF reales del AH-64D con una foto falsa del Moza vistos con
+captura de Edge, ventana de fotos comprobada fuera de pantalla; SIN fotos reales todavía): `Core/Sheets/`. `DeviceLayout` =
+`%APPDATA%\RigControl\fotos\VVVV_PPPP.json` (una por modelo de mando, vale para todos los perfiles): `image` (archivo al lado)
++ `markers` parte -> {x, y} en fracciones 0..1; "hat1" sirve para todas sus direcciones y "y" para sus zonas. `ProfileSheet`:
+por cada mando del perfil, foto con un número en cada entrada usada (gris en la tabla = sin colocar) + tabla Entrada / Gesto /
+Qué hace ("desc" o descripción automática, condición, acción). Pulsar + soltar sin condición = una fila ("al soltar: Off");
+secuencias = una fila por paso; entradas que solo son modificador (condiciones/capas) también salen. Luces e ICP al final.
+HTML autocontenido (foto en base64) en `%APPDATA%\RigControl\hojas\<perfil>.html`; PDF A4 apaisado con Edge sin ventana
+(`--headless --print-to-pdf`, carpeta de datos propia en %TEMP% para no chocar con Edge abierto). Perfil con errores = no se
+hace. App: Perfiles -> "Fotos de los mandos" (`DeviceLayoutWindow`: mando, "Cargar foto…" = copia girada por el EXIF y
+reducida a 1600 px en JPG, lista de entradas = con nombre en el catálogo + usadas en perfiles + colocadas, "Pulsar en el
+mando" = `InputCapture`; clic en la foto coloca la elegida y pasa a la siguiente sin colocar, clic derecho quita; se guarda
+solo) y, en el detalle del perfil, "Hoja de mandos" (abre el HTML) y "PDF".
 
 Otros pendientes (02/11/2026): (el Bravo NO se usará con DCS, decisión del usuario del 04/11/2026:
 no hace falta probar luces `D:` en él; la función sigue disponible); renombrar archivo de perfil en
