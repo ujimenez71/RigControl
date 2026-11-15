@@ -95,6 +95,9 @@ public sealed class HangarProfile
     /// <summary>Conjunto de mods.json que se aplica antes de abrir nada (null = no tocar los mods).</summary>
     public string? ModSet { get; set; }
 
+    /// <summary>Perfil de graficos.json que se aplica antes de abrir nada (null = no tocar los gráficos).</summary>
+    public string? GraphicsProfile { get; set; }
+
     public List<HangarStep> Steps { get; set; } = [];
 }
 

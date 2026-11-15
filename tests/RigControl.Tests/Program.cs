@@ -33,6 +33,7 @@ internal static class Program
                      ("Instantáneas", SnapshotTests.Run),
                      ("Generar con IA", AiTests.Run),
                      ("Hoja de mandos", SheetTests.Run),
+                     ("Perfiles gráficos", GraphicsTests.Run),
                  })
         {
             Console.WriteLine($"\n===== {name} =====");

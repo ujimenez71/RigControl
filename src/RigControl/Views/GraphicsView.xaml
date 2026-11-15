@@ -1,0 +1,146 @@
+<UserControl x:Class="RigControl.Views.GraphicsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <Style x:Key="Grid" TargetType="DataGrid" BasedOn="{StaticResource {x:Type DataGrid}}">
+            <Setter Property="AutoGenerateColumns" Value="False" />
+            <Setter Property="IsReadOnly" Value="True" />
+            <Setter Property="HeadersVisibility" Value="Column" />
+            <Setter Property="GridLinesVisibility" Value="None" />
+            <Setter Property="CanUserReorderColumns" Value="False" />
+            <Setter Property="SelectionMode" Value="Single" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <Style x:Key="Section" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Margin" Value="0,12,0,6" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="300" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Cabecera -->
+        <DockPanel Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,8">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                <TextBlock Text="{Binding HeadsetName}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <ComboBox ItemsSource="{Binding RefreshRates}" SelectedItem="{Binding RefreshHz}" MinWidth="90"
+                          ToolTip="Refresco con el que vuelas (Pimax Play). Las reglas de VR comparan con él el límite de FPS.">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock><Run Text="{Binding Mode=OneWay}" /><Run Text=" Hz" /></TextBlock>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <Button Content="Abrir graficos.json" Click="OpenFile_Click" Margin="8,0,0,0" />
+                <Button Content="Recargar" Click="Reload_Click" Margin="8,0,0,0" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="Gráficos" FontSize="24" FontWeight="SemiBold" />
+                <TextBlock Opacity="0.7" TextWrapping="Wrap" Text="Perfiles de ajustes gráficos de DCS (options.lua y autoexec.cfg) y MSFS 2024 (UserCfg.opt) pensados para VR. Aplicar solo con el simulador cerrado; antes se guarda una copia .bak del archivo. Cada hangar puede aplicar uno al abrirse." />
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Revisión de lo actual -->
+        <Border Grid.Row="1" Grid.ColumnSpan="2" Padding="12,8" CornerRadius="6" BorderThickness="1" Margin="0,0,0,8"
+                BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}">
+            <StackPanel>
+                <TextBlock Text="Ahora, revisado para VR" FontWeight="SemiBold" />
+                <ItemsControl ItemsSource="{Binding CurrentReview}" Margin="0,4,0,0">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,1" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="{Binding PathsText}" FontSize="11" Opacity="0.6" Margin="0,4,0,0" FontFamily="Cascadia Mono, Consolas" />
+            </StackPanel>
+        </Border>
+
+        <!-- Perfiles + guardar lo actual -->
+        <DockPanel Grid.Row="2" Grid.Column="0" Margin="0,0,16,0">
+            <Border DockPanel.Dock="Bottom" Padding="10" CornerRadius="6" BorderThickness="1" Margin="0,8,0,0"
+                    BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}">
+                <StackPanel>
+                    <TextBlock Text="Guardar lo actual como perfil" FontWeight="SemiBold" />
+                    <ComboBox ItemsSource="{Binding SimNames}" SelectedItem="{Binding NewSim}" Margin="0,6,0,0" />
+                    <TextBox Text="{Binding NewName, UpdateSourceTrigger=PropertyChanged}" Margin="0,6,0,0"
+                             ToolTip="Nombre del perfil, p. ej. «VR helicópteros» o «VR multijugador»" />
+                    <CheckBox Content="Para VR" IsChecked="{Binding NewVr}" Margin="0,6,0,0"
+                              ToolTip="En MSFS guarda solo los ajustes de VR (sin marcar: los del monitor). En DCS se revisa con las reglas de VR." />
+                    <Button Content="Guardar" Click="Capture_Click" Margin="0,6,0,0" HorizontalAlignment="Left" IsEnabled="{Binding CanCapture}" />
+                </StackPanel>
+            </Border>
+            <ListBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding Selected}" BorderThickness="0" Background="Transparent"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Margin="0,2">
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding Detail}" FontSize="12" Opacity="0.65" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </DockPanel>
+
+        <!-- Perfil elegido -->
+        <DockPanel Grid.Row="2" Grid.Column="1" Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel DockPanel.Dock="Top">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <Button Content="Aplicar" Click="Apply_Click" MinWidth="100" Margin="0,0,8,0" IsEnabled="{Binding CanApply}"
+                                Style="{DynamicResource AccentButtonStyle}" />
+                        <Button Content="Borrar" Click="Delete_Click" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding Selected.Name}" FontSize="20" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                </DockPanel>
+                <TextBlock Text="{Binding SelectedNotes}" TextWrapping="Wrap" Opacity="0.8" Margin="0,4,0,0" />
+                <ItemsControl ItemsSource="{Binding ProfileAdvice}" Margin="0,6,0,0">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Margin="0,1">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Level}" Value="Aviso">
+                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Style="{StaticResource Section}" Text="Qué cambiaría al aplicarlo" />
+                <TextBlock Text="Ya está aplicado: los ajustes actuales son los del perfil." Opacity="0.7"
+                           Visibility="{Binding NoChanges, Converter={StaticResource BoolToVisibility}}" />
+            </StackPanel>
+            <DataGrid ItemsSource="{Binding Changes}" Style="{StaticResource Grid}">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Ajuste" Binding="{Binding Key}" Width="2*" FontFamily="Cascadia Mono, Consolas" />
+                    <DataGridTextColumn Header="Ahora" Binding="{Binding CurrentText}" Width="*" />
+                    <DataGridTextColumn Header="Perfil" Binding="{Binding WantedText}" Width="*" FontWeight="SemiBold" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </DockPanel>
+        <TextBlock Grid.Row="2" Grid.Column="1" Opacity="0.6" TextWrapping="Wrap" VerticalAlignment="Top"
+                   Text="Aún no hay perfiles. Deja el simulador como te guste, ciérralo y guarda lo actual como perfil (abajo a la izquierda)."
+                   Visibility="{Binding NoSelection, Converter={StaticResource BoolToVisibility}}" />
+
+        <TextBlock Grid.Row="3" Grid.ColumnSpan="2" Text="{Binding Message}" TextWrapping="Wrap" Margin="0,8,0,0" />
+    </Grid>
+</UserControl>

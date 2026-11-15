@@ -88,6 +88,8 @@ internal static class Program
                 return AiCommand([.. args.Skip(1)], instances);
             case "hoja" when args.Length > 1:
                 return SheetCommand(args[1], args.Any(x => x.Equals("--pdf", StringComparison.OrdinalIgnoreCase)));
+            case "graficos" or "gráficos":
+                return GraphicsCommand([.. args.Skip(1)]);
             case "instantaneas" or "instantáneas":
                 return SnapshotsCommand([.. args.Skip(1)]);
             case "mods":
@@ -111,10 +113,99 @@ internal static class Program
                 Console.WriteLine("            | dcs vigilar [filtro] | hangar [nombre [--dry]] | ventanas <proceso>");
                 Console.WriteLine("            | mods | mods <conjunto> [--dry] | mods importar <biblioteca> [--dry]");
                 Console.WriteLine("            | instantaneas | instantaneas crear <grupo|todo> [nombre] | instantaneas comparar|restaurar <grupo> <n>");
+                Console.WriteLine("            | graficos | graficos actual dcs|msfs [--monitor] | graficos guardar dcs|msfs <nombre> [--monitor] | graficos comparar|aplicar <nombre> [--dry]");
                 Console.WriteLine("            | hoja <perfil> [--pdf] | ia | ia clave [borrar] | ia contexto <avión|actual> | ia <avión|actual> \"lo que quieres\" [--base <perfil>]");
                 Console.WriteLine("            | winwing | winwing luces | winwing led <disp> <n> <valor> [--modulo XXXX] | winwing barrido <disp> [desde] [hasta] [--modulo XXXX] [--valor N]");
                 Console.WriteLine($"  <perfil> es una ruta a un .json o un nombre en {ProfileFile.ProfilesDir}");
                 return 1;
+        }
+    }
+
+    // ----------------------------------------------------------------- graficos
+
+    /// <summary>
+    /// "graficos": perfiles gráficos de DCS y MSFS (graficos.json). "actual" = ajustes de ahora + revisión para VR;
+    /// "guardar" = lo actual como perfil; "comparar" = qué cambiaría; "aplicar" = cambiarlo (simulador cerrado, con .bak).
+    /// </summary>
+    private static int GraphicsCommand(string[] args)
+    {
+        var monitor = args.Any(a => a.Equals("--monitor", StringComparison.OrdinalIgnoreCase));
+        var dry = args.Any(a => a.Equals("--dry", StringComparison.OrdinalIgnoreCase));
+        args = [.. args.Where(a => !a.StartsWith("--", StringComparison.Ordinal))];
+        var manager = new RigControl.Core.Graphics.GraphicsManager();
+        RigControl.Core.Graphics.GraphicsFile file;
+        try
+        {
+            file = RigControl.Core.Graphics.GraphicsFile.Load();
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            Console.WriteLine($"{RigControl.Core.Graphics.GraphicsFile.DefaultPath} está roto: {ex.Message}");
+            return 1;
+        }
+        static string? Sim(string s) => s.ToLowerInvariant() switch { "dcs" => "dcs", "msfs" => "msfs", _ => null };
+
+        try
+        {
+            if (args.Length == 0)
+            {
+                Console.WriteLine($"Visor: {file.Headset.Name}, {file.Headset.RefreshHz} Hz, seguimiento ocular: {(file.Headset.EyeTracking ? "sí" : "no")}");
+                Console.WriteLine($"DCS:  {manager.DcsConfigDir ?? "(no encontrado)"}");
+                Console.WriteLine($"MSFS: {manager.MsfsUserCfgPath ?? "(no encontrado)"}");
+                Console.WriteLine($"Perfiles ({RigControl.Core.Graphics.GraphicsFile.DefaultPath}):");
+                foreach (var p in file.Profiles)
+                    Console.WriteLine($"  {p.Name,-28} {p.SimName,-10} {(p.Vr ? "VR" : "monitor"),-8} {p.Settings.Count} ajustes · {manager.Diff(p).Count} distintos de lo actual");
+                if (file.Profiles.Count == 0) Console.WriteLine("  (ninguno: \"graficos guardar dcs <nombre>\" guarda lo actual)");
+                return 0;
+            }
+
+            switch (args[0].ToLowerInvariant())
+            {
+                case "actual" when args.Length > 1 && Sim(args[1]) is { } sim:
+                {
+                    var current = manager.Current(sim, !monitor);
+                    foreach (var (k, v) in current) Console.WriteLine($"  {k,-45} {RigControl.Core.Graphics.LuaOptionsFile.Display(v)}");
+                    Console.WriteLine($"{current.Count} ajustes.");
+                    if (!monitor) PrintAdvice(RigControl.Core.Graphics.VrAdvisor.Check(sim, current, file.Headset));
+                    return 0;
+                }
+                case "guardar" when args.Length > 2 && Sim(args[1]) is { } sim:
+                {
+                    var name = string.Join(' ', args.Skip(2));
+                    var profile = manager.Capture(sim, name, !monitor);
+                    file.Profiles.RemoveAll(p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+                    file.Profiles.Add(profile);
+                    file.Save();
+                    Console.WriteLine($"Guardado «{name}» ({profile.SimName}, {(profile.Vr ? "VR" : "monitor")}, {profile.Settings.Count} ajustes).");
+                    return 0;
+                }
+                case "comparar" or "aplicar" when args.Length > 1:
+                {
+                    var name = string.Join(' ', args.Skip(1));
+                    if (file.Find(name) is not { } profile) { Console.WriteLine($"No existe el perfil «{name}»."); return 1; }
+                    var apply = args[0].Equals("aplicar", StringComparison.OrdinalIgnoreCase);
+                    var changes = apply ? manager.Apply(profile, dry) : manager.Diff(profile);
+                    foreach (var c in changes) Console.WriteLine($"  {c.Key,-45} {c.CurrentText} -> {c.WantedText}");
+                    Console.WriteLine(changes.Count == 0 ? "Ya está así: nada que cambiar."
+                        : apply && !dry ? $"Aplicados {changes.Count} cambios (copia .bak al lado del archivo)." : $"{changes.Count} cambios.");
+                    if (profile.Vr) PrintAdvice(RigControl.Core.Graphics.VrAdvisor.Check(profile.Sim, profile.Settings, file.Headset));
+                    return 0;
+                }
+            }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or InvalidDataException or IOException)
+        {
+            Console.WriteLine(ex.Message);
+            return 1;
+        }
+        Console.WriteLine("Uso: graficos | graficos actual dcs|msfs [--monitor] | graficos guardar dcs|msfs <nombre> [--monitor] | graficos comparar|aplicar <nombre> [--dry]");
+        return 1;
+
+        static void PrintAdvice(List<RigControl.Core.Graphics.GraphicsAdvice> advice)
+        {
+            if (advice.Count == 0) { Console.WriteLine("Revisión VR: nada que señalar."); return; }
+            Console.WriteLine("Revisión VR:");
+            foreach (var a in advice) Console.WriteLine("  " + a);
         }
     }
 
@@ -303,6 +394,7 @@ internal static class Program
             {
                 Console.WriteLine($"=== {hangar.Name} ===");
                 if (hangar.ModSet is { } setName) ApplyHangarMods(setName, dryRun: true);
+                if (hangar.GraphicsProfile is { } gp) Console.WriteLine("  " + new RigControl.Core.Graphics.GraphicsManager().ApplyNamed(gp, dryRun: true));
                 foreach (var step in hangar.Steps)
                 {
                     var state = !step.Enabled ? "desactivado" : runner.Inspect(step) switch
@@ -340,6 +432,7 @@ internal static class Program
             Console.WriteLine($"  Instantáneas: {ex.Message}");
         }
         if (chosen[0].ModSet is { } modSet) ApplyHangarMods(modSet, dryRun: false);
+        if (chosen[0].GraphicsProfile is { } graphics) Console.WriteLine("  " + new RigControl.Core.Graphics.GraphicsManager().ApplyNamed(graphics));
         var steps = chosen[0].Steps;
         runner.StepChanged += (i, _, detail) => Console.WriteLine($"{DateTime.Now:HH:mm:ss}  {steps[i].Name}: {detail}");
         var outcome = runner.RunAsync(chosen[0], cts.Token).GetAwaiter().GetResult();

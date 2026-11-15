@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Threading;
+using RigControl.Core.Graphics;
 using RigControl.Core.Hangar;
 using RigControl.Core.Mods;
 using RigControl.Core.Snapshots;
@@ -49,9 +50,9 @@ public sealed record TopmostOption(bool? Value, string Text)
 }
 
 /// <summary>Una opción del desplegable de conjunto de mods del hangar; null = no tocar los mods.</summary>
-public sealed record ModSetOption(string? Value, bool Missing = false)
+public sealed record ModSetOption(string? Value, bool Missing = false, string Source = "mods.json")
 {
-    public string Text => Value is null ? "Sin cambiar" : Missing ? $"{Value} (no existe en mods.json)" : Value;
+    public string Text => Value is null ? "Sin cambiar" : Missing ? $"{Value} (no existe en {Source})" : Value;
 
     /// <summary>Iguales por el nombre del conjunto (así el desplegable reconoce la opción elegida).</summary>
     public bool Equals(ModSetOption? other) => other is not null && string.Equals(Value, other.Value, StringComparison.OrdinalIgnoreCase);
@@ -184,6 +185,7 @@ public sealed class HangarItem : ObservableObject
     private string _name;
     private bool _startRun;
     private string? _modSet;
+    private string? _graphics;
 
     public HangarItem(HangarProfile model, Action changed)
     {
@@ -191,6 +193,7 @@ public sealed class HangarItem : ObservableObject
         _name = model.Name;
         _startRun = model.StartRun;
         _modSet = string.IsNullOrWhiteSpace(model.ModSet) ? null : model.ModSet;
+        _graphics = string.IsNullOrWhiteSpace(model.GraphicsProfile) ? null : model.GraphicsProfile;
         Steps.CollectionChanged += (_, e) =>
         {
             foreach (HangarStepItem item in e.NewItems ?? Array.Empty<HangarStepItem>()) item.PropertyChanged += OnStepChanged;
@@ -240,14 +243,38 @@ public sealed class HangarItem : ObservableObject
         set { if (value is not null) ModSet = value.Value; } // null: el desplegable se está vaciando
     }
 
+    /// <summary>Perfil gráfico que se aplica antes de abrir nada; null = no tocar los gráficos.</summary>
+    public string? GraphicsProfile
+    {
+        get => _graphics;
+        set
+        {
+            if (!Set(ref _graphics, value)) return;
+            Raise(nameof(GraphicsChoice));
+            _changed();
+        }
+    }
+
+    /// <summary>Para el desplegable de gráficos (null = "Sin cambiar").</summary>
+    public ModSetOption GraphicsChoice
+    {
+        get => new(_graphics);
+        set { if (value is not null) GraphicsProfile = value.Value; }
+    }
+
     /// <summary>Tras rehacer la lista de opciones, para que el desplegable vuelva a marcar la elegida.</summary>
-    public void RefreshChoice() => Raise(nameof(ModSetChoice));
+    public void RefreshChoice()
+    {
+        Raise(nameof(ModSetChoice));
+        Raise(nameof(GraphicsChoice));
+    }
 
     public HangarProfile ToModel() => new()
     {
         Name = Name,
         StartRun = StartRun,
         ModSet = ModSet,
+        GraphicsProfile = GraphicsProfile,
         Steps = [.. Steps.Select(s => s.ToModel())],
     };
 }
@@ -292,6 +319,9 @@ public sealed class HangarViewModel : ObservableObject, IDisposable
     /// <summary>"Sin cambiar" + los conjuntos de mods.json (+ el del hangar elegido si ya no existe).</summary>
     public ObservableCollection<ModSetOption> ModSetOptions { get; } = [];
 
+    /// <summary>"Sin cambiar" + los perfiles de graficos.json (+ el del hangar elegido si ya no existe).</summary>
+    public ObservableCollection<ModSetOption> GraphicsOptions { get; } = [];
+
     public HangarItem? SelectedHangar
     {
         get => _selectedHangar;
@@ -300,6 +330,7 @@ public sealed class HangarViewModel : ObservableObject, IDisposable
             if (!Set(ref _selectedHangar, value)) return;
             SelectedStep = value?.Steps.FirstOrDefault();
             RefreshModSets();
+            RefreshGraphicsProfiles();
             Raise(nameof(HasHangar));
             Raise(nameof(CanLaunch));
             _ = RefreshPresenceAsync();
@@ -340,6 +371,7 @@ public sealed class HangarViewModel : ObservableObject, IDisposable
         {
             ReloadIfChangedOnDisk();
             RefreshModSets();
+            RefreshGraphicsProfiles();
             _presenceTimer.Start();
             _ = RefreshPresenceAsync();
         }
@@ -480,6 +512,11 @@ public sealed class HangarViewModel : ObservableObject, IDisposable
             Message = $"Aplicando los mods «{setName}»…";
             modsText += await Task.Run(() => ApplyMods(setName));
         }
+        if (model.GraphicsProfile is { } graphicsName)
+        {
+            Message = $"Aplicando los gráficos «{graphicsName}»…";
+            modsText += await Task.Run(() => new GraphicsManager().ApplyNamed(graphicsName)) + " ";
+        }
         Message = $"{modsText}Abriendo {hangar.Name}…";
 
         _runner?.StopWatching();
@@ -546,6 +583,22 @@ public sealed class HangarViewModel : ObservableObject, IDisposable
         var keep = SelectedHangar;
         ModSetOptions.Clear();
         foreach (var o in options) ModSetOptions.Add(o);
+        keep?.RefreshChoice();
+    }
+
+    private void RefreshGraphicsProfiles()
+    {
+        var names = new List<string>();
+        try { names.AddRange(GraphicsFile.Load().Profiles.Select(p => p.Name)); }
+        catch (Exception) { /* graficos.json roto: lo dice la pantalla Gráficos */ }
+        var options = new List<ModSetOption> { new(null) };
+        options.AddRange(names.Select(n => new ModSetOption(n)));
+        if (SelectedHangar?.GraphicsProfile is { } current && !names.Contains(current, StringComparer.OrdinalIgnoreCase))
+            options.Add(new ModSetOption(current, Missing: true, Source: "graficos.json"));
+        if (options.SequenceEqual(GraphicsOptions) && options.Select(o => o.Text).SequenceEqual(GraphicsOptions.Select(o => o.Text))) return;
+        var keep = SelectedHangar;
+        GraphicsOptions.Clear();
+        foreach (var o in options) GraphicsOptions.Add(o);
         keep?.RefreshChoice();
     }
 

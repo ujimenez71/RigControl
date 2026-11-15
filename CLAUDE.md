@@ -8,7 +8,7 @@ Software propio de control del rig de simulación, inspirado en Hangar Control d
 - `src/RigControl.Core/`: biblioteca con todo lo que no es interfaz: dispositivos (`DeviceScanner`,
   `DeviceCatalog`, `DeviceMonitor`), `BravoLights`, y `Bindings/` (motor, perfiles, salidas teclado
   y SimConnect), `Hangar/` (secuencias, prioridad, ventanas), `Mods/` (biblioteca de mods con uniones),
-  `Snapshots/` (instantáneas de configuración en .zip), `Ai/` (generar perfiles con Claude) y `Sheets/` (hoja de mandos).
+  `Snapshots/` (instantáneas de configuración en .zip), `Ai/` (generar perfiles con Claude), `Sheets/` (hoja de mandos) y `Graphics/` (perfiles gráficos de DCS y MSFS para VR).
   Copia `SimConnect.dll` del SDK a la salida de quien la referencia.
 - `src/RigProbe/`: consola de sondeo y pruebas (`Program.cs`, `ConsoleInput.cs`).
   `dotnet run --project src/RigProbe -- <comando>`; exe en `src/RigProbe/bin/Debug/net10.0/RigProbe.exe`.
@@ -79,7 +79,7 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
 `mods` (estado de cada biblioteca), `mods <conjunto> [--dry]`, `mods importar <biblioteca> [--dry]`,
 `instantaneas` (grupos e instantáneas numeradas), `instantaneas crear <grupo|todo> [nombre]`,
 `instantaneas comparar <grupo> <n>`, `instantaneas restaurar <grupo> <n>` (pide confirmación),
-`ia` (generar perfiles con Claude, ver "Generar perfiles con IA"), `hoja <perfil> [--pdf]` (hoja de mandos, ver abajo).
+`ia` (generar perfiles con Claude, ver "Generar perfiles con IA"), `hoja <perfil> [--pdf]` (hoja de mandos, ver abajo), `graficos` / `graficos actual dcs|msfs [--monitor]` / `graficos guardar dcs|msfs <nombre> [--monitor]` / `graficos comparar|aplicar <nombre> [--dry]` (perfiles gráficos, ver abajo).
 - Fase 5, App Hangar (08/11/2026; escenarios con host falso + ping real, pantalla comprobada fuera de
   pantalla; ✅ verificado por el usuario con los programas reales: ningún paso en rojo, MSFS arranca,
   HapticSeat aparece en la bandeja y SimAppPro abre sin aviso de UAC): `Core/Hangar/`
@@ -511,6 +511,26 @@ hace. App: Perfiles -> "Fotos de los mandos" (`DeviceLayoutWindow`: mando, "Carg
 reducida a 1600 px en JPG, lista de entradas = con nombre en el catálogo + usadas en perfiles + colocadas, "Pulsar en el
 mando" = `InputCapture`; clic en la foto coloca la elegida y pasa a la siguiente sin colocar, clic derecho quita; se guarda
 solo) y, en el detalle del perfil, "Hoja de mandos" (abre el HTML) y "PDF".
+
+Optimizador gráfico para VR, fase 1 = perfiles gráficos (15/11/2026; escenarios en `GraphicsTests` y prueba sobre COPIAS de los
+archivos reales: solo cambian las líneas tocadas; pantalla comprobada fuera de pantalla; SIN aplicar aún nada a la configuración real).
+Idea del usuario, parecida a github.com/Fox3Luck/DCS-Graphics-Optimizer (MIT; ese mide con una misión de prueba en el MONITOR y no
+toca VR). Equipo: RTX 4090, i9-14900K, 64 GB; visor Pimax Crystal Light (SIN seguimiento ocular; 72/90/120 Hz), runtime OpenXR de
+Pimax (`PiOpenXR_64.json`); DCS y MSFS se vuelan siempre en VR. `Core/Graphics/`: `LuaOptionsFile` (options.lua de DCS editado en su
+sitio: claves "graphics.AA", "VR.pixel_density"; solo literales simples; clave nueva al final de su tabla), `AutoexecFile`
+(autoexec.cfg, conserva comentarios y el final sin salto), `UserCfgFile` (UserCfg.opt de MSFS, "GraphicsVR.Shadows.Size"; solo claves
+existentes), `GraphicsManager` (Current/Diff/Apply/Capture/ApplyNamed; DCS = graphics.* + VR.* + autoexec.*; MSFS VR = Video.*VR +
+GraphicsVR.*, monitor = el resto de Video (sin tarjeta/monitor/resolución) + Graphics.*; aplicar SOLO con el simulador cerrado,
+procesos DCS / FlightSimulator2024, porque los dos reescriben su archivo al salir; copia `<archivo>.rigcontrol-<fecha>.bak`, 5 últimas;
+0.660 = 0.66), `VrAdvisor` (reglas prudentes: maxFPS < refresco del visor, quad views apagado, eye gaze sin seguimiento ocular,
+PD > 1, DOF/motion blur/lens effects, vsync; MSFS: DOF y motion blur en VR). `%APPDATA%\RigControl\graficos.json`: `headset`
+(nombre, refreshHz 90, eyeTracking false) + perfiles (name, sim, vr, notes, settings clave -> valor tal cual en el archivo).
+Hangar: `"graphicsProfile"` por hangar, se aplica tras los mods y antes de abrir nada (simulador abierto = lo dice y sigue).
+App: pantalla Gráficos (revisión VR de lo actual, perfiles, guardar lo actual, qué cambiaría, Aplicar/Borrar, refresco del visor) y
+desplegable «Gráficos» en Hangar. Configuración del usuario el 15/11/2026: DCS DLSS (Scaling 0.66, preset K en autoexec), quad views
+ON, PD 1, maxFPS 90 (revisión VR: nada que señalar); MSFS VR DLSS Quality, Reflex, sin generación de fotogramas.
+Siguiente (fase 2): medir FPS/tiempos de fotograma en vuelos reales en VR (hook Lua de DCS, SimConnect en MSFS) por avión/mapa/perfil;
+fase 3: recomendaciones con esas medidas (opcionalmente con Claude).
 
 Otros pendientes (02/11/2026): (el Bravo NO se usará con DCS, decisión del usuario del 04/11/2026:
 no hace falta probar luces `D:` en él; la función sigue disponible); renombrar archivo de perfil en
