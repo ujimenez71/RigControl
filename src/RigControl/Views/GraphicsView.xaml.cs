@@ -43,6 +43,32 @@ public partial class GraphicsView : UserControl
         await Vm.ApplyAsync();
     }
 
+    private async void Measure_Click(object sender, RoutedEventArgs e)
+    {
+        var target = Vm.MeasureChoice == GraphicsViewModel.CurrentSettings ? "los ajustes actuales" : $"el perfil «{Vm.MeasureChoice}»";
+        if (MessageBox.Show(Window.GetWindow(this)!,
+                $"Se va a abrir DCS {(Vm.MeasureVr ? "en VR" : "en el monitor")} para medir {target}: unos 5 minutos sin tocar el ordenador.\n\n" +
+                (Vm.MeasureVr ? "Comprueba que la Crystal Light está encendida y despierta (puesta sin moverte o con el sensor de proximidad tapado).\n\n" : "") +
+                "DCS tiene que estar cerrado. Tu configuración queda como está. ¿Empezar?",
+                "RigControl", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+        await Vm.MeasureAsync();
+    }
+
+    private async void Optimize_Click(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show(Window.GetWindow(this)!,
+                "Optimizar en VR: DCS se abre una o dos veces y prueba a subir o bajar cada ajuste (sombras, nubes, agua, SSAO...) " +
+                "midiendo si llega al refresco del visor. Unos 15-20 minutos sin tocar el ordenador.\n\n" +
+                "La Crystal Light encendida y despierta (puesta sin moverte o con el sensor de proximidad tapado). DCS cerrado.\n\n" +
+                "Al final propone un perfil nuevo; no se aplica nada sin que lo decidas. ¿Empezar?",
+                "RigControl", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+        await Vm.OptimizeAsync();
+    }
+
+    private void CancelMeasure_Click(object sender, RoutedEventArgs e) => Vm.CancelMeasure();
+
     private void Delete_Click(object sender, RoutedEventArgs e)
     {
         if (Vm.Selected is not { } p) return;

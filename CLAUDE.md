@@ -38,10 +38,27 @@ Software propio de control del rig de simulación, inspirado en Hangar Control d
 - .NET 10, C#, Windows 11, x64 (`PlatformTarget` x64 en todos: SimConnect.dll es de 64 bits)
 - Vortice.DirectInput para entradas; HidSharp para HID (salidas: LEDs, pantallas)
 - IDE: Visual Studio Community 2026
-- UI: WPF en `net10.0-windows` con el tema Fluent (`ThemeMode="System"` en App.xaml; aviso
+- UI: WPF en `net10.0-windows` con el tema Fluent (`ThemeMode="Dark"` fijo en App.xaml desde el 15/11/2026; aviso
   experimental WPF0001 silenciado). Elegido frente a WinUI 3 (01/11/2026): mismo aspecto Windows 11,
   sin Windows App SDK ni empaquetado, diseñador de VS. Usar colores del tema (DynamicResource /
   SystemColors.AccentColorBrushKey), no pinceles clásicos como ControlBrush (no siguen el modo oscuro).
+  Tema "cabina" (15/11/2026, elegido por el usuario: cabina + ilustraciones, solo arte propio, oscuro siempre): en App.xaml
+  la paleta (BgBrush #070C12, PanelBrush, PanelBorderBrush, HudGreenBrush #3DFFA0, AmberBrush #FFB23E, TextMutedBrush,
+  HeadingFont = Bahnschrift) y las claves de Fluent sustituidas (SystemAccentColor*, AccentFillColor*Brush, fondos, y las de
+  "elegido/marcado" de ListBoxItem, DataGrid, CheckBox, RadioButton, ComboBoxItem, ToggleButton/Switch, ProgressBar: sin ellas
+  salía el acento de Windows). Acento = verde de cabina #15804F con texto blanco. MainWindow: menú lateral propio (logo
+  Assets/Logo.png, iconos Segoe Fluent Icons, elegido con barra verde, radar con barrido animado) y cabecera común de 168 px
+  por pantalla (ilustración de Assets/Banners/<pantalla>.jpg, rótulo ámbar, título Bahnschrift, adornos HUD vectoriales);
+  las pantallas ya no llevan su título grande. Ilustraciones: arte propio procedural `tools/arte/rigcontrol_arte.py`
+  (`python -I tools/arte/rigcontrol_arte.py src/RigControl/Assets/Banners [escena...]`; siluetas genéricas de caza,
+  helicóptero y portaaviones dibujadas ahí; semilla fija). Imágenes en recursos: `pack://application:,,,/RigControl;component/...`
+  (con el nombre del ensamblado, para que valga también desde el proyecto de capturas fuera de pantalla, que además debe
+  poner `app.ThemeMode = Dark` tras `InitializeComponent()` y pintar el fondo: la ventana no tiene fondo en su contenido).
+  Tarjeta de aeronave en Perfiles (15/11/2026, petición del usuario): `AircraftArt` elige la imagen del perfil elegido:
+  primero una propia en `%APPDATA%\RigControl\aviones\` (nombre del archivo del perfil o de uno de sus "aircraft", .jpg/.png/.webp);
+  si no, la ilustración de serie de `Assets/Aircraft` según el tipo (ah64, uh1h, c172; si no, helo por palabras como mi-8, ka-50,
+  bell, h135...; si no, jet en DCS y ga en MSFS). Ilustraciones 1500x300 del mismo script: `python -I tools/arte/rigcontrol_arte.py
+  src/RigControl/Assets/Aircraft aviones` (siluetas propias de C172, AH-64D con radar en el mástil y UH-1H con patines).
 
 ## Periféricos (10 dispositivos, todos con VID:PID único)
 
@@ -529,8 +546,40 @@ Hangar: `"graphicsProfile"` por hangar, se aplica tras los mods y antes de abrir
 App: pantalla Gráficos (revisión VR de lo actual, perfiles, guardar lo actual, qué cambiaría, Aplicar/Borrar, refresco del visor) y
 desplegable «Gráficos» en Hangar. Configuración del usuario el 15/11/2026: DCS DLSS (Scaling 0.66, preset K en autoexec), quad views
 ON, PD 1, maxFPS 90 (revisión VR: nada que señalar); MSFS VR DLSS Quality, Reflex, sin generación de fotogramas.
-Siguiente (fase 2): medir FPS/tiempos de fotograma en vuelos reales en VR (hook Lua de DCS, SimConnect en MSFS) por avión/mapa/perfil;
-fase 3: recomendaciones con esas medidas (opcionalmente con Claude).
+Fase 2a, medición automática de DCS (15/11/2026; escenarios con un DCS falso en `BenchTests`; SIN probar aún con DCS de verdad):
+`RigProbe graficos medir [perfil] [--monitor]` y `graficos mediciones`. `DcsBenchmark` (mecanismo de DCS Graphics Optimizer, MIT:
+`Core/Graphics/Bench/rigcontrol_bench.lua` adaptado de su hook + su misión `rigcontrol_bench.miz` del Caucaso, embebidos; aviso en
+`THIRD-PARTY-NOTICES.md`): copia options.lua/autoexec.cfg (`*.rigcontrol-bench` + `Config\rigcontrol_bench_journal.txt`; un corte se
+restaura en la siguiente), aplica el perfil si se pide (en monitor además sync=false y maxFPS=300; en VR tal cual, el ritmo lo marca
+el visor), instala el script en `Scripts\Hooks` con clave aleatoria + la misión en `Missions` + `Config\rigcontrol_bench_directive.json`
+(clave, caducidad 10 min, contraseña y puerto aleatorios, escenas ciudad/aeródromo/nubes de 25 s, asentamiento 20 s), arranca
+`DCS.exe --no-launcher --force_enable_VR -w DCS.openbeta` (exe del paso del Hangar), el script abre la misión como servidor local
+privado (127.0.0.1; necesita el inicio de sesión automático de DCS, `autologin = true`), mueve la cámara tras aviones de la IA y
+apunta cada fotograma (`DCS.getRealTime` en `onSimulationFrame`), escribe `Config\rigcontrol_bench_result.json` y cierra DCS (si no,
+se cierra a los 45 s; tiempo máximo 15 min). En VR exige "OpenXR: Creating swapchain for view" en dcs.log. Cifras (`FrameStats`):
+FPS medios, 1 % bajo (percentil 99), mediana, tirones (> 2,5× la mediana) y "fuera de tiempo" (> 1,1× 1000/refresco). Se guarda en
+`%APPDATA%\RigControl\mediciones\`. Siempre se restaura y se limpia; fallos con copia de dcs.log en `Config\rigcontrol-bench-failure.log`.
+Lo lanza el usuario (Claude no puede escribir en Scripts de DCS). Visor encendido y despierto (sensor de proximidad).
+App (15/11/2026, comprobada fuera de pantalla): pantalla Gráficos, pestaña «Medir FPS en DCS» (ajustes actuales o un perfil de DCS, VR o
+monitor, Medir/Cancelar con confirmación, progreso en vivo y tabla de mediciones; cerrar la app a mitad cancela = cierra DCS y restaura).
+OJO WPF: el desplegable va por SelectedIndex y sin vaciar la lista (vaciarla y rellenarla lo dejaba en blanco).
+Primera medición real (15/11/2026, ✅ funciona: 3:35 min, 5326 fotogramas): DCS en VR a 71 FPS de media, 1 % bajo 65,6, mediana 14,1 ms,
+casi sin tirones. El visor estaba a 72 Hz (Pimax Play, `fps_target` 72 en el registro de PiService), no a 90: DCS LLEGA a 72. Registro de
+Pimax (`%LOCALAPPDATA%\Pimax\PiService\Log`, línea "Performance body to send" al cerrar cada sesión): Smart Smoothing activo
+(`runtime_dbg_asw_enable` 1), resolución 4242x5102 por ojo, GPU > 80 % el 40 % del tiempo, quad views con periferia 0,09.
+Optimizador VR (15/11/2026; escenarios con un DCS falso en `OptimizerTests`; SIN probar aún con DCS): `VrOptimizer` +
+`DcsSettingsCatalog` (niveles, calidad y coste previsto de dcstune/data/settings.json, MIT; solo ajustes que DCS cambia sin reiniciar:
+sombras, sombras de objetos del terreno, nubes, visibilidad, agua, SSAO, SSLR, SSS, bosques, hierba). En VR el visor marca el ritmo: si
+llega, todos los fotogramas tardan 1000/refresco haya margen o no, así que hay que PROBAR. Arranque 1 = actual + cada ajuste un nivel
+arriba (4, por calidad/coste) y abajo (3, por FPS/calidad), cada prueba con todos los demás a su valor actual (el script los aplica con
+optionsEditor y repite la misión: `MeasureTrials`, "trials" de la directiva, escenas de 10 s, asentamiento 10 s). "Llega" = ≤ 2 % fuera
+de tiempo y 1 % bajo ≥ 90 % del refresco. Arranque 2 = combinaciones de lo que valió (subir: la mayor que llega; bajar: la menor). El
+refresco se detecta (`PimaxInfo.DetectRefresh`: Pimax si es de esa sesión; si no, mediana a < 4 % de 72/90/120 Hz o de su mitad, que es
+lo que fija Smart Smoothing al no llegar). Resultado: perfil nuevo «Óptimo VR <Hz> Hz (fecha)» en graficos.json SIN aplicar + consejos
+(texturas y DLSS no se prueban sin reiniciar; Smart Smoothing; GPU al límite; probar 90 Hz si sobra). `RigProbe graficos optimizar` y
+botón «Optimizar en VR» en la pestaña de medición.
+Siguiente: probarlo de verdad; luego `graficos optimizar` (varias configuraciones en un solo arranque con los "trials" del script) y
+medir en vuelos reales (y MSFS por SimConnect).
 
 Otros pendientes (02/11/2026): (el Bravo NO se usará con DCS, decisión del usuario del 04/11/2026:
 no hace falta probar luces `D:` en él; la función sigue disponible); renombrar archivo de perfil en

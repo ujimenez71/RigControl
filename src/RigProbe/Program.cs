@@ -113,7 +113,7 @@ internal static class Program
                 Console.WriteLine("            | dcs vigilar [filtro] | hangar [nombre [--dry]] | ventanas <proceso>");
                 Console.WriteLine("            | mods | mods <conjunto> [--dry] | mods importar <biblioteca> [--dry]");
                 Console.WriteLine("            | instantaneas | instantaneas crear <grupo|todo> [nombre] | instantaneas comparar|restaurar <grupo> <n>");
-                Console.WriteLine("            | graficos | graficos actual dcs|msfs [--monitor] | graficos guardar dcs|msfs <nombre> [--monitor] | graficos comparar|aplicar <nombre> [--dry]");
+                Console.WriteLine("            | graficos | graficos actual dcs|msfs [--monitor] | graficos guardar dcs|msfs <nombre> [--monitor] | graficos comparar|aplicar <nombre> [--dry] | graficos medir [perfil] [--monitor] | graficos optimizar | graficos mediciones");
                 Console.WriteLine("            | hoja <perfil> [--pdf] | ia | ia clave [borrar] | ia contexto <avión|actual> | ia <avión|actual> \"lo que quieres\" [--base <perfil>]");
                 Console.WriteLine("            | winwing | winwing luces | winwing led <disp> <n> <valor> [--modulo XXXX] | winwing barrido <disp> [desde] [hasta] [--modulo XXXX] [--valor N]");
                 Console.WriteLine($"  <perfil> es una ruta a un .json o un nombre en {ProfileFile.ProfilesDir}");
@@ -179,6 +179,93 @@ internal static class Program
                     Console.WriteLine($"Guardado «{name}» ({profile.SimName}, {(profile.Vr ? "VR" : "monitor")}, {profile.Settings.Count} ajustes).");
                     return 0;
                 }
+                case "medir":
+                {
+                    RigControl.Core.Graphics.GraphicsProfile? profile = null;
+                    if (args.Length > 1)
+                    {
+                        var name = string.Join(' ', args.Skip(1));
+                        if (file.Find(name) is not { } found) { Console.WriteLine($"No existe el perfil «{name}»."); return 1; }
+                        if (found.Sim != "dcs") { Console.WriteLine("Por ahora solo se mide DCS (MSFS no se puede arrancar en un vuelo sin intervenir)."); return 1; }
+                        profile = found;
+                    }
+                    var exe = RigControl.Core.Graphics.DcsBenchmark.FindDcsExe();
+                    var saved = RigControl.Core.Graphics.DcsBenchmark.FindSavedGames();
+                    if (exe is null || saved is null) { Console.WriteLine($"No se encuentra DCS.exe ({exe ?? "?"}) o su carpeta de Saved Games ({saved ?? "?"})."); return 1; }
+                    var vr = !monitor;
+                    Console.WriteLine($"Medición de DCS {(vr ? $"en VR ({file.Headset.Name}, {file.Headset.RefreshHz} Hz)" : "en el monitor")} con " +
+                                      (profile is null ? "los ajustes actuales" : $"el perfil «{profile.Name}»") + ".");
+                    Console.WriteLine($"  DCS: {exe}\n  Saved Games: {saved}");
+                    Console.WriteLine("  Se abre DCS solo, vuela una misión de prueba (3 escenas, ~25 s cada una) y se cierra. Unos 5 minutos.");
+                    if (vr) Console.WriteLine("  El visor tiene que estar encendido y DESPIERTO (sensor de proximidad tapado o puesto, sin moverte).");
+                    Console.WriteLine("  Tu options.lua y autoexec.cfg quedan como estaban. Ctrl+C cancela (cierra DCS y restaura).");
+                    using var cts = new CancellationTokenSource();
+                    Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+                    var bench = new RigControl.Core.Graphics.DcsBenchmark(saved, exe);
+                    var progress = new Progress<string>(m => Console.WriteLine($"{DateTime.Now:HH:mm:ss}  {m}"));
+                    try
+                    {
+                        var r = bench.Measure(profile, vr, file.Headset.RefreshHz, progress, cts.Token);
+                        Console.WriteLine();
+                        foreach (var s in r.Scenes) Console.WriteLine($"  {s.Name,-10} {s.Stats}");
+                        Console.WriteLine($"  {"TOTAL",-10} {r.Total}");
+                        if (vr) Console.WriteLine($"  («fuera de tiempo» = fotogramas que tardan más de {1000.0 / file.Headset.RefreshHz * 1.1:0.0} ms: no llegan a {file.Headset.RefreshHz} Hz)");
+                        Console.WriteLine($"Guardada en {RigControl.Core.Graphics.DcsBenchmark.ResultsDir} ({r.Seconds} s).");
+                        return 0;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        Console.WriteLine("Cancelado: DCS cerrado y configuración restaurada.");
+                        return 1;
+                    }
+                    catch (TimeoutException ex)
+                    {
+                        Console.WriteLine(ex.Message);
+                        return 1;
+                    }
+                }
+                case "optimizar":
+                {
+                    var exe = RigControl.Core.Graphics.DcsBenchmark.FindDcsExe();
+                    var saved = RigControl.Core.Graphics.DcsBenchmark.FindSavedGames();
+                    if (exe is null || saved is null) { Console.WriteLine($"No se encuentra DCS.exe ({exe ?? "?"}) o su carpeta de Saved Games ({saved ?? "?"})."); return 1; }
+                    Console.WriteLine("Optimizar en VR: DCS se abre una o dos veces y prueba a subir o bajar cada ajuste. Unos 15-20 minutos.");
+                    Console.WriteLine("  Visor encendido y DESPIERTO. Tu configuración queda como estaba; el resultado es un perfil nuevo SIN aplicar. Ctrl+C cancela.");
+                    using var cts = new CancellationTokenSource();
+                    Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+                    var progress = new Progress<string>(m => Console.WriteLine($"{DateTime.Now:HH:mm:ss}  {m}"));
+                    try
+                    {
+                        var report = new RigControl.Core.Graphics.VrOptimizer(new RigControl.Core.Graphics.DcsBenchmark(saved, exe), file.Headset).Run(progress, cts.Token);
+                        Console.WriteLine();
+                        foreach (var t in report.Tests)
+                            Console.WriteLine($"  {(t.Holds ? "✔" : "✘")} {t.Description,-60} {t.Result.Total.AvgFps,5:0.0} FPS · {t.Result.Total.MissedPercent,4:0.0} % fuera de tiempo");
+                        Console.WriteLine();
+                        Console.WriteLine(RigControl.Core.Graphics.VrOptimizer.Describe(report));
+                        file.Profiles.Add(report.Profile);
+                        file.Save();
+                        Console.WriteLine($"Guardado como perfil «{report.Profile.Name}» (sin aplicar): \"graficos comparar\" / \"graficos aplicar\" con ese nombre.");
+                        return 0;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        Console.WriteLine("Cancelado: DCS cerrado y configuración restaurada.");
+                        return 1;
+                    }
+                    catch (TimeoutException ex)
+                    {
+                        Console.WriteLine(ex.Message);
+                        return 1;
+                    }
+                }
+                case "mediciones":
+                {
+                    var results = RigControl.Core.Graphics.DcsBenchmark.LoadResults();
+                    if (results.Count == 0) { Console.WriteLine("Aún no hay mediciones (\"graficos medir\")."); return 0; }
+                    foreach (var r in results)
+                        Console.WriteLine($"  {r.When:dd/MM HH:mm}  {(r.Vr ? $"VR {r.RefreshHz} Hz" : "monitor"),-9} {r.Profile,-24} {r.Total}");
+                    return 0;
+                }
                 case "comparar" or "aplicar" when args.Length > 1:
                 {
                     var name = string.Join(' ', args.Skip(1));
@@ -198,7 +285,7 @@ internal static class Program
             Console.WriteLine(ex.Message);
             return 1;
         }
-        Console.WriteLine("Uso: graficos | graficos actual dcs|msfs [--monitor] | graficos guardar dcs|msfs <nombre> [--monitor] | graficos comparar|aplicar <nombre> [--dry]");
+        Console.WriteLine("Uso: graficos | graficos actual dcs|msfs [--monitor] | graficos guardar dcs|msfs <nombre> [--monitor] | graficos comparar|aplicar <nombre> [--dry] | graficos medir [perfil] [--monitor] | graficos optimizar | graficos mediciones");
         return 1;
 
         static void PrintAdvice(List<RigControl.Core.Graphics.GraphicsAdvice> advice)

@@ -157,6 +157,10 @@ public sealed class ProfilesViewModel : ObservableObject, IDisposable
             Raise(nameof(HasSelection));
             Raise(nameof(ShowDetail));
             Raise(nameof(AircraftText));
+            Raise(nameof(AircraftImage));
+            Raise(nameof(AircraftCaption));
+            Raise(nameof(AircraftCredit));
+            _ = FetchImageAsync(value);
             Raise(nameof(ErrorsText));
             Raise(nameof(HasErrors));
             Raise(nameof(FindingsHeader));
@@ -184,6 +188,27 @@ public sealed class ProfilesViewModel : ObservableObject, IDisposable
     public string Summary { get => _summary; private set => Set(ref _summary, value); }
 
     public bool HasNotes => !string.IsNullOrWhiteSpace(_selected?.Notes);
+
+    /// <summary>Imagen de la aeronave del perfil elegido (del usuario en aviones\ o la ilustración de su tipo).</summary>
+    public System.Windows.Media.ImageSource? AircraftImage => AircraftArt.For(_selected);
+
+    private static readonly RigControl.Core.Aircraft.AircraftImages Images = new();
+
+    /// <summary>Perfil sin imagen propia: busca su foto real en Wikimedia Commons (una vez) y la enseña al llegar.</summary>
+    private async Task FetchImageAsync(ProfileReport? p)
+    {
+        if (p is null) return;
+        var name = System.IO.Path.GetFileNameWithoutExtension(p.Path);
+        if (AircraftArt.UserImage(p) is not null || Images.TriedWithoutLuck(name)) return;
+        var file = await Images.FetchAsync(name, p.Name, p.Aircraft);
+        if (file is not null && _selected == p) { Raise(nameof(AircraftImage)); Raise(nameof(AircraftCredit)); }
+    }
+
+    /// <summary>Autoría de la foto (las licencias CC la exigen), o vacío.</summary>
+    public string AircraftCredit => _selected is not null && AircraftArt.UserImage(_selected) is { } f && Images.Credit(f) is { } c ? "Foto: " + c.Text : "";
+
+    /// <summary>Rótulo de la tarjeta: simulador y tipo de aeronave.</summary>
+    public string AircraftCaption => _selected is null ? "" : $"◢ {_selected.SimName.ToUpperInvariant()} · {AircraftArt.KindText(AircraftArt.Kind(_selected))}";
 
     public string AircraftText => _selected is null ? ""
         : $"{_selected.SimName} · " + (_selected.Aircraft.Length == 0 ? "sin \"aircraft\": solo se usa eligiéndolo a mano"

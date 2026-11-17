@@ -27,7 +27,6 @@
 
         <!-- Cabecera -->
         <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,12">
-            <TextBlock Text="Hangar" FontSize="24" FontWeight="SemiBold" />
             <TextBlock Opacity="0.7" TextWrapping="Wrap">
                 <Run Text="Abre en orden los programas de cada tipo de vuelo. Lo que ya está abierto no se vuelve a lanzar y nunca se cierra nada. Se guarda solo en " /><Run Text="{Binding FilePath, Mode=OneWay}" FontFamily="Cascadia Mono, Consolas" />
             </TextBlock>

@@ -22,7 +22,6 @@
                         ToolTip="Vuelve a detectar y abrir los mandos (p. ej. tras conectar uno)" />
             </StackPanel>
             <StackPanel>
-                <TextBlock Text="Monitor de entradas" FontSize="24" FontWeight="SemiBold" />
                 <TextBlock Text="{Binding Status}" Opacity="0.7" TextWrapping="Wrap" />
             </StackPanel>
         </DockPanel>

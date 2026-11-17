@@ -28,7 +28,6 @@
 
         <!-- Cabecera -->
         <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,12">
-            <TextBlock Text="Instantáneas" FontSize="24" FontWeight="SemiBold" />
             <TextBlock Opacity="0.7" TextWrapping="Wrap">
                 <Run Text="Copias de la configuración (mandos y opciones de DCS, gráficos de MSFS, la propia RigControl). Al abrir un hangar se hace una automática si algo cambió. Restaurar sobrescribe, no borra, y antes guarda lo actual. Se guardan en " /><Run Text="{Binding StoreDir, Mode=OneWay}" FontFamily="Cascadia Mono, Consolas" />
             </TextBlock>

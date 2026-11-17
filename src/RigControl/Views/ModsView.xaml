@@ -32,7 +32,6 @@
 
         <!-- Cabecera -->
         <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,12">
-            <TextBlock Text="Mods" FontSize="24" FontWeight="SemiBold" />
             <TextBlock Opacity="0.7" TextWrapping="Wrap">
                 <Run Text="Los mods viven en una biblioteca; activar uno es poner un enlace en la carpeta del simulador (al instante, sin copiar). Nunca se borra un mod. Se guarda en " /><Run Text="{Binding FilePath, Mode=OneWay}" FontFamily="Cascadia Mono, Consolas" />
             </TextBlock>

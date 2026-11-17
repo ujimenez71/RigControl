@@ -17,6 +17,11 @@
   <ItemGroup>
     <!-- Icono de la ventana y de la barra de tareas -->
     <Resource Include="Assets\RigControl.ico" />
+    <!-- Logo del menú y cabeceras ilustradas de cada pantalla (arte propio: tools/arte/rigcontrol_arte.py). -->
+    <Resource Include="Assets\Logo.png" />
+    <Resource Include="Assets\Banners\*.jpg" />
+    <!-- Ilustraciones de aeronave de la pantalla Perfiles (mismo script, "aviones"). -->
+    <Resource Include="Assets\Aircraft\*.jpg" />
   </ItemGroup>
 
   <ItemGroup>

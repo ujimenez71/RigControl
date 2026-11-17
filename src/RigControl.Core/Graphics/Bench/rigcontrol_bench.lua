@@ -1,0 +1,509 @@
+-- rigcontrol_bench.lua -- medición de RigControl (Saved Games\<perfil>\Scripts\Hooks)
+--
+-- Adaptado de dcstune_bench.lua de DCS Graphics Optimizer
+-- (https://github.com/Fox3Luck/DCS-Graphics-Optimizer), Copyright (c) 2026 Fox3 Managed Solutions Inc.,
+-- licencia MIT (texto completo en THIRD-PARTY-NOTICES.md, junto a este archivo en el código de RigControl).
+-- Cambios: nombres de archivos, registro y servidor de RigControl; el mecanismo es el original.
+--
+-- Comentario original:
+--
+-- Inert unless Config\dcstune_directive.json exists AND carries this copy's key. The
+-- optimizer writes a fresh random key into each copy of this file it installs, so a
+-- directive written by anything that has not read this copy is ignored, as is one that is
+-- out of date or names any mission other than the bundled one. The directive is deleted
+-- the moment it is read, so a crash or a manual DCS launch can never replay a benchmark.
+-- This file is used once: it deletes itself every time DCS loads it, whether or not it
+-- found a valid directive (the code keeps running from memory). The optimizer installs a
+-- fresh copy with a new key before each DCS start, so the key never stays on disk after
+-- DCS has read it, and a copy left behind by an interrupted test is gone after the next
+-- DCS start.
+-- A directive may carry several "trials" (each a set of graphics options): they are
+-- applied through DCS's own options module and measured one after another in the SAME
+-- DCS process, restarting only the mission. Options DCS itself says need a full restart
+-- (resolution, visibility range, terrain textures, vsync...) must not be put in trials.
+-- Flow: host the bundled mission locally (unlisted, random password), never slot,
+-- fly a free camera behind named AI aircraft for each scene, time every rendered
+-- frame, write Config\dcstune_result.json, exit DCS.
+-- Log lines: grep "DCSTUNE" in dcs.log.
+
+local function L(msg) log.write("RIGCONTROL_BENCH", log.INFO, tostring(msg)) end
+-- Kept as DCS gave it when this file loaded: other add-ons' hooks sometimes replace
+-- net.dostring_in with a wrapper that returns nothing (beta issue #3, 2026-11-14 logs).
+local DOSTRING_IN = net and net.dostring_in
+
+local DIRECTIVE = lfs.writedir() .. "Config\\rigcontrol_bench_directive.json"
+local RESULT    = lfs.writedir() .. "Config\\rigcontrol_bench_result.json"
+
+local SELF      = lfs.writedir() .. "Scripts\\Hooks\\rigcontrol_bench.lua"
+local MISSION   = lfs.writedir() .. "Missions\\rigcontrol_bench.miz"
+local KEY       = "@RIGCONTROL_KEY@"     -- replaced with a random key when the optimizer installs this file
+
+-- Why a directive must not be obeyed, or nil when it is acceptable.
+local function refuse(tbl)
+  if #KEY < 32 or KEY:find("@", 1, true) then return "this copy has no key" end
+  if type(tbl.key) ~= "string" or tbl.key ~= KEY then return "wrong key" end
+  if type(tbl.not_after) ~= "number" or os.time() > tbl.not_after then return "out of date" end
+  if type(tbl.mission) ~= "string" or tbl.mission:lower() ~= MISSION:lower() then return "not the bundled mission" end
+  if type(tbl.password) ~= "string" or #tbl.password < 32 or tbl.password:find("[^%w]") then return "no strong password" end
+  local port = tonumber(tbl.port)
+  if not port or port < 1024 or port > 65535 or port == 10308 then return "no port" end
+  return nil
+end
+
+local D
+do
+  local f = io.open(DIRECTIVE, "r")
+  if f then
+    local raw = f:read("*a"); f:close()
+    os.remove(DIRECTIVE)
+    local ok, tbl = pcall(net.json2lua, raw)
+    if ok and type(tbl) == "table" and type(tbl.scenes) == "table" then
+      local why = refuse(tbl)
+      if why then L("directive ignored: " .. why) else D = tbl end
+    else L("directive parse failed") end
+  end
+end
+pcall(function() os.remove(SELF) end)     -- one use only, valid directive or not
+if not D then
+  L("no directive -- hook inert and removed")
+  return
+end
+
+-- Text from the directive ends up in file names and in the result file: keep it plain.
+local function plain(s) return (tostring(s):gsub("[^%w_%-]", "")) end
+D.tag = plain(D.tag or "run")
+for _, sc in ipairs(D.scenes) do if type(sc) == "table" and sc.name then sc.name = plain(sc.name) end end
+if type(D.trials) == "table" then
+  for i, t in ipairs(D.trials) do if type(t) == "table" then t.tag = plain(t.tag or i) end end
+end
+L("directive loaded: mission=" .. tostring(D.mission) .. " scenes=" .. #D.scenes)
+
+local cfg = {
+  settle_sec    = tonumber(D.settle_sec) or 20,   -- texture streaming after the world appears
+  scene_sec     = tonumber(D.scene_sec) or 25,
+  scene_lead    = tonumber(D.scene_lead_sec) or 4, -- untimed seconds after each camera move
+  view_cmd      = tonumber(D.view_cmd) or 16,
+  start_timeout = tonumber(D.start_timeout) or 120,
+  total_timeout = tonumber(D.total_timeout) or 600,
+  screenshots   = D.screenshots ~= false,
+  tag           = tostring(D.tag or "run"),
+}
+
+local function now()
+  if DCS.getRealTime then return DCS.getRealTime() end
+  return os.clock()
+end
+
+local trials = (type(D.trials) == "table" and #D.trials > 0) and D.trials or { { tag = tostring(D.tag or "run") } }
+
+-- Hosting is refused until DCS has signed in to its multiplayer service, which it does in the
+-- background: the menu can be up before that is done (a Steam edition log from #27: refused with
+-- "login is required", signed in 0.4 s later; the hook then waited two minutes for nothing).
+-- So a refusal is retried every few seconds for up to a minute.
+local HOST_RETRY_SEC, HOST_TRIES = 3, 20
+
+local state = {
+  t0 = os.time(), frames = 0, hosted = false, running = false, finished = false,
+  ready_at = nil, scene_i = 0, scene_t0 = nil, last = nil, results = {},
+  trial_i = 1, trial_t0 = os.time(), menu_frames = 0, stopping = false, stop_step = 0,
+  done = {}, applied = "", host_tries = 0, host_next = nil,
+  subj = nil, subj_t = 0, vel = { x = 0, y = 0, z = 0 }, fwd = { x = 1, z = 0 },
+}
+
+local function scenesJson(results)
+  local parts = {}
+  for _, r in ipairs(results) do
+    parts[#parts + 1] = string.format('{"name":"%s","shot":"%s","frame_ms":[%s]}',
+      r.name, r.shot or "", table.concat(r.ms, ","))
+  end
+  return table.concat(parts, ",")
+end
+
+local function writeResult(ok, reason)
+  local tparts = {}
+  for _, t in ipairs(state.done) do
+    tparts[#tparts + 1] = string.format('{"tag":"%s","applied":"%s","scenes":[%s]}',
+      plain(t.tag), (tostring(t.applied):gsub('[%c"\\]', "")), scenesJson(t.scenes))
+  end
+  local f = io.open(RESULT, "w")
+  if f then
+    -- "scenes" = the first trial, so a single-trial directive reads exactly as before
+    f:write(string.format('{"ok":%s,"reason":"%s","tag":"%s","clock":"%s","scenes":[%s],"trials":[%s]}',
+      tostring(ok), (tostring(reason or ""):gsub('[%c"\\]', "")), cfg.tag,
+      DCS.getRealTime and "DCS.getRealTime" or "os.clock",
+      scenesJson(state.done[1] and state.done[1].scenes or state.results), table.concat(tparts, ",")))
+    f:close()
+  end
+  L("result written ok=" .. tostring(ok) .. " reason=" .. tostring(reason or ""))
+end
+
+local function finish(ok, reason)
+  if state.finished then return end
+  state.finished = true
+  writeResult(ok, reason)
+  pcall(function() DCS.exitProcess() end)
+end
+
+-- Apply a trial's graphics options from inside DCS; they take effect when the next
+-- mission starts. The hook's Lua state offers 'optionsEditor' (the interface mods such
+-- as SRS use); 'Options.Data' is the options screen's own module and is the fallback.
+local function keysOf(t)
+  if type(t) ~= "table" then return type(t) end
+  local k = {}
+  for name in pairs(t) do k[#k + 1] = tostring(name) end
+  table.sort(k)
+  return table.concat(k, ",")
+end
+
+local function applyOptions(set)
+  if type(set) ~= "table" then return "unchanged" end
+  local names, how = {}, nil
+  local ok, err = pcall(function()
+    local okE, editor = pcall(require, 'optionsEditor')
+    if okE and type(editor) == "table" and type(editor.setOption) == "function" then
+      for k, v in pairs(set) do
+        editor.setOption("graphics." .. k, v)
+        names[#names + 1] = k .. "=" .. tostring(v)
+      end
+      how = "optionsEditor"
+      return
+    end
+    L("optionsEditor unusable: " .. tostring(okE) .. " " .. keysOf(editor))
+    local data = require('Options.Data')
+    if type(data) ~= "table" or type(data.setGraphics) ~= "function" then
+      error("no usable options interface; Options.Data has: " .. keysOf(data))
+    end
+    for k, v in pairs(set) do
+      data.setGraphics(k, v)
+      names[#names + 1] = k .. "=" .. tostring(v)
+    end
+    data.saveChanges()
+    how = "Options.Data"
+  end)
+  table.sort(names)
+  if not ok then L("applyOptions FAILED: " .. tostring(err)); return "FAILED" end
+  -- read back what DCS now reports, as proof the change was accepted
+  local back = {}
+  pcall(function()
+    local editor = require('optionsEditor')
+    for k in pairs(set) do back[#back + 1] = k .. "=" .. tostring(editor.getOption("graphics." .. k)) end
+  end)
+  table.sort(back)
+  L("applied via " .. tostring(how) .. "; DCS reports: " .. table.concat(back, " "))
+  return table.concat(names, " ")
+end
+
+local function tryHost()
+  state.host_tries, state.host_next = state.host_tries + 1, nil
+  if type(net.start_server) ~= "function" then state.hosted = true; finish(false, "net.start_server missing"); return end
+  local scfg
+  if type(net.get_default_server_settings) == "function" then
+    local ok1, c1 = pcall(function() return net.get_default_server_settings(D.mission) end)
+    if ok1 and type(c1) == "table" then scfg = c1 else
+      local ok2, c2 = pcall(function() return net.get_default_server_settings() end)
+      if ok2 and type(c2) == "table" then scfg = c2 end
+    end
+  end
+  if type(scfg) ~= "table" then scfg = {} end
+  if type(scfg["advanced"]) ~= "table" then scfg["advanced"] = {} end
+  scfg["advanced"]["resume_mode"] = 1
+  scfg["advanced"]["pause_on_load"] = false
+  scfg["advanced"]["external_views"] = true
+  scfg["advanced"]["allow_external_views"] = true
+  scfg["advanced"]["allow_object_export"] = false
+  scfg["missionList"]    = { D.mission }
+  scfg["listStartIndex"] = 1
+  scfg["port"]           = tonumber(D.port)     -- a random port chosen for this run, never the usual 10308
+  scfg["bind_address"]   = "127.0.0.1"          -- this PC only
+  scfg["name"]           = "RIGCONTROL-LOCAL-BENCH"
+  scfg["isPublic"]       = false   -- never advertised; exists only because hooks cannot start single-player
+  scfg["password"]       = D.password           -- 128 random bits from the optimizer, new for every start
+  scfg["maxPlayers"]     = 1
+  scfg["require_pure_clients"] = false
+  local ok, ret = pcall(function() return net.start_server(scfg) end)
+  L("net.start_server ok=" .. tostring(ok) .. " ret=" .. tostring(ret) .. " try=" .. state.host_tries)
+  if not ok then state.hosted = true; finish(false, "start_server failed"); return end
+  if type(ret) == "number" and ret < 0 then          -- refused; DCS's own log says why
+    if state.host_tries >= HOST_TRIES then
+      state.hosted = true
+      finish(false, "DCS refused to host the test mission " .. state.host_tries ..
+                    " times (not logged in to DCS multiplayer?)")
+      return
+    end
+    state.host_next = os.time() + HOST_RETRY_SEC
+    L("hosting refused; trying again in " .. HOST_RETRY_SEC .. "s")
+    return
+  end
+  state.hosted = true
+  -- Hosting can hold this call for minutes on a PC with many add-ons (beta 15 log: 3 minutes).
+  -- The wait for the mission is counted from here, not from when DCS started.
+  state.trial_t0 = os.time()
+end
+
+-- Position + heading of a named AI unit. Polled a few times a second only; the camera is
+-- extrapolated in between so the per-frame cost of the benchmark itself stays negligible.
+-- Two sources: the export state (LoGetWorldObjects), and as a fallback the mission's own
+-- scripting state on this host (Unit.getByName). On some players' PCs the export state
+-- answers nothing at all - add-ons replace or break it (beta issue #3) - so the first
+-- source that answers is kept for the rest of the run. Both use the same world axes
+-- (x north, y up, z east) and a heading in radians clockwise from north.
+local SUBJECT_CODE = {
+  export = [[
+    if type(LoGetWorldObjects) ~= 'function' then return 'ERR no LoGetWorldObjects' end
+    local objs = LoGetWorldObjects()
+    if objs then
+      for _, o in pairs(objs) do
+        if o and o.UnitName == %q and o.Position then
+          return string.format('%%.2f %%.2f %%.2f %%.4f', o.Position.x, o.Position.y, o.Position.z, o.Heading or 0)
+        end
+      end
+    end
+    return ''
+  ]],
+  server = [[
+    if not (Unit and Unit.getByName) then return 'ERR no Unit' end
+    local u = Unit.getByName(%q)
+    if not u or not u:isExist() then return '' end
+    local p = u:getPosition()
+    local h = math.atan2(p.x.z, p.x.x)
+    if h < 0 then h = h + 2 * math.pi end
+    return string.format('%%.2f %%.2f %%.2f %%.4f', p.p.x, p.p.y, p.p.z, h)
+  ]],
+}
+local subject_src = nil            -- the source that answered first; nil until one has
+local subject_err = {}             -- last thing each source said, for the log on failure
+
+-- Third source, no net.dostring_in at all: this hook state's own Export table.
+local function askDirect(unitName)
+  if not (Export and type(Export.LoGetWorldObjects) == "function") then
+    subject_err.direct = "no Export.LoGetWorldObjects here"; return nil
+  end
+  local ok, objs = pcall(Export.LoGetWorldObjects)
+  if not ok then subject_err.direct = "pcall: " .. tostring(objs); return nil end
+  if type(objs) ~= "table" then subject_err.direct = "no answer (" .. tostring(objs) .. ")"; return nil end
+  for _, o in pairs(objs) do
+    if type(o) == "table" and o.UnitName == unitName and type(o.Position) == "table" then
+      subject_err.direct = nil
+      return { x = o.Position.x, y = o.Position.y, z = o.Position.z, h = o.Heading or 0 }
+    end
+  end
+  subject_err.direct = "answers, unit not there yet"
+  return false
+end
+
+local function dostring(src, code)
+  local ok, s, ok2 = pcall(DOSTRING_IN, src, code)
+  if ok and type(s) == "string" then return ok, s, ok2 end
+  if net.dostring_in ~= DOSTRING_IN then          -- replaced after we loaded: try the current one too
+    local okb, sb, ok2b = pcall(net.dostring_in, src, code)
+    if okb and type(sb) == "string" then return okb, sb, ok2b end
+  end
+  return ok, s, ok2
+end
+
+local function askSubject(src, unitName)
+  if src == "direct" then return askDirect(unitName) end
+  local ok, s, ok2 = dostring(src, string.format(SUBJECT_CODE[src], unitName))
+  if not ok then subject_err[src] = "pcall: " .. tostring(s); return nil end
+  if type(s) ~= "string" then subject_err[src] = "no answer (" .. tostring(s) .. ", " .. tostring(ok2) .. ")"; return nil end
+  if s:sub(1, 4) == "ERR " then subject_err[src] = s; return nil end
+  subject_err[src] = (s == "" and "answers, unit not there yet") or nil
+  if s == "" then return false end
+  local x, y, z, h = s:match("([-%d%.]+) ([-%d%.]+) ([-%d%.]+) ([-%d%.]+)")
+  if not x then subject_err[src] = "unreadable: " .. s:sub(1, 60); return nil end
+  return { x = tonumber(x), y = tonumber(y), z = tonumber(z), h = tonumber(h) }
+end
+
+local function pollSubject(unitName)
+  if subject_src then
+    local p = askSubject(subject_src, unitName)
+    return p or nil
+  end
+  local forced = { server = { "server" }, direct = { "direct" } }
+  local order = forced[D.subject_source] or { "export", "server", "direct" }
+  for _, src in ipairs(order) do
+    local p = askSubject(src, unitName)
+    if p then
+      subject_src = src
+      L("aircraft positions come from the " .. src .. " state")
+      return p
+    end
+  end
+  return nil
+end
+
+local function updateSubject(scene, t)
+  local p = pollSubject(scene.unit)
+  if not p then return false end
+  if state.subj and t > state.subj_t then
+    local dt = t - state.subj_t
+    state.vel = { x = (p.x - state.subj.x) / dt, y = (p.y - state.subj.y) / dt, z = (p.z - state.subj.z) / dt }
+  end
+  state.subj, state.subj_t = p, t
+  state.fwd = { x = math.cos(p.h), z = math.sin(p.h) }   -- DCS: x north, z east, heading from north
+  return true
+end
+
+local function setCamera(scene, t)
+  local s = state.subj
+  if not s then return end
+  local dt = t - state.subj_t
+  local ax, ay, az = s.x + state.vel.x * dt, s.y + state.vel.y * dt, s.z + state.vel.z * dt
+  local back, up, side = tonumber(scene.back) or 30, tonumber(scene.up) or 6, tonumber(scene.side) or 0
+  local fwx, fwz = state.fwd.x, state.fwd.z
+  local px = ax - fwx * back - fwz * side
+  local pz = az - fwz * back + fwx * side
+  local py = ay + up
+  local fx, fy, fz = ax - px, ay - py, az - pz
+  local fl = math.sqrt(fx * fx + fy * fy + fz * fz)
+  if fl < 0.01 then return end
+  fx, fy, fz = fx / fl, fy / fl, fz / fl
+  local rx, rz = -fz, fx
+  local rl = math.sqrt(rx * rx + rz * rz)
+  if rl < 0.001 then rx, rz, rl = 1, 0, 1 end
+  rx, rz = rx / rl, rz / rl
+  local ux, uy, uz = -rz * fy, rz * fx - rx * fz, rx * fy
+  pcall(function()
+    Export.LoSetCameraPosition({
+      x = { x = fx, y = fy, z = fz }, y = { x = ux, y = uy, z = uz },
+      z = { x = rx, y = 0, z = rz },  p = { x = px, y = py, z = pz } })
+  end)
+end
+
+local function startScene(i, t)
+  state.scene_i, state.scene_t0, state.last = i, t, nil
+  state.subj, state.vel = nil, { x = 0, y = 0, z = 0 }
+  local scene = D.scenes[i]
+  state.results[i] = { name = tostring(scene.name), ms = {} }
+  if not updateSubject(scene, t) then finish(false, "unit not found: " .. tostring(scene.unit)); return end
+  L("scene " .. i .. " '" .. tostring(scene.name) .. "' start")
+end
+
+local function endScene(t)
+  local i = state.scene_i
+  local r = state.results[i]
+  L(string.format("scene %d done: %d frames", i, #r.ms))
+  if cfg.screenshots then
+    r.shot = string.format("rigcontrol_%s_%s", tostring(trials[state.trial_i].tag or cfg.tag), r.name)
+    pcall(function() DCS.makeScreenShot(r.shot) end)
+  end
+  if i < #D.scenes then startScene(i + 1, t); return end
+  local trial = trials[state.trial_i]
+  state.done[#state.done + 1] = { tag = tostring(trial.tag or state.trial_i), applied = state.applied, scenes = state.results }
+  if state.trial_i >= #trials then finish(true, ""); return end
+  -- more trials: stop only the mission, keep DCS running
+  state.trial_i = state.trial_i + 1
+  state.results, state.scene_i, state.ready_at, state.running = {}, 0, nil, false
+  state.stopping, state.stop_step, state.stop_t = true, 0, os.time()
+end
+
+-- Stopping a hosted mission from a hook is not documented; try the known calls in turn
+-- and log which one worked.
+local STOP_CALLS = {
+  { "DCS.stopMission", function() DCS.stopMission() end },
+  { "net.stop_game",   function() net.stop_game() end },
+  { "net.stop_network", function() net.stop_network() end },
+}
+local function driveStop()
+  local waited = os.time() - state.stop_t
+  local due = math.floor(waited / 15) + 1
+  if due > #STOP_CALLS then finish(false, "could not stop the mission between trials"); return end
+  if due > state.stop_step then
+    state.stop_step = due
+    local c = STOP_CALLS[due]
+    local ok, err = pcall(c[2])
+    L("stop attempt " .. c[1] .. " ok=" .. tostring(ok) .. " " .. tostring(err or ""))
+  end
+end
+
+local h = {}
+
+function h.onSimulationStart()
+  state.running = true
+  L("simulation started")
+end
+
+function h.onSimulationStop()
+  if state.stopping then
+    L("mission stopped after " .. tostring(STOP_CALLS[state.stop_step] and STOP_CALLS[state.stop_step][1]))
+    local ok, err = pcall(function() if net.stop_network then net.stop_network() end end)
+    L("net.stop_network after stop ok=" .. tostring(ok) .. " " .. tostring(err or ""))
+    state.stopping, state.hosted, state.menu_frames, state.trial_t0 = false, false, 0, os.time()
+    return
+  end
+  if not state.finished then finish(false, "simulation stopped early") end
+end
+
+function h.onSimulationFrame()
+  if state.finished then return end
+  state.frames = state.frames + 1
+  if os.time() - state.t0 > cfg.total_timeout then finish(false, "total timeout"); return end
+  local elapsed = os.time() - state.trial_t0
+  if state.stopping then driveStop(); return end
+  if not state.hosted then
+    state.menu_frames = state.menu_frames + 1
+    if state.menu_frames == 30 then
+      state.applied = applyOptions(trials[state.trial_i].set)
+      L("trial " .. state.trial_i .. "/" .. #trials .. " options: " .. state.applied)
+      state.host_tries = 0
+      tryHost()
+    elseif state.host_next and os.time() >= state.host_next then
+      tryHost()                                    -- the options are already set; only host again
+    end
+    return
+  end
+  if not state.running then
+    if elapsed > cfg.start_timeout then finish(false, "mission never started (not logged in, or mission failed to load?)") end
+    return
+  end
+
+  local t = now()
+  if not state.ready_at then
+    -- wait for the first AI unit to exist, then let textures stream in
+    if state.frames % 30 == 0 and pollSubject(D.scenes[1].unit) then
+      local settle = tonumber(trials[state.trial_i].settle_sec) or cfg.settle_sec
+      state.ready_at = t + settle
+      pcall(function() DCS.setPause(false) end)
+      pcall(function() Export.LoSetCommand(cfg.view_cmd) end)
+      updateSubject(D.scenes[1], t)
+      L("world up; settling " .. settle .. "s")
+    elseif elapsed > cfg.start_timeout then
+      L("net.dostring_in replaced by another script: " .. tostring(net.dostring_in ~= DOSTRING_IN))
+      local okd, names = pcall(function() return DOSTRING_IN("export", [[
+        local t, n = {}, 0
+        local objs = LoGetWorldObjects()
+        if not objs then return 'LoGetWorldObjects=nil' end
+        for _, o in pairs(objs) do
+          n = n + 1
+          if n <= 30 and o then t[#t+1] = tostring(o.Name) .. '/' .. tostring(o.UnitName) end
+        end
+        return 'count=' .. n .. ' ' .. table.concat(t, ', ')
+      ]]) end)
+      L("world objects seen: " .. tostring(okd) .. " " .. tostring(names))
+      for src, why in pairs(subject_err) do L("position source " .. src .. ": " .. tostring(why)) end
+      finish(false, "benchmark aircraft never appeared")
+    end
+    return
+  end
+  if state.scene_i == 0 then
+    setCamera(D.scenes[1], t)
+    if t >= state.ready_at then startScene(1, t) end
+    return
+  end
+
+  local scene = D.scenes[state.scene_i]
+  if state.frames % 12 == 0 then updateSubject(scene, t) end
+  setCamera(scene, t)
+  local since = t - state.scene_t0
+  if since >= cfg.scene_lead then
+    if state.last then
+      local ms = state.results[state.scene_i].ms
+      ms[#ms + 1] = string.format("%.3f", (t - state.last) * 1000)
+    end
+    state.last = t
+  end
+  if since >= cfg.scene_lead + cfg.scene_sec then endScene(t) end
+end
+
+DCS.setUserCallbacks(h)
+L("armed")

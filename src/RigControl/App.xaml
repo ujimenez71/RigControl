@@ -2,9 +2,104 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              StartupUri="MainWindow.xaml"
-             ThemeMode="System">
-    <!-- ThemeMode="System": estilo Fluent de Windows 11, claro u oscuro según el sistema. -->
+             ThemeMode="Dark">
+    <!--
+        Tema "cabina": Fluent de Windows 11 en oscuro SIEMPRE (decisión del usuario, 15/11/2026), con los colores
+        cambiados: fondo azul noche casi negro, acento verde de cabina (texto blanco encima), líneas verde HUD,
+        avisos en ámbar. Los nombres de Fluent (SystemAccentColor*, AccentFillColor*Brush...) se sustituyen aquí:
+        los recursos propios de la aplicación mandan sobre los del tema.
+    -->
     <Application.Resources>
+        <!-- Paleta -->
+        <Color x:Key="BgColor">#070C12</Color>
+        <Color x:Key="SidebarColor">#0A1119</Color>
+        <Color x:Key="PanelColor">#0E1721</Color>
+        <Color x:Key="PanelBorderColor">#22384B</Color>
+        <Color x:Key="HudGreenColor">#3DFFA0</Color>
+        <Color x:Key="CockpitGreenColor">#15804F</Color>
+        <Color x:Key="AmberColor">#FFB23E</Color>
+
+        <SolidColorBrush x:Key="BgBrush" Color="{StaticResource BgColor}" />
+        <SolidColorBrush x:Key="SidebarBrush" Color="{StaticResource SidebarColor}" />
+        <SolidColorBrush x:Key="PanelBrush" Color="{StaticResource PanelColor}" />
+        <SolidColorBrush x:Key="PanelBorderBrush" Color="{StaticResource PanelBorderColor}" />
+        <SolidColorBrush x:Key="HudGreenBrush" Color="{StaticResource HudGreenColor}" />
+        <SolidColorBrush x:Key="HudGreenDimBrush" Color="#2A9C6B" />
+        <SolidColorBrush x:Key="AmberBrush" Color="{StaticResource AmberColor}" />
+        <SolidColorBrush x:Key="TextMutedBrush" Color="#8FA3B6" />
+        <FontFamily x:Key="HeadingFont">Bahnschrift</FontFamily>
+
+        <!-- Acento de Fluent = verde de cabina -->
+        <Color x:Key="SystemAccentColor">#15804F</Color>
+        <Color x:Key="SystemAccentColorSecondary">#1A9460</Color>
+        <Color x:Key="SystemAccentColorLight1">#1F9E66</Color>
+        <Color x:Key="SystemAccentColorLight2">#3DD68C</Color>
+        <Color x:Key="SystemAccentColorLight3">#7CF2BB</Color>
+        <Color x:Key="SystemAccentColorDark1">#116B42</Color>
+        <Color x:Key="SystemAccentColorDark2">#0C5233</Color>
+        <Color x:Key="SystemAccentColorDark3">#083823</Color>
+        <SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="#15804F" />
+        <SolidColorBrush x:Key="AccentFillColorSecondaryBrush" Color="#1A9460" />
+        <SolidColorBrush x:Key="AccentFillColorTertiaryBrush" Color="#116B42" />
+        <SolidColorBrush x:Key="AccentFillColorDisabledBrush" Color="#33FFFFFF" />
+        <SolidColorBrush x:Key="AccentFillColorSelectedTextBackgroundBrush" Color="#15804F" />
+        <SolidColorBrush x:Key="AccentTextFillColorPrimaryBrush" Color="#5CF2A8" />
+        <SolidColorBrush x:Key="AccentTextFillColorSecondaryBrush" Color="#4BE39B" />
+        <SolidColorBrush x:Key="AccentTextFillColorTertiaryBrush" Color="#3BD18C" />
+        <SolidColorBrush x:Key="TextOnAccentFillColorPrimaryBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="TextOnAccentFillColorSecondaryBrush" Color="#E6FFFFFF" />
+        <SolidColorBrush x:Key="TextOnAccentFillColorSelectedTextBrush" Color="#FFFFFF" />
+
+        <!-- Fondos de Fluent = azul noche -->
+        <SolidColorBrush x:Key="ApplicationBackgroundBrush" Color="{StaticResource BgColor}" />
+        <SolidColorBrush x:Key="SolidBackgroundFillColorBaseBrush" Color="{StaticResource BgColor}" />
+        <SolidColorBrush x:Key="SolidBackgroundFillColorBaseAltBrush" Color="#05090E" />
+        <SolidColorBrush x:Key="SolidBackgroundFillColorSecondaryBrush" Color="{StaticResource SidebarColor}" />
+        <SolidColorBrush x:Key="SolidBackgroundFillColorTertiaryBrush" Color="{StaticResource PanelColor}" />
+        <SolidColorBrush x:Key="SolidBackgroundFillColorQuarternaryBrush" Color="#132030" />
+        <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#B30E1721" />
+        <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush" Color="#800B131B" />
+        <SolidColorBrush x:Key="LayerFillColorDefaultBrush" Color="#4D0E1721" />
+
+        <!-- Controles de Fluent que tienen su propio color de "elegido"/"marcado" (si no, salía el acento de Windows) -->
+        <SolidColorBrush x:Key="ListBoxItemSelectedBackgroundThemeBrush" Color="#3315804F" />
+        <SolidColorBrush x:Key="ListBoxItemSelectedBackgroundPointerOverThemeBrush" Color="#4D15804F" />
+        <SolidColorBrush x:Key="ListBoxItemSelectedBackgroundPressedThemeBrush" Color="#2615804F" />
+        <SolidColorBrush x:Key="ListBoxItemBackgroundSelectedPressedThemeBrush" Color="#2615804F" />
+        <SolidColorBrush x:Key="ListBoxItemSelectedForegroundThemeBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="ListViewItemBackgroundSelectedPointerOver" Color="#4D15804F" />
+        <SolidColorBrush x:Key="ListViewItemPillFillBrush" Color="{StaticResource HudGreenColor}" />
+        <SolidColorBrush x:Key="DataGridRowSelectedBackgroundThemeBrush" Color="#4015804F" />
+        <SolidColorBrush x:Key="DataGridRowSelectedForegroundThemeBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="ComboBoxItemBackgroundSelected" Color="#3315804F" />
+        <SolidColorBrush x:Key="ComboBoxItemPillFillBrush" Color="{StaticResource HudGreenColor}" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="#15804F" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="#1A9460" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="#116B42" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeChecked" Color="#15804F" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="#1A9460" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPressed" Color="#116B42" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminate" Color="#15804F" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePointerOver" Color="#1A9460" />
+        <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePressed" Color="#116B42" />
+        <SolidColorBrush x:Key="CheckBoxCheckGlyphForeground" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFill" Color="#15804F" />
+        <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStroke" Color="#15804F" />
+        <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStrokePointerOver" Color="#1A9460" />
+        <SolidColorBrush x:Key="RadioButtonCheckOuterEllipseCheckedFillPointerOver" Color="#1A9460" />
+        <SolidColorBrush x:Key="RadioButtonCheckOuterEllipseCheckedFillPressed" Color="#116B42" />
+        <SolidColorBrush x:Key="ToggleButtonBackgroundChecked" Color="#15804F" />
+        <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="#1A9460" />
+        <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed" Color="#116B42" />
+        <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#15804F" />
+        <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#1A9460" />
+        <SolidColorBrush x:Key="ProgressBarForeground" Color="{StaticResource HudGreenColor}" />
+        <SolidColorBrush x:Key="ProgressBarIndicatorAnimatedFill" Color="{StaticResource HudGreenColor}" />
+
+        <!-- Lo que usan las pantallas con SystemColors (acento y bordes de los paneles) -->
+        <SolidColorBrush x:Key="{x:Static SystemColors.AccentColorBrushKey}" Color="#15804F" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.ActiveBorderBrushKey}" Color="{StaticResource PanelBorderColor}" />
+
         <!-- Registros compactos: una línea por entrada (el tema Fluent deja mucho margen en cada elemento). -->
         <Style x:Key="LogItem" TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
             <Setter Property="Padding" Value="8,1" />

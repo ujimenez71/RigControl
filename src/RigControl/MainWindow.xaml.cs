@@ -1,12 +1,25 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
+using System.Windows.Media.Imaging;
 using RigControl.ViewModels;
 
 namespace RigControl;
 
 public partial class MainWindow : Window
 {
+    /// <summary>Cabecera de cada pantalla (en el orden del menú): ilustración de Assets/Banners, rótulo, título y subtítulo.</summary>
+    private static readonly (string Image, string Caption, string Title, string Subtitle)[] Banners =
+    [
+        ("monitor", "◢ 01 · ENTRADAS", "MONITOR", "Todos los mandos en directo: ejes, botones y hats."),
+        ("ejecucion", "◢ 02 · MISIÓN", "EJECUCIÓN", "Simulador, avión y perfil activo: los mandos en vuelo."),
+        ("perfiles", "◢ 03 · CONFIGURACIÓN", "PERFILES", "Bindings por avión, luces, pantalla del ICP y generación con IA."),
+        ("hangar", "◢ 04 · ARRANQUE", "HANGAR", "Secuencias de arranque: programas, prioridad, ventanas, mods y gráficos."),
+        ("mods", "◢ 05 · EQUIPAMIENTO", "MODS", "Bibliotecas y conjuntos de mods con uniones de directorio."),
+        ("instantaneas", "◢ 06 · RESPALDO", "INSTANTÁNEAS", "Copias de la configuración de DCS, MSFS y RigControl."),
+        ("graficos", "◢ 07 · RENDIMIENTO", "GRÁFICOS", "Perfiles gráficos, medición de FPS y optimizador para VR."),
+    ];
+
     private readonly MonitorViewModel _monitor = new();
     private readonly RunViewModel _run = new();
     private readonly ProfilesViewModel _profiles = new();
@@ -26,6 +39,7 @@ public partial class MainWindow : Window
         SnapshotsPage.DataContext = _snapshots;
         GraphicsPage.DataContext = _graphics;
         _hangar.StartRunRequested += _run.StartAuto;
+        ShowBanner(0);
 
         // DirectInput necesita la ventana ya creada para el nivel cooperativo (compartido, en segundo plano).
         SourceInitialized += (_, _) =>
@@ -40,6 +54,7 @@ public partial class MainWindow : Window
         Closed += (_, _) =>
         {
             _hangar.Dispose();
+            _graphics.Dispose();
             _run.Dispose();
             _profiles.Dispose();
             _monitor.Dispose();
@@ -63,5 +78,16 @@ public partial class MainWindow : Window
         _profiles.SetVisible(page == 2);
         _hangar.SetVisible(page == 3);
         _mods.SetVisible(page == 4);
+        ShowBanner(page);
+    }
+
+    private void ShowBanner(int page)
+    {
+        if (BannerImage is null || page < 0 || page >= Banners.Length) return;
+        var (image, caption, title, subtitle) = Banners[page];
+        BannerImage.Source = new BitmapImage(new Uri($"pack://application:,,,/RigControl;component/Assets/Banners/{image}.jpg"));
+        BannerCaption.Text = caption;
+        BannerTitle.Text = title;
+        BannerSubtitle.Text = subtitle;
     }
 }

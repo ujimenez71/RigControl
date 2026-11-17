@@ -34,6 +34,8 @@ internal static class Program
                      ("Generar con IA", AiTests.Run),
                      ("Hoja de mandos", SheetTests.Run),
                      ("Perfiles gráficos", GraphicsTests.Run),
+                     ("Medición de DCS", BenchTests.Run),
+                     ("Optimizador VR", OptimizerTests.Run),
                  })
         {
             Console.WriteLine($"\n===== {name} =====");

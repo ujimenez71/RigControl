@@ -36,7 +36,6 @@
 
         <!-- Cabecera -->
         <StackPanel Grid.Row="0" Margin="0,0,0,12">
-            <TextBlock Text="Ejecución" FontSize="24" FontWeight="SemiBold" />
             <TextBlock Opacity="0.7" TextWrapping="Wrap">
                 <Run Text="Ejecuta los perfiles de " /><Run Text="{Binding ProfilesDir, Mode=OneWay}" FontFamily="Cascadia Mono, Consolas" />
                 <Run Text=". Guardar un perfil lo recarga al momento." />

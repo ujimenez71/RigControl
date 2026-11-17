@@ -24,6 +24,12 @@
     <PackageReference Include="Vortice.DirectInput" Version="3.8.3" />
   </ItemGroup>
 
+  <!-- Medición de DCS: script de Hooks y misión de prueba (MIT, ver Graphics\Bench\THIRD-PARTY-NOTICES.md). -->
+  <ItemGroup>
+    <EmbeddedResource Include="Graphics\Bench\rigcontrol_bench.lua" LogicalName="RigControl.Bench.Hook" />
+    <EmbeddedResource Include="Graphics\Bench\rigcontrol_bench.miz" LogicalName="RigControl.Bench.Mission" />
+  </ItemGroup>
+
   <!-- La DLL nativa se copia junto al ejecutable (también al de los proyectos que referencian este);
        sin el SDK se compila igual y las acciones K:/B:/L: avisan. -->
   <ItemGroup Condition="Exists('$(SimConnectDll)')">

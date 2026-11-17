@@ -45,7 +45,6 @@
                 <Button Content="Recargar" Click="Refresh_Click" />
             </StackPanel>
             <StackPanel>
-                <TextBlock Text="Perfiles" FontSize="24" FontWeight="SemiBold" />
                 <TextBlock Opacity="0.7" TextWrapping="Wrap">
                     <Run Text="{Binding ProfilesDir, Mode=OneWay}" FontFamily="Cascadia Mono, Consolas" />
                     <Run Text="· " /><Run Text="{Binding Summary, Mode=OneWay}" />
@@ -110,26 +109,53 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <DockPanel Grid.Row="0" Margin="0,0,0,8">
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
-                    <Button Content="✏  Editar" Click="Edit_Click" Margin="0,0,8,0" MinWidth="100"
-                            Background="{DynamicResource {x:Static SystemColors.AccentColorBrushKey}}" Foreground="White"
-                            ToolTip="Editor gráfico: capturar entradas, elegir acciones, validar y guardar" />
-                    <Button Content="🖨  Hoja de mandos" Click="Sheet_Click" Margin="0,0,8,0"
-                            ToolTip="Fotos de los mandos con un número en cada entrada usada y la tabla de lo que hace (HTML, se abre en el navegador; se puede imprimir)" />
-                    <Button x:Name="PdfButton" Content="PDF" Click="Pdf_Click" Margin="0,0,8,0"
-                            ToolTip="La hoja de mandos en PDF (la hace Edge sin abrir ventana)" />
-                    <Button Content="Abrir el JSON" Click="OpenSelected_Click" Margin="0,0,8,0"
-                            ToolTip="Abre el archivo con el programa asociado; al guardar, esta pantalla y la ejecución se actualizan" />
-                    <Button Content="Borrar" Click="Delete_Click" ToolTip="Borra el perfil (queda una copia .json.bak en la carpeta)" />
-                </StackPanel>
-                <StackPanel>
-                    <TextBlock Text="{Binding Selected.Name}" FontSize="20" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{Binding AircraftText}" Style="{StaticResource Small}" />
-                    <TextBlock Text="{Binding Selected.Notes}" FontSize="12" Opacity="0.8" TextWrapping="Wrap" Margin="0,6,0,0"
+            <StackPanel Grid.Row="0" Margin="0,0,0,8">
+                <!-- Tarjeta de la aeronave: ilustración (o imagen propia en aviones\), simulador y tipo, nombre -->
+                <Border Height="150" CornerRadius="8" BorderThickness="1" BorderBrush="{StaticResource PanelBorderBrush}"
+                        ToolTip="Imagen propia: ponla en %APPDATA%\RigControl\aviones\ con el nombre del perfil (p. ej. ah64d.jpg)">
+                    <Border.Background>
+                        <ImageBrush ImageSource="{Binding AircraftImage}" Stretch="UniformToFill" AlignmentX="Right" />
+                    </Border.Background>
+                    <Border CornerRadius="8">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                <GradientStop Color="#E6070C12" Offset="0" />
+                                <GradientStop Color="#99070C12" Offset="0.35" />
+                                <GradientStop Color="#00070C12" Offset="0.7" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <StackPanel VerticalAlignment="Bottom" Margin="18,0,18,14">
+                            <TextBlock Text="{Binding AircraftCaption}" FontFamily="{StaticResource HeadingFont}" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{StaticResource AmberBrush}" />
+                            <TextBlock Text="{Binding Selected.Name}" FontFamily="{StaticResource HeadingFont}" FontSize="28" FontWeight="Bold"
+                                       Foreground="White" TextTrimming="CharacterEllipsis">
+                                <TextBlock.Effect>
+                                    <DropShadowEffect Color="Black" BlurRadius="10" ShadowDepth="0" Opacity="0.8" />
+                                </TextBlock.Effect>
+                            </TextBlock>
+                            <TextBlock Text="{Binding AircraftText}" FontSize="12" Foreground="#C9D6E2" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding AircraftCredit}" FontSize="10" Foreground="#99C9D6E2" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Border>
+                </Border>
+                <DockPanel Margin="0,10,0,0">
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                        <Button Content="✏  Editar" Click="Edit_Click" Margin="0,0,8,0" MinWidth="100"
+                                Background="{DynamicResource {x:Static SystemColors.AccentColorBrushKey}}" Foreground="White"
+                                ToolTip="Editor gráfico: capturar entradas, elegir acciones, validar y guardar" />
+                        <Button Content="🖨  Hoja de mandos" Click="Sheet_Click" Margin="0,0,8,0"
+                                ToolTip="Fotos de los mandos con un número en cada entrada usada y la tabla de lo que hace (HTML, se abre en el navegador; se puede imprimir)" />
+                        <Button x:Name="PdfButton" Content="PDF" Click="Pdf_Click" Margin="0,0,8,0"
+                                ToolTip="La hoja de mandos en PDF (la hace Edge sin abrir ventana)" />
+                        <Button Content="Abrir el JSON" Click="OpenSelected_Click" Margin="0,0,8,0"
+                                ToolTip="Abre el archivo con el programa asociado; al guardar, esta pantalla y la ejecución se actualizan" />
+                        <Button Content="Borrar" Click="Delete_Click" ToolTip="Borra el perfil (queda una copia .json.bak en la carpeta)" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding Selected.Notes}" FontSize="12" Opacity="0.8" TextWrapping="Wrap" Margin="0,0,12,0" MaxHeight="64"
+                               TextTrimming="CharacterEllipsis" ToolTip="{Binding Selected.Notes}"
                                Visibility="{Binding HasNotes, Converter={StaticResource BoolToVisibility}}" />
-                </StackPanel>
-            </DockPanel>
+                </DockPanel>
+            </StackPanel>
 
             <!-- Errores de compilación -->
             <Border Grid.Row="1" Margin="0,0,0,8" Padding="12,8" CornerRadius="6" Background="#33D9342B"

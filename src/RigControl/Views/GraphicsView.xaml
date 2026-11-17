@@ -13,6 +13,9 @@
             <Setter Property="FontSize" Value="13" />
             <Setter Property="BorderThickness" Value="0" />
         </Style>
+        <Style x:Key="Wrap" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
         <Style x:Key="Section" TargetType="TextBlock">
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="FontSize" Value="15" />
@@ -48,7 +51,6 @@
                 <Button Content="Recargar" Click="Reload_Click" Margin="8,0,0,0" />
             </StackPanel>
             <StackPanel>
-                <TextBlock Text="Gráficos" FontSize="24" FontWeight="SemiBold" />
                 <TextBlock Opacity="0.7" TextWrapping="Wrap" Text="Perfiles de ajustes gráficos de DCS (options.lua y autoexec.cfg) y MSFS 2024 (UserCfg.opt) pensados para VR. Aplicar solo con el simulador cerrado; antes se guarda una copia .bak del archivo. Cada hangar puede aplicar uno al abrirse." />
             </StackPanel>
         </DockPanel>
@@ -96,50 +98,101 @@
             </ListBox>
         </DockPanel>
 
-        <!-- Perfil elegido -->
-        <DockPanel Grid.Row="2" Grid.Column="1" Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}">
-            <StackPanel DockPanel.Dock="Top">
-                <DockPanel>
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                        <Button Content="Aplicar" Click="Apply_Click" MinWidth="100" Margin="0,0,8,0" IsEnabled="{Binding CanApply}"
-                                Style="{DynamicResource AccentButtonStyle}" />
-                        <Button Content="Borrar" Click="Delete_Click" />
+        <!-- Perfil elegido / medición -->
+        <TabControl Grid.Row="2" Grid.Column="1" x:Name="Tabs">
+            <TabItem Header="Perfil">
+                <Grid Margin="0,8,0,0">
+                <DockPanel Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel DockPanel.Dock="Top">
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                <Button Content="Aplicar" Click="Apply_Click" MinWidth="100" Margin="0,0,8,0" IsEnabled="{Binding CanApply}"
+                                        Style="{DynamicResource AccentButtonStyle}" />
+                                <Button Content="Borrar" Click="Delete_Click" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding Selected.Name}" FontSize="20" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        </DockPanel>
+                        <TextBlock Text="{Binding SelectedNotes}" TextWrapping="Wrap" Opacity="0.8" Margin="0,4,0,0" />
+                        <ItemsControl ItemsSource="{Binding ProfileAdvice}" Margin="0,6,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Margin="0,1">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Level}" Value="Aviso">
+                                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Style="{StaticResource Section}" Text="Qué cambiaría al aplicarlo" />
+                        <TextBlock Text="Ya está aplicado: los ajustes actuales son los del perfil." Opacity="0.7"
+                                   Visibility="{Binding NoChanges, Converter={StaticResource BoolToVisibility}}" />
                     </StackPanel>
-                    <TextBlock Text="{Binding Selected.Name}" FontSize="20" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <DataGrid ItemsSource="{Binding Changes}" Style="{StaticResource Grid}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Ajuste" Binding="{Binding Key}" Width="2*" FontFamily="Cascadia Mono, Consolas" />
+                            <DataGridTextColumn Header="Ahora" Binding="{Binding CurrentText}" Width="*" />
+                            <DataGridTextColumn Header="Perfil" Binding="{Binding WantedText}" Width="*" FontWeight="SemiBold" />
+                        </DataGrid.Columns>
+                    </DataGrid>
                 </DockPanel>
-                <TextBlock Text="{Binding SelectedNotes}" TextWrapping="Wrap" Opacity="0.8" Margin="0,4,0,0" />
-                <ItemsControl ItemsSource="{Binding ProfileAdvice}" Margin="0,6,0,0">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Margin="0,1">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Level}" Value="Aviso">
-                                                <Setter Property="FontWeight" Value="SemiBold" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <TextBlock Style="{StaticResource Section}" Text="Qué cambiaría al aplicarlo" />
-                <TextBlock Text="Ya está aplicado: los ajustes actuales son los del perfil." Opacity="0.7"
-                           Visibility="{Binding NoChanges, Converter={StaticResource BoolToVisibility}}" />
-            </StackPanel>
-            <DataGrid ItemsSource="{Binding Changes}" Style="{StaticResource Grid}">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="Ajuste" Binding="{Binding Key}" Width="2*" FontFamily="Cascadia Mono, Consolas" />
-                    <DataGridTextColumn Header="Ahora" Binding="{Binding CurrentText}" Width="*" />
-                    <DataGridTextColumn Header="Perfil" Binding="{Binding WantedText}" Width="*" FontWeight="SemiBold" />
-                </DataGrid.Columns>
-            </DataGrid>
-        </DockPanel>
-        <TextBlock Grid.Row="2" Grid.Column="1" Opacity="0.6" TextWrapping="Wrap" VerticalAlignment="Top"
-                   Text="Aún no hay perfiles. Deja el simulador como te guste, ciérralo y guarda lo actual como perfil (abajo a la izquierda)."
-                   Visibility="{Binding NoSelection, Converter={StaticResource BoolToVisibility}}" />
+                <TextBlock Opacity="0.6" TextWrapping="Wrap" VerticalAlignment="Top"
+                           Text="Aún no hay perfiles. Deja el simulador como te guste, ciérralo y guarda lo actual como perfil (abajo a la izquierda)."
+                           Visibility="{Binding NoSelection, Converter={StaticResource BoolToVisibility}}" />
+                </Grid>
+            </TabItem>
+            <TabItem Header="Medir FPS en DCS">
+                <DockPanel Margin="0,8,0,0">
+                    <StackPanel DockPanel.Dock="Top">
+                        <TextBlock TextWrapping="Wrap" Opacity="0.8"
+                                   Text="DCS se abre solo, vuela una misión de prueba en el Caucaso (ciudad, aeródromo y nubes, ~25 s cada una) y se cierra: unos 5 minutos sin tocar el ordenador. Tu options.lua y autoexec.cfg quedan como estaban, pase lo que pase. En VR, el visor encendido y despierto (puesto sin moverte o con el sensor de proximidad tapado); mejor sin Smart Smoothing." />
+                        <WrapPanel Margin="0,10,0,0">
+                            <TextBlock Text="Medir" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <ComboBox ItemsSource="{Binding MeasureOptions}" SelectedIndex="{Binding MeasureIndex}" MinWidth="220"
+                                      IsEnabled="{Binding NotMeasuring}" />
+                            <CheckBox Content="En VR" IsChecked="{Binding MeasureVr}" Margin="16,0,0,0" VerticalAlignment="Center"
+                                      IsEnabled="{Binding NotMeasuring}"
+                                      ToolTip="Sin marcar: en el monitor, sin límite de FPS ni sincronización (para comparar costes)." />
+                            <Button Content="▶  Medir" Click="Measure_Click" Margin="16,0,0,0" MinWidth="100" Style="{DynamicResource AccentButtonStyle}"
+                                    IsEnabled="{Binding CanMeasure}" />
+                            <Button Content="🔧  Optimizar en VR" Click="Optimize_Click" Margin="8,0,0,0" IsEnabled="{Binding CanMeasure}"
+                                    ToolTip="Prueba subir o bajar cada ajuste en VR y propone la mejor configuración que llega al refresco del visor (15-20 min). Guarda un perfil nuevo sin aplicarlo." />
+                            <Button Content="■  Cancelar" Click="CancelMeasure_Click" Margin="8,0,0,0"
+                                    Visibility="{Binding IsMeasuring, Converter={StaticResource BoolToVisibility}}" />
+                        </WrapPanel>
+                        <ProgressBar IsIndeterminate="True" Height="4" Margin="0,10,0,0"
+                                     Visibility="{Binding IsMeasuring, Converter={StaticResource BoolToVisibility}}" />
+                        <ItemsControl ItemsSource="{Binding MeasureLog}" Margin="0,8,0,0" FontFamily="Cascadia Mono, Consolas" FontSize="12" />
+                        <Border Margin="0,8,0,0" Padding="12,8" CornerRadius="6" BorderThickness="2"
+                                BorderBrush="{DynamicResource {x:Static SystemColors.AccentColorBrushKey}}"
+                                Visibility="{Binding HasOptimizeSummary, Converter={StaticResource BoolToVisibility}}">
+                            <TextBox Text="{Binding OptimizeSummary, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Background="Transparent" />
+                        </Border>
+                        <TextBlock Style="{StaticResource Section}" Text="Mediciones" />
+                        <TextBlock Opacity="0.7" FontSize="12" TextWrapping="Wrap"
+                                   Text="«Fuera de tiempo» = fotogramas que no llegan al refresco del visor (+10 %): es lo que se nota en VR. «1 % bajo» = FPS en el percentil 99." />
+                    </StackPanel>
+                    <DataGrid ItemsSource="{Binding Measurements}" Style="{StaticResource Grid}" Margin="0,6,0,0">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Cuándo" Binding="{Binding When}" Width="Auto" />
+                            <DataGridTextColumn Header="Modo" Binding="{Binding Mode}" Width="Auto" />
+                            <DataGridTextColumn Header="Configuración" Binding="{Binding Profile}" Width="*" ElementStyle="{StaticResource Wrap}" />
+                            <DataGridTextColumn Header="FPS" Binding="{Binding Avg}" Width="Auto" />
+                            <DataGridTextColumn Header="1 % bajo" Binding="{Binding Low}" Width="Auto" />
+                            <DataGridTextColumn Header="Fuera de tiempo" Binding="{Binding Missed}" Width="Auto" FontWeight="SemiBold" />
+                            <DataGridTextColumn Header="Tirones" Binding="{Binding Stutters}" Width="Auto" />
+                            <DataGridTextColumn Header="Por escena" Binding="{Binding PerScene}" Width="1.6*" ElementStyle="{StaticResource Wrap}" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
+        </TabControl>
 
         <TextBlock Grid.Row="3" Grid.ColumnSpan="2" Text="{Binding Message}" TextWrapping="Wrap" Margin="0,8,0,0" />
     </Grid>
