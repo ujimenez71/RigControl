@@ -222,10 +222,18 @@ public sealed class DcsBenchmark
             Install(trials, sceneSeconds, settleSeconds, timeoutSeconds);
             var minutes = Math.Max(5, 2 + trials.Count * (sceneSeconds * 3 + 40) / 60);
             progress?.Report($"Arrancando DCS {(vr ? "en VR" : "en el monitor")}" +
-                             (trials.Count > 1 ? $" para {trials.Count} pruebas seguidas" : "") + $"… (unos {minutes} min; no toques el ordenador)");
+                             (trials.Count > 1 ? $" para {trials.Count} pruebas seguidas" : "") + $"… (unos {minutes} min; no toques el ordenador" +
+                             (vr ? " y deja el visor puesto o con el sensor de proximidad tapado)" : ")"));
             Run(vr, timeoutSeconds, progress, cancel);
 
-            if (vr) CheckVr();
+            if (vr)
+            {
+                CheckVr();
+                if (PimaxInfo.ScreenOff(started, DateTime.Now, PimaxLogDir) is { } off)
+                    throw new InvalidOperationException($"La pantalla del visor se apagó a las {off:HH:mm:ss} durante la medición " +
+                        "(el sensor de proximidad la apaga si nadie lleva el visor puesto) y DCS dejó de ir a su ritmo: la medición no vale. " +
+                        "Repítela con el visor puesto o con el sensor tapado.");
+            }
             return ReadResults(vr, refreshHz, trials, settings, started);
         }
         finally
@@ -358,6 +366,9 @@ public sealed class DcsBenchmark
         }
     }
 
+    /// <summary>Mediana de fotograma en VR por encima de la cual (menos de 25 FPS) la medición no vale.</summary>
+    public const double MaxVrMedianMs = 40;
+
     /// <summary>Asentamiento de cada prueba después de la primera (la misión ya está cargada una vez).</summary>
     public const int TrialSettleSeconds = 10;
 
@@ -380,9 +391,19 @@ public sealed class DcsBenchmark
         // En VR el ritmo lo marca el visor: el refresco de verdad sale de Pimax o del ritmo de la primera prueba.
         if (vr)
         {
-            var firstAll = raw[0].SelectMany(s => s.Ms).Order().ToList();
-            var detected = PimaxInfo.DetectRefresh(firstAll[firstAll.Count / 2], refreshHz, PimaxInfo.LastSession(logDir: PimaxLogDir), started);
+            var firstAll = raw[0].SelectMany(s => s.Ms).ToList();
+            var detected = PimaxInfo.DetectRefresh(firstAll, refreshHz, PimaxInfo.WaitSession(started, PimaxLogDir), started);
             refreshHz = detected;
+            // Ni con Smart Smoothing (mitad del refresco) se baja de 36 FPS: muchísimo menos es que la imagen no
+            // llegaba al visor (dormido, apagado). Por si no hay registro de Pimax que lo diga.
+            for (var i = 0; i < raw.Length; i++)
+            {
+                var ms = raw[i].SelectMany(s => s.Ms).Order().ToList();
+                if (ms.Count > 0 && ms[ms.Count / 2] > MaxVrMedianMs)
+                    throw new InvalidOperationException($"DCS iba a {1000 / ms[ms.Count / 2]:0} FPS en el visor" +
+                        (raw.Length > 1 ? $" en la prueba {i + 1}" : "") + ": la imagen no llegaba al visor (¿apagado, dormido o sin ponérselo?). " +
+                        "La medición no vale: repítela con el visor puesto o con el sensor de proximidad tapado.");
+            }
         }
         var seconds = (int)(DateTime.Now - started).TotalSeconds;
         return [.. raw.Select((scenes, i) => new BenchResult(started, trials.Count > 0 ? trials[i].Tag : "(actual)", vr, refreshHz, seconds,

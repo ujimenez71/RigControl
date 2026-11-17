@@ -14,6 +14,8 @@ internal static class OptimizerTests
     private sealed class FakeVrDcs(string savedGames, Func<IReadOnlyDictionary<string, double>, double> renderMs) : IDcsLauncher
     {
         public int Launches;
+        /// <summary>Tiempo de fotograma fijo (p. ej. 137 ms = visor apagado), en lugar del modelo.</summary>
+        public double? ForceMs;
         public List<int> TrialsPerLaunch = [];
 
         public bool IsRunning() => false;
@@ -40,7 +42,7 @@ internal static class OptimizerTests
                     values["graphics." + k] = s.IndexOf(lua);
                 }
                 var ms = renderMs(values);
-                var paced = ms <= 1000.0 / 72 ? 1000.0 / 72 : 1000.0 / 36;   // visor a 72 Hz con Smart Smoothing
+                var paced = ForceMs ?? (ms <= 1000.0 / 72 ? 1000.0 / 72 : 1000.0 / 36);   // visor a 72 Hz con Smart Smoothing
                 var frames = string.Join(",", Enumerable.Range(0, 200).Select(i => (paced + (i % 7) * 0.01).ToString("0.000", CultureInfo.InvariantCulture)));
                 var scenes = string.Join(",", DcsBenchmark.Scenes.Select(sc => $"{{\"name\":\"{sc.Name}\",\"frame_ms\":[{frames}]}}"));
                 parts.Add($"{{\"tag\":\"{t["tag"]}\",\"scenes\":[{scenes}]}}");
@@ -88,6 +90,9 @@ internal static class OptimizerTests
         Check(PimaxInfo.DetectRefresh(14.11, 90, null, DateTime.Now) == 72 && PimaxInfo.DetectRefresh(11.2, 72, null, DateTime.Now) == 90
               && PimaxInfo.DetectRefresh(27.8, 90, null, DateTime.Now) == 72
               && PimaxInfo.DetectRefresh(20, 90, null, DateTime.Now) == 90, "refresco detectado por el ritmo (14,1 ms = 72 Hz)");
+        // Como el 17/11/2026 a 90 Hz: una escena a ~87 FPS y dos a 45 (mediana 17 ms ≈ mitad de 120): debe dar 90.
+        List<double> mixed = [.. Enumerable.Range(0, 2158).Select(i => 11.1 + (i % 10) * 0.1), .. Enumerable.Range(0, 2266).Select(i => 22.2 + (i % 5) * 0.05)];
+        Check(PimaxInfo.DetectRefresh(mixed, 120, null, DateTime.Now) == 90, "refresco por el ritmo con escenas a 90 y a 45 = 90 (no 120)");
         var pimax = new PimaxSession(72, true, "4242x5102", 39.5, 65.8, DateTime.Now);
         Check(PimaxInfo.DetectRefresh(11.1, 90, pimax, DateTime.Now.AddMinutes(-5)) == 72, "refresco: manda el de Pimax si es de esta medición");
 
@@ -101,6 +106,18 @@ internal static class OptimizerTests
         var s = PimaxInfo.LastSession(logDir: logDir);
         Check(s is { TargetFps: 72, SmartSmoothing: true, Resolution: "4242x5102" } && Math.Abs(s.GpuOver80Percent - 39.5) < 0.1,
               "registro de Pimax: refresco 72, Smart Smoothing, resolución y GPU > 80 %");
+
+        // Pantalla del visor apagada (sensor de proximidad), como el 17/11/2026: se apaga a mitad y no vuelve.
+        File.WriteAllText(Path.Combine(logDir, "PiService__2026-11-17-19.log"),
+            "2026-11-17 19:24:33.365 I  5712 [::OnScreenOnOffTimer] [LogEventThread] HMD screen state changed to false\n" +
+            "2026-11-17 19:24:37.917 I  5712 [::OnScreenOnOffTimer] [LogEventThread] HMD screen state changed to true\n" +
+            "2026-11-17 19:27:54.099 I  5712 [::OnScreenOnOffTimer] [LogEventThread] HMD screen state changed to false\n");
+        DateTime T(string hms) => DateTime.ParseExact("2026-11-17 " + hms, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+        Check(PimaxInfo.ScreenOff(T("19:26:17"), T("19:29:40"), logDir) == T("19:27:54").AddMilliseconds(99)
+              && PimaxInfo.ScreenOff(T("19:31:10"), T("19:42:00"), logDir) == T("19:31:10")
+              && PimaxInfo.ScreenOff(T("19:24:30"), T("19:27:00"), logDir) is null
+              && PimaxInfo.ScreenOff(T("19:25:00"), T("19:27:00"), logDir) is null,
+              "registro de Pimax: pantalla apagada a mitad o desde antes; el apagón de 4,5 s al arrancar Pimax no cuenta");
         Directory.Delete(logDir, true);
 
         // Optimizar con un DCS falso.
@@ -136,6 +153,22 @@ internal static class OptimizerTests
             report = new VrOptimizer(bench, new HeadsetInfo { RefreshHz = 72 }).Run();
             Check(!report.BaselineHolds && report.Changes.Count > 0 && report.Changes.All(c => c.Reason.StartsWith("Libera")),
                   $"no llega: recomienda bajar ({string.Join(", ", report.Changes.Select(c => c.Label + " " + c.From + "→" + c.To))})");
+
+            // Smart Smoothing fija todas las pruebas a la mitad (como a 90 Hz el 17/11/2026): no concluyente, sin cambios.
+            dcs = new FakeVrDcs(saved, Model) { ForceMs = 1000.0 / 36 };
+            bench = new DcsBenchmark(saved, exe, dcs) { PollMs = 1, GraceMs = 10, PimaxLogDir = Path.Combine(root, "sin-pimax"), ResultsDirectory = Path.Combine(root, "med") };
+            report = new VrOptimizer(bench, new HeadsetInfo { RefreshHz = 72 }).Run();
+            Check(report.Changes.Count == 0 && report.Notes[0].StartsWith("NO CONCLUYENTE") && report.Profile.Notes.StartsWith("NO CONCLUYENTE") && dcs.Launches == 1,
+                  "todas las pruebas fijas a la mitad (Smart Smoothing): no concluyente, sin cambios ni segundo arranque");
+
+            // Visor apagado: ~7 FPS en todas las pruebas = la medición no vale (no un «sin cambios»).
+            dcs = new FakeVrDcs(saved, Model) { ForceMs = 137 };
+            bench = new DcsBenchmark(saved, exe, dcs) { PollMs = 1, GraceMs = 10, PimaxLogDir = Path.Combine(root, "sin-pimax"), ResultsDirectory = Path.Combine(root, "med") };
+            string? error = null;
+            try { new VrOptimizer(bench, new HeadsetInfo { RefreshHz = 72 }).Run(); }
+            catch (InvalidOperationException ex) { error = ex.Message; }
+            Check(error?.Contains("no llegaba al visor") == true && File.ReadAllText(Path.Combine(saved, "Config", "options.lua")) == Options,
+                  $"visor apagado (7 FPS): error claro y options.lua intacto ({error})");
         }
         finally
         {

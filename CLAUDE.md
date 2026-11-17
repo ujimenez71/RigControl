@@ -578,6 +578,20 @@ refresco se detecta (`PimaxInfo.DetectRefresh`: Pimax si es de esa sesión; si n
 lo que fija Smart Smoothing al no llegar). Resultado: perfil nuevo «Óptimo VR <Hz> Hz (fecha)» en graficos.json SIN aplicar + consejos
 (texturas y DLSS no se prueban sin reiniciar; Smart Smoothing; GPU al límite; probar 90 Hz si sobra). `RigProbe graficos optimizar` y
 botón «Optimizar en VR» en la pestaña de medición.
+Primera prueba real del optimizador (17/11/2026, NO VALE): la pantalla del visor se apagó a las 19:27:54 (sensor de proximidad, nadie
+lo llevaba puesto; PiService: "HMD screen state changed to false") a mitad de la medición previa y siguió apagada todo el optimizador:
+DCS a ~7 FPS (103 fotogramas por escena de 14 s) en las 8 pruebas, sesión OpenXR solo en VISIBLE (OJO: con Pimax nunca pasa a
+FOCUSED, tampoco en una medición buena: no sirve para detectarlo). De la medición de las 19:26 solo vale «ciudad» (72 FPS); los 36 de
+aeródromo/nubes son del apagón. Desde entonces: `PimaxInfo.ScreenOff` (pantalla apagada > 10 s durante la medición = error) y, sin
+Pimax, mediana > 40 ms en VR (< 25 FPS) = error; la nota «Sin cambios» distingue ya «llega» de «no llega».
+Medición de las 19:53 (17/11/2026, visor ya a 90 Hz en Pimax Play): ciudad 86 FPS, aeródromo y nubes 45 (mitad) = a 90 Hz NO llega
+(a 72 sí, 15/11). Salió "120 Hz" por dos fallos, corregidos: Pimax escribe "Performance body" en el MISMO segundo en que se cierra
+DCS (se leía antes: ahora `PimaxInfo.WaitSession` espera hasta 15 s) y la mediana conjunta de escenas a 90 y a 45 caía en 17 ms
+(= mitad de 120): ahora `DetectRefresh` cuenta fotogramas a < 6 % de cada periodo o su doble y gana el que reúna la mitad o más.
+Optimizador a 90 Hz (17/11/2026 20:00, visor encendido todo el rato): NO CONCLUYENTE. Smart Smoothing fijó DCS a 45 FPS en las 8
+pruebas (450 fotogramas exactos por escena de 10 s; Pimax: mediana 44,75, 99 % < 50 FPS, GPU 55 % de media), así que todas salen
+iguales. Desde entonces `VrOptimizer.LockedAtHalf`: si todas quedan a la mitad, nota «NO CONCLUYENTE» y ningún cambio. Para optimizar
+en un refresco al que DCS no llega hay que DESACTIVAR Smart Smoothing en Pimax Play durante la prueba (y reactivarlo después).
 Siguiente: probarlo de verdad; luego `graficos optimizar` (varias configuraciones en un solo arranque con los "trials" del script) y
 medir en vuelos reales (y MSFS por SimConnect).
 

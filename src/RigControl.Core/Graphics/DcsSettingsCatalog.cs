@@ -126,17 +126,86 @@ public static class PimaxInfo
     }
 
     /// <summary>
+    /// Momento en que se apagó la pantalla del visor entre <paramref name="from"/> y <paramref name="to"/> (líneas
+    /// "HMD screen state changed to false/true" de PiService: el sensor de proximidad la apaga si nadie lo lleva
+    /// puesto, y entonces DCS cae a unos pocos FPS). Null si estuvo encendida (se toleran <paramref name="toleranceSeconds"/>
+    /// apagada en total: Pimax la apaga y enciende un momento al arrancar) o si no hay registro de Pimax.
+    /// </summary>
+    public static DateTime? ScreenOff(DateTime from, DateTime to, string? logDir = null, double toleranceSeconds = 10)
+    {
+        logDir ??= LogDir;
+        if (!Directory.Exists(logDir)) return null;
+        const string mark = "HMD screen state changed to ";
+        List<(DateTime When, bool On)> events = [];
+        foreach (var file in Directory.EnumerateFiles(logDir, "PiService_*.log").OrderByDescending(File.GetLastWriteTimeUtc).Take(3))
+        {
+            try
+            {
+                using var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                using var reader = new StreamReader(fs);
+                while (reader.ReadLine() is { } line)
+                {
+                    var at = line.IndexOf(mark, StringComparison.Ordinal);
+                    if (at < 0 || line.Length < 23) continue;
+                    if (!DateTime.TryParse(line[..23], CultureInfo.InvariantCulture, DateTimeStyles.None, out var when)) continue;
+                    events.Add((when, line[(at + mark.Length)..].TrimStart().StartsWith("true", StringComparison.Ordinal)));
+                }
+            }
+            catch (IOException) { }
+        }
+        events.Sort((a, b) => a.When.CompareTo(b.When));
+        var on = true;                     // sin noticias, encendida
+        foreach (var e in events.Where(e => e.When < from)) on = e.On;
+        DateTime? firstOff = on ? null : from;
+        var offSince = on ? (DateTime?)null : from;
+        var offSeconds = 0.0;
+        foreach (var e in events.Where(e => e.When >= from && e.When <= to))
+        {
+            if (!e.On && offSince is null) { offSince = e.When; firstOff ??= e.When; }
+            else if (e.On && offSince is { } since) { offSeconds += (e.When - since).TotalSeconds; offSince = null; }
+        }
+        if (offSince is { } still) offSeconds += (to - still).TotalSeconds;
+        return offSeconds > toleranceSeconds ? firstOff : null;
+    }
+
+    /// <summary>
     /// Refresco al que iba el visor: el de Pimax si es de esta medición; si no, el ritmo de los fotogramas
     /// (mediana a menos de un 4 % de 72/90/120 Hz); si no, el configurado.
     /// </summary>
-    public static int DetectRefresh(double medianMs, int configured, PimaxSession? pimax, DateTime measuredFrom)
+    public static int DetectRefresh(double medianMs, int configured, PimaxSession? pimax, DateTime measuredFrom) =>
+        DetectRefresh([medianMs], configured, pimax, measuredFrom);
+
+    /// <summary>
+    /// Igual, con todos los fotogramas: gana el refresco con más fotogramas a menos de un 6 % de su periodo o del
+    /// doble (Smart Smoothing a la mitad), si son al menos la mitad. Una sola mediana no vale: con unas escenas a
+    /// 90 y otras a 45 caía en 17 ms (= mitad de 120 Hz) el 17/11/2026.
+    /// </summary>
+    public static int DetectRefresh(IReadOnlyList<double> frameMs, int configured, PimaxSession? pimax, DateTime measuredFrom)
     {
         if (pimax is { TargetFps: > 0 } p && p.When >= measuredFrom.AddMinutes(-1)) return p.TargetFps;
-        foreach (var hz in new[] { 72, 90, 120 })
-            if (Math.Abs(medianMs - 1000.0 / hz) / (1000.0 / hz) < 0.04) return hz;
-        // Sin llegar, con Smart Smoothing el visor fija la mitad (36, 45 o 60 FPS) y reproyecta.
-        foreach (var hz in new[] { 72, 90, 120 })
-            if (Math.Abs(medianMs - 2000.0 / hz) / (2000.0 / hz) < 0.04) return hz;
-        return configured;
+        if (frameMs.Count == 0) return configured;
+        static bool Near(double ms, double period) => Math.Abs(ms - period) / period < 0.06;
+        var best = new[] { 72, 90, 120 }
+            .Select(hz => (Hz: hz, Count: frameMs.Count(ms => Near(ms, 1000.0 / hz) || Near(ms, 2000.0 / hz))))
+            .MaxBy(c => c.Count);
+        return best.Count * 2 >= frameMs.Count ? best.Hz : configured;
+    }
+
+    /// <summary>
+    /// Pimax escribe el resumen de la sesión al cerrarse el juego, a veces un instante DESPUÉS de que DCS termine:
+    /// espera hasta <paramref name="waitMs"/> uno posterior a <paramref name="since"/> (sin registro de Pimax, no espera).
+    /// </summary>
+    public static PimaxSession? WaitSession(DateTime since, string? logDir = null, int waitMs = 15_000)
+    {
+        logDir ??= LogDir;
+        if (!Directory.Exists(logDir)) return null;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        while (true)
+        {
+            var s = LastSession(logDir: logDir);
+            if (s is not null && s.When >= since) return s;
+            if (clock.ElapsedMilliseconds >= waitMs) return s;
+            Thread.Sleep(500);
+        }
     }
 }

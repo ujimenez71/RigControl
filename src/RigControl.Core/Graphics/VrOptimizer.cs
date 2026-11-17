@@ -32,6 +32,10 @@ public sealed class VrOptimizer(DcsBenchmark bench, HeadsetInfo headset)
     /// <summary>"Llega" = como mucho un 2 % de fotogramas fuera de tiempo y el 1 % bajo a un 90 % del refresco.</summary>
     public static bool Holds(FrameStats s, int hz) => s.MissedPercent <= 2.0 && s.P1LowFps >= hz * 0.9;
 
+    /// <summary>Ritmo fijo a la mitad del refresco (mediana a < 3 % de 2000/hz y casi sin fotogramas más rápidos).</summary>
+    public static bool LockedAtHalf(FrameStats s, int hz) =>
+        Math.Abs(s.MedianMs - 2000.0 / hz) / (2000.0 / hz) < 0.03 && s.AvgFps < hz * 0.55;
+
     /// <summary>Un nivel arriba (holds) o abajo de cada ajuste que se puede probar, en el orden en que conviene probarlos.</summary>
     public static List<(DcsSetting Setting, int From, int To, double Score)> Candidates(IReadOnlyDictionary<string, string> current, bool up)
     {
@@ -91,6 +95,15 @@ public sealed class VrOptimizer(DcsBenchmark bench, HeadsetInfo headset)
             if (!holds && (ok || r.Total.MissedPercent < baseline.MissedPercent * 0.7)) passed.Add(c);
         }
 
+        // Todas las pruebas clavadas a la mitad del refresco = Smart Smoothing ha fijado el ritmo y no deja ver
+        // diferencias (17/11/2026: 45 FPS exactos en las 8 pruebas a 90 Hz). No se concluye nada.
+        var locked = !holds && tests.All(t => LockedAtHalf(t.Result.Total, hz));
+        if (locked)
+        {
+            passed.Clear();
+            progress?.Report($"Todas las pruebas quedaron fijas a {hz / 2} FPS (la mitad): Smart Smoothing no deja ver diferencias.");
+        }
+
         // ---- 2.º arranque: combinaciones (las de subir, de más a menos; las de bajar, de menos a más).
         List<(DcsSetting Setting, int From, int To, double Score)> chosen = [];
         if (passed.Count == 1)
@@ -123,6 +136,10 @@ public sealed class VrOptimizer(DcsBenchmark bench, HeadsetInfo headset)
             holds ? $"Cabe a {hz} Hz y se ve mejor: {c.Setting.Why.ToLowerInvariant()}."
                   : $"Libera GPU con poca pérdida visual ({c.Setting.Why.ToLowerInvariant()})."))];
         var notes = Notes(current, hz, holds, ups.Count, passed.Count, chosen, tests);
+        if (locked)
+            notes.Insert(0, $"NO CONCLUYENTE: todas las pruebas quedaron fijas a {hz / 2} FPS, la mitad de {hz} Hz. Smart Smoothing de Pimax " +
+                            "bloquea el ritmo cuando DCS no llega y así todas las configuraciones salen iguales. Desactívalo en Pimax Play " +
+                            "mientras optimizas (vuelve a activarlo después) y repite.");
         var settings = new Dictionary<string, string>(current, StringComparer.Ordinal);
         foreach (var c in chosen) settings[c.Setting.Key] = c.Setting.Levels[c.To].Value;
         var profile = new GraphicsProfile
@@ -130,7 +147,9 @@ public sealed class VrOptimizer(DcsBenchmark bench, HeadsetInfo headset)
             Name = $"Óptimo VR {hz} Hz ({DateTime.Now:dd-MM HH.mm})",
             Sim = "dcs",
             Vr = true,
-            Notes = (changes.Count == 0 ? "Sin cambios: tu configuración ya es la mejor de las probadas. "
+            Notes = (locked ? "NO CONCLUYENTE: Smart Smoothing fijó todas las pruebas a la mitad del refresco; repetir sin él. "
+                   : changes.Count == 0 ? (holds ? "Sin cambios: ninguna subida probada cabe; tu configuración es la buena para este refresco. "
+                                                 : "Sin cambios: NO llega al refresco y ningún ajuste probado mejora lo bastante (mira los consejos). ")
                                         : "Cambios: " + string.Join("; ", changes.Select(c => $"{c.Label} {c.From} → {c.To}")) + ". ") +
                     $"Optimizado en VR a {hz} Hz con la misión de prueba.",
             Settings = settings,
