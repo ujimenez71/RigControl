@@ -395,6 +395,9 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
   (`Start-Process .\src\RigProbe\bin\Debug\net10.0\RigProbe.exe -ArgumentList run,<perfil>`); en
   segundo plano solo la ve Claude. Para la app WPF se puede verificar el aspecto con una captura de
   la ventana (GetWindowRect + CopyFromScreen) y leer la imagen.
+- Ventana principal (17/11/2026, petición del usuario; ✅ comprobado moviendo, maximizando, cerrando y reabriendo): `WindowPlacement`
+  guarda al cerrar posición/tamaño normal y si estaba maximizada en `%APPDATA%\RigControl\ventana.json` (Get/SetWindowPlacement, píxeles
+  reales) y lo aplica en SourceInitialized; si ya no cae en ninguna pantalla (MonitorFromRect), sale centrada; minimizada = normal.
 - App WPF, pantalla Monitor ✅ (01/11/2026): lista de dispositivos con punto de actividad, detalle
   con ejes (barra + % + valor bruto, solo los que existen según `GetObjects`), hats con flecha y
   botones que se iluminan; registro de cambios (pausable). Lee a ~60 Hz con un DispatcherTimer en

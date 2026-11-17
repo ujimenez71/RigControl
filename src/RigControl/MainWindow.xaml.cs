@@ -44,11 +44,14 @@ public partial class MainWindow : Window
         // DirectInput necesita la ventana ya creada para el nivel cooperativo (compartido, en segundo plano).
         SourceInitialized += (_, _) =>
         {
+            WindowPlacement.Restore(this);   // posición y tamaño de la última vez
             var hwnd = new WindowInteropHelper(this).Handle;
             _monitor.Start(hwnd);
             _run.Initialize(hwnd);
             _profiles.Initialize(hwnd);
         };
+
+        Closing += (_, _) => WindowPlacement.Save(this);
 
         // Al cerrar: parar la ejecución (suelta teclas y dispositivos) y cerrar el monitor.
         Closed += (_, _) =>
