@@ -600,6 +600,11 @@ probar, por puntuación; hasta `MaxCombos` = 6); gana la más pequeña que llega
 mejora la media ≥ 5 % (nota «aún NO llega»). Sin cambios = SIN perfil (`OptimizeReport.Profile` null; antes se guardaba una copia de lo
 actual). Usuario: visor a 72 Hz con Smart Smoothing (17/11/2026). Ojo: sin registro de Pimax, 60 FPS justos se confunden con la mitad
 de 120 Hz (el refresco sale del resumen de Pimax).
+Optimizador con combinaciones (17/11/2026 20:57, ✅ válido, 72 Hz sin Smart Smoothing): aeródromo actual 61,1; solas: bosques 63,7,
+nubes 62,8, hierba 61,9; juntas (2.º arranque): bosques+nubes 57,9 (!), +hierba 59,1, +sombras terreno planas 62,6, +sombras medias
+62,3, +SSS no 64,1. Ni bajando 6 ajustes a la vez pasa de ~64: el ruido entre pruebas (±3 FPS) es tan grande como el efecto, y el
+aeródromo no depende de estos ajustes (muy probablemente CPU: muchos aviones de la IA en la escena; GPU 73 % de media). Sin perfil
+(mejora < 5 %): correcto. Siguiente: medir en vuelos reales antes de tocar nada más; el umbral de `Helps` (1 %) está por debajo del ruido.
 Siguiente: probarlo de verdad; luego `graficos optimizar` (varias configuraciones en un solo arranque con los "trials" del script) y
 medir en vuelos reales (y MSFS por SimConnect).
 
