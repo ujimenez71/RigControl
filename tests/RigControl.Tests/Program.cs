@@ -36,6 +36,7 @@ internal static class Program
                      ("Perfiles gráficos", GraphicsTests.Run),
                      ("Medición de DCS", BenchTests.Run),
                      ("Optimizador VR", OptimizerTests.Run),
+                     ("Vuelos en VR (Pimax)", VrSessionTests.Run),
                  })
         {
             Console.WriteLine($"\n===== {name} =====");

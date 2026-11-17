@@ -96,7 +96,7 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
 `mods` (estado de cada biblioteca), `mods <conjunto> [--dry]`, `mods importar <biblioteca> [--dry]`,
 `instantaneas` (grupos e instantáneas numeradas), `instantaneas crear <grupo|todo> [nombre]`,
 `instantaneas comparar <grupo> <n>`, `instantaneas restaurar <grupo> <n>` (pide confirmación),
-`ia` (generar perfiles con Claude, ver "Generar perfiles con IA"), `hoja <perfil> [--pdf]` (hoja de mandos, ver abajo), `graficos` / `graficos actual dcs|msfs [--monitor]` / `graficos guardar dcs|msfs <nombre> [--monitor]` / `graficos comparar|aplicar <nombre> [--dry]` (perfiles gráficos, ver abajo).
+`ia` (generar perfiles con Claude, ver "Generar perfiles con IA"), `hoja <perfil> [--pdf]` (hoja de mandos, ver abajo), `graficos` / `graficos actual dcs|msfs [--monitor]` / `graficos guardar dcs|msfs <nombre> [--monitor]` / `graficos comparar|aplicar <nombre> [--dry]` (perfiles gráficos, ver abajo), `graficos vuelos` (sesiones del visor según Pimax).
 - Fase 5, App Hangar (08/11/2026; escenarios con host falso + ping real, pantalla comprobada fuera de
   pantalla; ✅ verificado por el usuario con los programas reales: ningún paso en rojo, MSFS arranca,
   HapticSeat aparece en la bandeja y SimAppPro abre sin aviso de UAC): `Core/Hangar/`
@@ -605,6 +605,17 @@ nubes 62,8, hierba 61,9; juntas (2.º arranque): bosques+nubes 57,9 (!), +hierba
 62,3, +SSS no 64,1. Ni bajando 6 ajustes a la vez pasa de ~64: el ruido entre pruebas (±3 FPS) es tan grande como el efecto, y el
 aeródromo no depende de estos ajustes (muy probablemente CPU: muchos aviones de la IA en la escena; GPU 73 % de media). Sin perfil
 (mejora < 5 %): correcto. Siguiente: medir en vuelos reales antes de tocar nada más; el umbral de `Helps` (1 %) está por debajo del ruido.
+Vuelos en VR (17/11/2026, opción A elegida por el usuario frente a un registrador en DCS; escenarios en `VrSessionTests`, pestaña comprobada
+fuera de pantalla con los datos reales): `Core/Graphics/VrSessions.cs` lee TODAS las líneas "Performance body to send" de PiService (Pimax
+guarda unas 8 semanas: 28 archivos, 23 sesiones desde el 22/09/2026): inicio/fin (el fin viene como "18:33M:52S"), juego (`client_process`
+DCS / FlightSimulator2024), refresco, Smart Smoothing, FPS medios/mediana/1 %/5 % (muestreo a 1 Hz; cuenta los segundos a 0 de menús y
+cargas: la mediana manda), tramos <50/50-70/70-90/>90, GPU y CPU. Misión de DCS = líneas "loading mission from:" de dcs.log y dcs.log.old
+dentro de la sesión (solo las 2 últimas ejecuciones de DCS). Historial propio `%APPDATA%\RigControl\sesiones-vr.json` (Pimax borra lo viejo;
+la misión se conserva). Veredicto: llega / casi siempre / el X % del tiempo / a la mitad (Smart Smoothing) / no llega / sin imagen / corta.
+`DcsBenchmark` guarda su sesión en el historial al terminar (WaitSession + Refresh, solo si existe la carpeta de Pimax) para que salga
+como «Medición de RigControl»; las de 15/11 16:40 y 16:56 y 17/11 19:26-21:07 se marcaron a mano. App: pestaña «Vuelos en VR» en
+Gráficos (carga al abrirla; «Solo vuelos» oculta cortas, sin imagen y mediciones). Datos: en sep./oct. a 90 Hz sin SS los vuelos de DCS
+iban a 72-75 FPS de mediana (5 % bajo 57-64); 10/11 y 15/11 (72 Hz con SS) a 36 casi siempre; MSFS 06/10 a 41 FPS a 90 Hz.
 Siguiente: probarlo de verdad; luego `graficos optimizar` (varias configuraciones en un solo arranque con los "trials" del script) y
 medir en vuelos reales (y MSFS por SimConnect).
 

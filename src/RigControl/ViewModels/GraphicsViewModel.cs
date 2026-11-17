@@ -27,6 +27,27 @@ public sealed class MeasurementRow(BenchResult r)
     public string PerScene => string.Join(" · ", r.Scenes.Select(s => $"{s.Name} {s.Stats.AvgFps:0}" + (r.Vr ? $" ({s.Stats.MissedPercent:0} %)" : "")));
 }
 
+/// <summary>Una sesión del visor (resumen de Pimax) en la tabla de vuelos.</summary>
+public sealed class VrSessionRow(VrSession s)
+{
+    public VrSession Model => s;
+    public string When => s.Start.ToString("dd/MM HH:mm");
+    public string Game => s.Game;
+    public string Duration => s.Seconds < 60 ? $"{s.Seconds} s" : $"{s.Seconds / 60} min";
+    public string Hz => s.TargetHz > 0 ? $"{s.TargetHz} Hz" + (s.SmartSmoothing ? " · SS" : "") : "?";
+    public string Median => s.MedianFps.ToString("0");
+    public string P5 => s.P5Fps.ToString("0");
+    public string Below50 => $"{s.Below50 * 100:0} %";
+    public string Gpu => $"{s.AvgGpu:0} %";
+    public string GpuDetail => $"GPU media {s.AvgGpu:0} %; por encima del 80 % el {s.GpuOver80 * 100:0} % del tiempo. CPU media {s.AvgCpu:0} %." +
+                               (s.Resolution is null ? "" : $" Resolución por ojo {s.Resolution}.");
+    /// <summary>Veredicto y, debajo, la misión (o «Medición de RigControl»).</summary>
+    public string Result => s.Verdict + (Mission.Length > 0 ? "\n" + Mission : "");
+    public string Mission => s.IsBenchmark ? "Medición de RigControl" : s.Mission ?? "";
+    /// <summary>Sesión corta, sin imagen casi todo el rato o medición de RigControl: no es un vuelo.</summary>
+    public bool IsNoise => s.Seconds < 120 || s.MedianFps <= 1 || s.IsBenchmark;
+}
+
 /// <summary>
 /// Pantalla Gráficos: perfiles de ajustes gráficos de DCS y MSFS 2024 (graficos.json), revisión para VR de lo
 /// que hay ahora y de cada perfil, diferencias con lo actual, y aplicar (simulador cerrado, con copia .bak).
@@ -216,6 +237,43 @@ public sealed class GraphicsViewModel : ObservableObject, IDisposable
     {
         Measurements.Clear();
         foreach (var r in DcsBenchmark.LoadResults()) Measurements.Add(new MeasurementRow(r));
+    }
+
+    // ------------------------------------------------------------------ vuelos (sesiones de Pimax)
+
+    private List<VrSessionRow> _allFlights = [];
+    public ObservableCollection<VrSessionRow> Flights { get; } = [];
+
+    private bool _onlyFlights = true;
+    /// <summary>Ocultar sesiones cortas, sin imagen y mediciones de RigControl.</summary>
+    public bool OnlyFlights { get => _onlyFlights; set { if (Set(ref _onlyFlights, value)) FilterFlights(); } }
+
+    private string _flightsInfo = "";
+    public string FlightsInfo { get => _flightsInfo; private set => Set(ref _flightsInfo, value); }
+
+    /// <summary>Lee los registros de Pimax (y las misiones de dcs.log), los junta con el historial y lo guarda.</summary>
+    public async Task LoadFlightsAsync()
+    {
+        FlightsInfo = "Leyendo los registros de Pimax…";
+        try
+        {
+            var sessions = await Task.Run(() => VrSessions.Refresh());
+            _allFlights = [.. sessions.Select(s => new VrSessionRow(s))];
+            FilterFlights();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            FlightsInfo = $"No se pudieron leer las sesiones: {ex.Message}";
+        }
+    }
+
+    private void FilterFlights()
+    {
+        Flights.Clear();
+        foreach (var r in _allFlights.Where(r => !_onlyFlights || !r.IsNoise)) Flights.Add(r);
+        FlightsInfo = _allFlights.Count == 0
+            ? "Pimax aún no ha guardado ninguna sesión (se guarda al cerrar el juego)."
+            : $"{Flights.Count} de {_allFlights.Count} sesiones. Historial en {VrSessions.HistoryPath}.";
     }
 
     private void RefreshMeasureOptions()

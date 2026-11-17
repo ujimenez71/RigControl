@@ -12,6 +12,18 @@ public partial class GraphicsView : UserControl
 
     private GraphicsViewModel Vm => (GraphicsViewModel)DataContext;
 
+    private bool _flightsLoaded;
+
+    /// <summary>Los vuelos se leen la primera vez que se abre su pestaña (leer todos los registros de Pimax lleva un momento).</summary>
+    private async void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (e.OriginalSource != Tabs || Tabs.SelectedItem != FlightsTab || _flightsLoaded) return;
+        _flightsLoaded = true;
+        await Vm.LoadFlightsAsync();
+    }
+
+    private async void RefreshFlights_Click(object sender, RoutedEventArgs e) => await Vm.LoadFlightsAsync();
+
     /// <summary>El registro de progreso sigue a la última línea cuando crece.</summary>
     private void LogScroll_ScrollChanged(object sender, ScrollChangedEventArgs e)
     {

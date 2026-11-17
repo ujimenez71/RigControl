@@ -113,7 +113,7 @@ internal static class Program
                 Console.WriteLine("            | dcs vigilar [filtro] | hangar [nombre [--dry]] | ventanas <proceso>");
                 Console.WriteLine("            | mods | mods <conjunto> [--dry] | mods importar <biblioteca> [--dry]");
                 Console.WriteLine("            | instantaneas | instantaneas crear <grupo|todo> [nombre] | instantaneas comparar|restaurar <grupo> <n>");
-                Console.WriteLine("            | graficos | graficos actual dcs|msfs [--monitor] | graficos guardar dcs|msfs <nombre> [--monitor] | graficos comparar|aplicar <nombre> [--dry] | graficos medir [perfil] [--monitor] | graficos optimizar | graficos mediciones");
+                Console.WriteLine("            | graficos | graficos actual dcs|msfs [--monitor] | graficos guardar dcs|msfs <nombre> [--monitor] | graficos comparar|aplicar <nombre> [--dry] | graficos medir [perfil] [--monitor] | graficos optimizar | graficos mediciones | graficos vuelos");
                 Console.WriteLine("            | hoja <perfil> [--pdf] | ia | ia clave [borrar] | ia contexto <avión|actual> | ia <avión|actual> \"lo que quieres\" [--base <perfil>]");
                 Console.WriteLine("            | winwing | winwing luces | winwing led <disp> <n> <valor> [--modulo XXXX] | winwing barrido <disp> [desde] [hasta] [--modulo XXXX] [--valor N]");
                 Console.WriteLine($"  <perfil> es una ruta a un .json o un nombre en {ProfileFile.ProfilesDir}");
@@ -270,6 +270,18 @@ internal static class Program
                         Console.WriteLine($"  {r.When:dd/MM HH:mm}  {(r.Vr ? $"VR {r.RefreshHz} Hz" : "monitor"),-9} {r.Profile,-24} {r.Total}");
                     return 0;
                 }
+                case "vuelos":
+                {
+                    // Sesiones del visor según Pimax (también vuelos normales, sin instalar nada), con historial propio.
+                    var sessions = RigControl.Core.Graphics.VrSessions.Refresh();
+                    if (sessions.Count == 0) { Console.WriteLine("No hay sesiones de Pimax (¿registro de PiService en otra carpeta?)."); return 0; }
+                    Console.WriteLine("  Inicio       Juego       Dur.   Hz  SS  Mediana  5 % bajo  <50 FPS  GPU   Veredicto / misión");
+                    foreach (var s in sessions)
+                        Console.WriteLine($"  {s.Start:dd/MM HH:mm}  {s.Game,-10} {s.Seconds / 60,3} min {s.TargetHz,3}  {(s.SmartSmoothing ? "sí" : "no"),-3} {s.MedianFps,6:0.0} {s.P5Fps,8:0.0} {s.Below50 * 100,7:0} % {s.AvgGpu,4:0} %  " +
+                                          $"{s.Verdict}{(s.Mission is null ? "" : $" · {s.Mission}")}");
+                    Console.WriteLine($"Historial en {RigControl.Core.Graphics.VrSessions.HistoryPath}");
+                    return 0;
+                }
                 case "comparar" or "aplicar" when args.Length > 1:
                 {
                     var name = string.Join(' ', args.Skip(1));
@@ -289,7 +301,7 @@ internal static class Program
             Console.WriteLine(ex.Message);
             return 1;
         }
-        Console.WriteLine("Uso: graficos | graficos actual dcs|msfs [--monitor] | graficos guardar dcs|msfs <nombre> [--monitor] | graficos comparar|aplicar <nombre> [--dry] | graficos medir [perfil] [--monitor] | graficos optimizar | graficos mediciones");
+        Console.WriteLine("Uso: graficos | graficos actual dcs|msfs [--monitor] | graficos guardar dcs|msfs <nombre> [--monitor] | graficos comparar|aplicar <nombre> [--dry] | graficos medir [perfil] [--monitor] | graficos optimizar | graficos mediciones | graficos vuelos");
         return 1;
 
         static void PrintAdvice(List<RigControl.Core.Graphics.GraphicsAdvice> advice)

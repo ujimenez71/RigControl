@@ -239,7 +239,26 @@ public sealed class DcsBenchmark
         finally
         {
             Restore();
+            if (vr) RecordVrSession(started);
         }
+    }
+
+    /// <summary>Historial de sesiones del visor (en las pruebas, sin Pimax, no se toca).</summary>
+    public string VrHistoryPath { get; init; } = VrSessions.HistoryPath;
+
+    /// <summary>
+    /// Guarda en el historial de vuelos la sesión de Pimax de esta medición mientras dcs.log aún tiene su misión
+    /// (rigcontrol_bench): así sale como «Medición de RigControl» y no como un vuelo. Nunca falla la medición.
+    /// </summary>
+    private void RecordVrSession(DateTime started)
+    {
+        if (!Directory.Exists(PimaxLogDir)) return;
+        try
+        {
+            PimaxInfo.WaitSession(started, PimaxLogDir);
+            VrSessions.Refresh(PimaxLogDir, SavedGamesDir, VrHistoryPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException) { }
     }
 
     // ------------------------------------------------------------------ pasos
