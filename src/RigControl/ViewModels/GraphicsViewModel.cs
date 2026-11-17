@@ -57,6 +57,16 @@ public sealed class GraphicsViewModel : ObservableObject, IDisposable
 
     public ObservableCollection<string> MeasureOptions { get; } = [CurrentSettings];
     public ObservableCollection<string> MeasureLog { get; } = [];
+
+    /// <summary>Línea del registro con la hora; las de «… mm:ss» (cada 30 s) sustituyen a la anterior del mismo tipo.</summary>
+    private void AddLog(string message)
+    {
+        var line = $"{DateTime.Now:HH:mm:ss}  {message}";
+        if (message.TrimStart().StartsWith('…') && MeasureLog.Count > 0 && MeasureLog[^1][10..].TrimStart().StartsWith('…'))
+            MeasureLog[^1] = line;
+        else
+            MeasureLog.Add(line);
+    }
     public ObservableCollection<MeasurementRow> Measurements { get; } = [];
 
     public string MeasureChoice { get => _measureChoice; set { if (value is not null && Set(ref _measureChoice, value)) Raise(nameof(MeasureIndex)); } }
@@ -108,23 +118,23 @@ public sealed class GraphicsViewModel : ObservableObject, IDisposable
         MeasureLog.Clear();
         _measureCts = new CancellationTokenSource();
         var token = _measureCts.Token;
-        var progress = new Progress<string>(m => MeasureLog.Add($"{DateTime.Now:HH:mm:ss}  {m}"));
+        var progress = new Progress<string>(AddLog);
         ((IProgress<string>)progress).Report($"Midiendo {(profile is null ? "los ajustes actuales" : $"«{profile.Name}»")} {(vr ? $"en VR ({refresh} Hz)" : "en el monitor")}.");
         try
         {
             var r = await Task.Run(() => new DcsBenchmark(saved, exe).Measure(profile, vr, refresh, progress, token), token);
-            MeasureLog.Add($"{DateTime.Now:HH:mm:ss}  Terminado: {r.Total.AvgFps:0.0} FPS de media" +
+            AddLog($"Terminado: {r.Total.AvgFps:0.0} FPS de media" +
                            (vr ? $", {r.Total.MissedPercent:0.0} % fuera de tiempo." : "."));
             Message = "Medición guardada. Tu configuración de DCS está como antes.";
         }
         catch (OperationCanceledException)
         {
-            MeasureLog.Add($"{DateTime.Now:HH:mm:ss}  Cancelado: DCS cerrado y configuración restaurada.");
+            AddLog($"Cancelado: DCS cerrado y configuración restaurada.");
         }
         catch (Exception ex) when (ex is InvalidOperationException or InvalidDataException or TimeoutException or IOException
                                        or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
         {
-            MeasureLog.Add($"{DateTime.Now:HH:mm:ss}  {ex.Message}");
+            AddLog($"{ex.Message}");
             Message = "La medición no se pudo hacer; tu configuración de DCS está como antes.";
         }
         finally
@@ -164,32 +174,34 @@ public sealed class GraphicsViewModel : ObservableObject, IDisposable
         OptimizeSummary = "";
         _measureCts = new CancellationTokenSource();
         var token = _measureCts.Token;
-        var progress = new Progress<string>(m => MeasureLog.Add($"{DateTime.Now:HH:mm:ss}  {m}"));
+        var progress = new Progress<string>(AddLog);
         try
         {
             var headset = _file.Headset;
             var report = await Task.Run(() => new VrOptimizer(new DcsBenchmark(saved, exe), headset).Run(progress, token), token);
-            foreach (var t in report.Tests)
-                MeasureLog.Add($"    {(t.Holds ? "✔" : "✘")} {t.Description}: {t.Result.Total.AvgFps:0.0} FPS, {t.Result.Total.MissedPercent:0.0} % fuera de tiempo");
+            var tests = "\n\nPruebas (✔ = llega al refresco):\n" + string.Join("\n", report.Tests.Select(t =>
+                $"{(t.Holds ? "✔" : "✘")} {t.Description}: {t.Result.Total.AvgFps:0.0} FPS, {t.Result.Total.MissedPercent:0.0} % fuera de tiempo" +
+                (t.Result.Scenes.Count > 1 ? $" ({string.Join(", ", t.Result.Scenes.Select(sc => $"{sc.Name} {sc.Stats.AvgFps:0.0}"))})" : "")));
+            AddLog("Terminado: el resultado está en el recuadro de abajo.");
             if (report.Profile is { } profile)
             {
                 _file.Profiles.Add(profile);
                 Save();
-                OptimizeSummary = VrOptimizer.Describe(report) + $"\nGuardado como perfil «{profile.Name}» (sin aplicar): elígelo en la lista, revisa la pestaña Perfil y pulsa Aplicar.";
+                OptimizeSummary = VrOptimizer.Describe(report) + $"\nGuardado como perfil «{profile.Name}» (sin aplicar): elígelo en la lista, revisa la pestaña Perfil y pulsa Aplicar." + tests;
                 Reload(keep: profile.Name);
             }
             else
-                OptimizeSummary = VrOptimizer.Describe(report) + "\nSin cambios que recomendar: no se guarda ningún perfil.";
+                OptimizeSummary = VrOptimizer.Describe(report) + "\nSin cambios que recomendar: no se guarda ningún perfil." + tests;
             Message = "Optimización terminada. Tu configuración de DCS está como antes.";
         }
         catch (OperationCanceledException)
         {
-            MeasureLog.Add($"{DateTime.Now:HH:mm:ss}  Cancelado: DCS cerrado y configuración restaurada.");
+            AddLog($"Cancelado: DCS cerrado y configuración restaurada.");
         }
         catch (Exception ex) when (ex is InvalidOperationException or InvalidDataException or TimeoutException or IOException
                                        or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
         {
-            MeasureLog.Add($"{DateTime.Now:HH:mm:ss}  {ex.Message}");
+            AddLog($"{ex.Message}");
             Message = "La optimización no se pudo terminar; tu configuración de DCS está como antes.";
         }
         finally

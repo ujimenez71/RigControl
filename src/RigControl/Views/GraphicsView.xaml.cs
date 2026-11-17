@@ -12,6 +12,12 @@ public partial class GraphicsView : UserControl
 
     private GraphicsViewModel Vm => (GraphicsViewModel)DataContext;
 
+    /// <summary>El registro de progreso sigue a la última línea cuando crece.</summary>
+    private void LogScroll_ScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (e.ExtentHeightChange > 0) LogScroll.ScrollToEnd();
+    }
+
     private void Reload_Click(object sender, RoutedEventArgs e) => Vm.Reload(Vm.Selected?.Name);
 
     private void OpenFile_Click(object sender, RoutedEventArgs e)
