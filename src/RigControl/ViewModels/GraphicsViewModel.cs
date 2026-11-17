@@ -171,11 +171,16 @@ public sealed class GraphicsViewModel : ObservableObject, IDisposable
             var report = await Task.Run(() => new VrOptimizer(new DcsBenchmark(saved, exe), headset).Run(progress, token), token);
             foreach (var t in report.Tests)
                 MeasureLog.Add($"    {(t.Holds ? "✔" : "✘")} {t.Description}: {t.Result.Total.AvgFps:0.0} FPS, {t.Result.Total.MissedPercent:0.0} % fuera de tiempo");
-            _file.Profiles.Add(report.Profile);
-            Save();
-            OptimizeSummary = VrOptimizer.Describe(report) + $"\nGuardado como perfil «{report.Profile.Name}» (sin aplicar): elígelo en la lista, revisa la pestaña Perfil y pulsa Aplicar.";
+            if (report.Profile is { } profile)
+            {
+                _file.Profiles.Add(profile);
+                Save();
+                OptimizeSummary = VrOptimizer.Describe(report) + $"\nGuardado como perfil «{profile.Name}» (sin aplicar): elígelo en la lista, revisa la pestaña Perfil y pulsa Aplicar.";
+                Reload(keep: profile.Name);
+            }
+            else
+                OptimizeSummary = VrOptimizer.Describe(report) + "\nSin cambios que recomendar: no se guarda ningún perfil.";
             Message = "Optimización terminada. Tu configuración de DCS está como antes.";
-            Reload(keep: report.Profile.Name);
         }
         catch (OperationCanceledException)
         {

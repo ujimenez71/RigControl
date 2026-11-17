@@ -10,7 +10,7 @@ public sealed record OptimizerTest(string Description, BenchResult Result, bool 
 
 /// <summary>Lo que sale de optimizar: refresco detectado, pruebas, cambios recomendados, consejos y el perfil propuesto.</summary>
 public sealed record OptimizeReport(int RefreshHz, bool BaselineHolds, FrameStats Baseline, List<OptimizerTest> Tests,
-                                    List<Recommendation> Changes, List<string> Notes, GraphicsProfile Profile);
+                                    List<Recommendation> Changes, List<string> Notes, GraphicsProfile? Profile);
 
 /// <summary>
 /// Optimizador para VR. En el visor el ritmo lo marca su refresco: si DCS llega, cada fotograma tarda lo mismo
@@ -89,45 +89,75 @@ public sealed class VrOptimizer(DcsBenchmark bench, HeadsetInfo headset)
         {
             var c = downs[i];
             var r = r1[1 + ups.Count + i];
-            var ok = Holds(r.Total, hz);
-            tests.Add(new($"{c.Setting.Label}: {c.Setting.Levels[c.From].Name} → {c.Setting.Levels[c.To].Name}", r, ok));
-            // Sin llegar: vale si llega o si mejora claramente los fotogramas fuera de tiempo.
-            if (!holds && (ok || r.Total.MissedPercent < baseline.MissedPercent * 0.7)) passed.Add(c);
+            tests.Add(new($"{c.Setting.Label}: {c.Setting.Levels[c.From].Name} → {c.Setting.Levels[c.To].Name}", r, Holds(r.Total, hz)));
         }
 
         // Todas las pruebas clavadas a la mitad del refresco = Smart Smoothing ha fijado el ritmo y no deja ver
         // diferencias (17/11/2026: 45 FPS exactos en las 8 pruebas a 90 Hz). No se concluye nada.
         var locked = !holds && tests.All(t => LockedAtHalf(t.Result.Total, hz));
-        if (locked)
-        {
-            passed.Clear();
-            progress?.Report($"Todas las pruebas quedaron fijas a {hz / 2} FPS (la mitad): Smart Smoothing no deja ver diferencias.");
-        }
+        if (locked) progress?.Report($"Todas las pruebas quedaron fijas a {hz / 2} FPS (la mitad): Smart Smoothing no deja ver diferencias.");
 
-        // ---- 2.º arranque: combinaciones (las de subir, de más a menos; las de bajar, de menos a más).
         List<(DcsSetting Setting, int From, int To, double Score)> chosen = [];
-        if (passed.Count == 1)
-            chosen = passed;   // ya medido por separado
-        else if (passed.Count > 0)
+        FrameStats? reached = null;     // cifras de la configuración recomendada (si se ha medido)
+        if (holds && passed.Count == 1)
+            chosen = passed;            // ya medido por separado
+        else if (holds && passed.Count > 1)
         {
-            var combos = holds
-                ? Enumerable.Range(1, passed.Count).Reverse().Take(4).Select(n => passed.Take(n).ToList()).ToList()
-                : Enumerable.Range(1, passed.Count).Take(4).Select(n => passed.Take(n).ToList()).ToList();
-            progress?.Report($"Arranque 2: probando {combos.Count} combinación(es) de los cambios que han valido.");
-            var comboTrials = combos.Select((combo, i) =>
-            {
-                var set = Base();
-                foreach (var c in combo) set = With(set, c.Setting, c.To);
-                return new BenchTrial($"combo{i}", set);
-            }).ToList();
-            var r2 = bench.MeasureTrials(null, comboTrials, vr: true, headset.RefreshHz, progress, cancel, sceneSeconds: SceneSeconds);
+            // ---- 2.º arranque (llega): combinaciones de las subidas que caben, de más a menos; gana la mayor que llega.
+            var combos = Enumerable.Range(1, passed.Count).Reverse().Take(4).Select(n => passed.Take(n).ToList()).ToList();
+            var r2 = MeasureCombos(combos, Base, progress, cancel);
             for (var i = 0; i < combos.Count; i++)
             {
                 var ok = Holds(r2[i].Total, hz);
-                tests.Add(new("Juntos: " + string.Join(", ", combos[i].Select(c => $"{c.Setting.Label} {c.Setting.Levels[c.To].Name}")), r2[i], ok));
-                if (ok && chosen.Count == 0) chosen = combos[i];   // subir: la más grande que llega; bajar: la más pequeña
+                tests.Add(new(ComboName(combos[i]), r2[i], ok));
+                if (ok && chosen.Count == 0) chosen = combos[i];
             }
-            if (chosen.Count == 0 && !holds) chosen = combos[^1];  // no llega con ninguna: al menos la que más mejora
+        }
+        else if (!holds && !locked)
+        {
+            // No llega. Si una bajada sola ya llega, la de menos pérdida (van por puntuación). Si no, 2.º arranque:
+            // bajadas acumuladas, primero las que han mejorado algo (de más a menos) y luego otras aún sin probar
+            // (sombras, visibilidad...). Gana la más pequeña que llega; si ninguna, la más pequeña que da casi lo
+            // mismo que la mejor, y solo si mejora claramente (17/11/2026: a 72 Hz el aeródromo iba a 60 FPS y
+            // ninguna bajada sola pasaba de 63).
+            var single = downs.Select((c, i) => (c, r: r1[1 + ups.Count + i].Total)).ToList();
+            var holder = single.FirstOrDefault(x => Holds(x.r, hz));
+            if (holder.c.Setting is not null)
+            {
+                chosen = [holder.c];
+                reached = holder.r;
+            }
+            else
+            {
+                var helpful = single.Where(x => Helps(x.r, baseline)).OrderByDescending(x => x.r.AvgFps).Select(x => x.c).ToList();
+                var untested = Candidates(current, up: false).Where(c => downs.All(d => d.Setting.Key != c.Setting.Key)).Take(MaxExtraDowns);
+                var order = helpful.Concat(untested).ToList();
+                var combos = Enumerable.Range(1, order.Count)
+                    .Where(n => n > helpful.Count || n >= 2)          // una sola de las que ya han mejorado ya está medida
+                    .Take(MaxCombos).Select(n => order.Take(n).ToList()).ToList();
+                if (combos.Count > 0)
+                {
+                    var r2 = MeasureCombos(combos, Base, progress, cancel);
+                    List<(List<(DcsSetting Setting, int From, int To, double Score)> Combo, FrameStats Stats)> measured = [];
+                    for (var i = 0; i < combos.Count; i++)
+                    {
+                        var ok = Holds(r2[i].Total, hz);
+                        tests.Add(new(ComboName(combos[i]), r2[i], ok));
+                        measured.Add((combos[i], r2[i].Total));
+                    }
+                    var first = measured.FirstOrDefault(m => Holds(m.Stats, hz));
+                    if (first.Combo is not null) (chosen, reached) = (first.Combo, first.Stats);
+                    else
+                    {
+                        var best = measured.MaxBy(m => m.Stats.AvgFps);
+                        if (best.Stats.AvgFps >= baseline.AvgFps * 1.05)
+                        {
+                            var pick = measured.First(m => m.Stats.AvgFps >= best.Stats.AvgFps * 0.99);
+                            (chosen, reached) = (pick.Combo, pick.Stats);
+                        }
+                    }
+                }
+            }
         }
 
         // ---- Recomendaciones, consejos y perfil.
@@ -136,25 +166,57 @@ public sealed class VrOptimizer(DcsBenchmark bench, HeadsetInfo headset)
             holds ? $"Cabe a {hz} Hz y se ve mejor: {c.Setting.Why.ToLowerInvariant()}."
                   : $"Libera GPU con poca pérdida visual ({c.Setting.Why.ToLowerInvariant()})."))];
         var notes = Notes(current, hz, holds, ups.Count, passed.Count, chosen, tests);
+        if (!holds && reached is { } st && !Holds(st, hz))
+            notes.Insert(0, $"Con estos cambios aún NO llega a {hz} Hz ({st.AvgFps:0.0} FPS de media frente a {baseline.AvgFps:0.0}), " +
+                            "pero es lo que más mejora sin perder mucho. Para llegar del todo: DLSS en un modo más rápido o menos resolución en Pimax Play.");
         if (locked)
             notes.Insert(0, $"NO CONCLUYENTE: todas las pruebas quedaron fijas a {hz / 2} FPS, la mitad de {hz} Hz. Smart Smoothing de Pimax " +
                             "bloquea el ritmo cuando DCS no llega y así todas las configuraciones salen iguales. Desactívalo en Pimax Play " +
                             "mientras optimizas (vuelve a activarlo después) y repite.");
-        var settings = new Dictionary<string, string>(current, StringComparer.Ordinal);
-        foreach (var c in chosen) settings[c.Setting.Key] = c.Setting.Levels[c.To].Value;
-        var profile = new GraphicsProfile
+        // Sin cambios no hay perfil: sería una copia de lo actual.
+        GraphicsProfile? profile = null;
+        if (changes.Count > 0)
         {
-            Name = $"Óptimo VR {hz} Hz ({DateTime.Now:dd-MM HH.mm})",
-            Sim = "dcs",
-            Vr = true,
-            Notes = (locked ? "NO CONCLUYENTE: Smart Smoothing fijó todas las pruebas a la mitad del refresco; repetir sin él. "
-                   : changes.Count == 0 ? (holds ? "Sin cambios: ninguna subida probada cabe; tu configuración es la buena para este refresco. "
-                                                 : "Sin cambios: NO llega al refresco y ningún ajuste probado mejora lo bastante (mira los consejos). ")
-                                        : "Cambios: " + string.Join("; ", changes.Select(c => $"{c.Label} {c.From} → {c.To}")) + ". ") +
-                    $"Optimizado en VR a {hz} Hz con la misión de prueba.",
-            Settings = settings,
-        };
+            var settings = new Dictionary<string, string>(current, StringComparer.Ordinal);
+            foreach (var c in chosen) settings[c.Setting.Key] = c.Setting.Levels[c.To].Value;
+            profile = new GraphicsProfile
+            {
+                Name = $"Óptimo VR {hz} Hz ({DateTime.Now:dd-MM HH.mm})",
+                Sim = "dcs",
+                Vr = true,
+                Notes = "Cambios: " + string.Join("; ", changes.Select(c => $"{c.Label} {c.From} → {c.To}")) + ". " +
+                        (reached is { } rr && !Holds(rr, hz) ? $"Aún no llega a {hz} Hz, pero mejora. " : "") +
+                        $"Optimizado en VR a {hz} Hz con la misión de prueba.",
+                Settings = settings,
+            };
+        }
         return new OptimizeReport(hz, holds, baseline, tests, changes, notes, profile);
+    }
+
+    /// <summary>Bajadas extra (aún sin probar) que entran en las combinaciones cuando no llega.</summary>
+    public int MaxExtraDowns { get; init; } = 3;
+
+    /// <summary>Combinaciones como mucho en el 2.º arranque.</summary>
+    public int MaxCombos { get; init; } = 6;
+
+    /// <summary>Una bajada "ayuda" si sube la media más de un 1 % o quita más de un punto de fotogramas fuera de tiempo.</summary>
+    private static bool Helps(FrameStats r, FrameStats baseline) =>
+        r.AvgFps > baseline.AvgFps * 1.01 || r.MissedPercent < baseline.MissedPercent - 1;
+
+    private static string ComboName(List<(DcsSetting Setting, int From, int To, double Score)> combo) =>
+        "Juntos: " + string.Join(", ", combo.Select(c => $"{c.Setting.Label} {c.Setting.Levels[c.To].Name}"));
+
+    private List<BenchResult> MeasureCombos(List<List<(DcsSetting Setting, int From, int To, double Score)>> combos,
+                                            Func<Dictionary<string, string>> baseSet, IProgress<string>? progress, CancellationToken cancel)
+    {
+        progress?.Report($"Arranque 2: probando {combos.Count} combinación(es) de cambios.");
+        var trials = combos.Select((combo, i) =>
+        {
+            var set = baseSet();
+            foreach (var c in combo) set = With(set, c.Setting, c.To);
+            return new BenchTrial($"combo{i}", set);
+        }).ToList();
+        return bench.MeasureTrials(null, trials, vr: true, headset.RefreshHz, progress, cancel, sceneSeconds: SceneSeconds);
     }
 
     private List<string> Notes(Dictionary<string, string> current, int hz, bool holds, int triedUp, int passed,
@@ -167,7 +229,7 @@ public sealed class VrOptimizer(DcsBenchmark bench, HeadsetInfo headset)
         if (holds && passed == 0 && triedUp > 0)
             notes.Add($"Ninguna subida cabe a {hz} Hz: estás en el límite; tu configuración es la buena para este refresco.");
         if (!holds && !tests.Skip(1).Any(t => t.Holds))
-            notes.Add($"Ni bajando un ajuste se llega a {hz} Hz: baja el modo de DLSS (p. ej. Quality → Balanced), la resolución en Pimax Play o el refresco.");
+            notes.Add($"Ni bajando ajustes se llega a {hz} Hz: baja el modo de DLSS (p. ej. Quality → Balanced), la resolución en Pimax Play o el refresco.");
         if (pimax is { SmartSmoothing: true })
             notes.Add("Smart Smoothing está activo en Pimax Play: si DCS no llega al refresco, el visor lo fija a la mitad y reproyecta (se nota en movimientos rápidos).");
         if (pimax is { GpuOver80Percent: > 30 })

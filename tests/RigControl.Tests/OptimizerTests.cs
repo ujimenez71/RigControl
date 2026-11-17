@@ -16,6 +16,8 @@ internal static class OptimizerTests
         public int Launches;
         /// <summary>Tiempo de fotograma fijo (p. ej. 137 ms = visor apagado), en lugar del modelo.</summary>
         public double? ForceMs;
+        /// <summary>Con Smart Smoothing (por defecto) lo que no llega cae a la mitad; sin él, va a su ritmo.</summary>
+        public bool SmartSmoothing = true;
         public List<int> TrialsPerLaunch = [];
 
         public bool IsRunning() => false;
@@ -42,8 +44,12 @@ internal static class OptimizerTests
                     values["graphics." + k] = s.IndexOf(lua);
                 }
                 var ms = renderMs(values);
-                var paced = ForceMs ?? (ms <= 1000.0 / 72 ? 1000.0 / 72 : 1000.0 / 36);   // visor a 72 Hz con Smart Smoothing
-                var frames = string.Join(",", Enumerable.Range(0, 200).Select(i => (paced + (i % 7) * 0.01).ToString("0.000", CultureInfo.InvariantCulture)));
+                // Visor a 72 Hz. Con Smart Smoothing lo que no llega cae a la mitad; sin él, cada fotograma dura uno o dos
+                // periodos, en la proporción que da su media (como el aeródromo real: ~60 FPS = 13,9 y 27,8 ms mezclados).
+                const double period = 1000.0 / 72;
+                var late = ForceMs is null && !SmartSmoothing && ms > period ? (int)Math.Round(200 * Math.Min(1, (ms - period) / period)) : 0;
+                var paced = ForceMs ?? (ms <= period ? period : SmartSmoothing ? 2 * period : period);
+                var frames = string.Join(",", Enumerable.Range(0, 200).Select(i => ((i < late ? 2 * period : paced) + (i % 7) * 0.01).ToString("0.000", CultureInfo.InvariantCulture)));
                 var scenes = string.Join(",", DcsBenchmark.Scenes.Select(sc => $"{{\"name\":\"{sc.Name}\",\"frame_ms\":[{frames}]}}"));
                 parts.Add($"{{\"tag\":\"{t["tag"]}\",\"scenes\":[{scenes}]}}");
             }
@@ -138,12 +144,12 @@ internal static class OptimizerTests
             Check(report.RefreshHz == 72, "optimizar: refresco detectado = 72 aunque el configurado sea 90");
             Check(report.BaselineHolds && dcs.Launches == 2 && dcs.TrialsPerLaunch[0] == 8,
                   $"llega: un arranque con la actual + 7 pruebas y otro de combinaciones ({string.Join("+", dcs.TrialsPerLaunch)})");
-            var final = report.Profile.Settings.Where(kv => DcsSettingsCatalog.Find(kv.Key) is not null)
+            var final = report.Profile!.Settings.Where(kv => DcsSettingsCatalog.Find(kv.Key) is not null)
                 .ToDictionary(kv => kv.Key, kv => (double)DcsSettingsCatalog.Find(kv.Key)!.IndexOf(kv.Value));
             Check(report.Changes.Count > 0 && Model(final) <= 1000.0 / 72, $"recomienda subidas y la combinación cabe a 72 Hz ({Model(final):0.00} ms; {string.Join(", ", report.Changes.Select(c => c.Label + " " + c.To))})");
             Check(report.Tests.Any(t => t.Description.StartsWith("Juntos") && !t.Holds) || report.Changes.Count == report.Tests.Count(t => t.Holds && !t.Description.StartsWith("Juntos")) - 1,
                   "las combinaciones que no caben se descartan");
-            Check(report.Profile.Settings["graphics.textures"] == "1" && report.Notes.Any(n => n.StartsWith("Texturas")) && report.Notes.Any(n => n.Contains("DLSS")),
+            Check(report.Profile!.Settings["graphics.textures"] == "1" && report.Notes.Any(n => n.StartsWith("Texturas")) && report.Notes.Any(n => n.Contains("DLSS")),
                   "texturas y DLSS: no se tocan, solo consejo");
             Check(File.ReadAllText(Path.Combine(saved, "Config", "options.lua")) == Options, "options.lua queda como estaba");
 
@@ -158,8 +164,31 @@ internal static class OptimizerTests
             dcs = new FakeVrDcs(saved, Model) { ForceMs = 1000.0 / 36 };
             bench = new DcsBenchmark(saved, exe, dcs) { PollMs = 1, GraceMs = 10, PimaxLogDir = Path.Combine(root, "sin-pimax"), ResultsDirectory = Path.Combine(root, "med") };
             report = new VrOptimizer(bench, new HeadsetInfo { RefreshHz = 72 }).Run();
-            Check(report.Changes.Count == 0 && report.Notes[0].StartsWith("NO CONCLUYENTE") && report.Profile.Notes.StartsWith("NO CONCLUYENTE") && dcs.Launches == 1,
-                  "todas las pruebas fijas a la mitad (Smart Smoothing): no concluyente, sin cambios ni segundo arranque");
+            Check(report.Changes.Count == 0 && report.Notes[0].StartsWith("NO CONCLUYENTE") && report.Profile is null && dcs.Launches == 1,
+                  "todas las pruebas fijas a la mitad (Smart Smoothing): no concluyente, sin cambios, sin perfil ni segundo arranque");
+
+            // Como a 72 Hz el 17/11/2026 sin Smart Smoothing: la actual va a ~60 FPS y cada bajada sola mejora un poco
+            // sin llegar: hacen falta varias juntas (también de las que no se probaron solas).
+            var baseValues = new LuaOptionsFile(Options).Keys.Where(k => DcsSettingsCatalog.Find(k) is not null)
+                .ToDictionary(k => k, k => (double)DcsSettingsCatalog.Find(k)!.IndexOf(new LuaOptionsFile(Options).Get(k)));
+            var extra = 16.5 - Model(baseValues);   // ~60 FPS de media
+            dcs = new FakeVrDcs(saved, v => Model(v) + extra) { SmartSmoothing = false };
+            bench = new DcsBenchmark(saved, exe, dcs) { PollMs = 1, GraceMs = 10, PimaxLogDir = Path.Combine(root, "sin-pimax"), ResultsDirectory = Path.Combine(root, "med") };
+            report = new VrOptimizer(bench, new HeadsetInfo { RefreshHz = 72 }).Run();
+            var singlesHold = report.Tests.Skip(1).Any(t => !t.Description.StartsWith("Juntos") && t.Holds);
+            var finalNear = report.Profile?.Settings.Where(kv => DcsSettingsCatalog.Find(kv.Key) is not null)
+                .ToDictionary(kv => kv.Key, kv => (double)DcsSettingsCatalog.Find(kv.Key)!.IndexOf(kv.Value));
+            Check(!report.BaselineHolds && !singlesHold && dcs.Launches == 2 && report.Changes.Count >= 2 && report.Profile is not null
+                  && finalNear is not null && Model(finalNear) + extra <= 1000.0 / 72
+                  && report.Tests.Any(t => t.Description.StartsWith("Juntos") && t.Holds),
+                  $"no llega y ninguna bajada sola basta: combinación de bajadas que llega ({string.Join(", ", report.Changes.Select(c => c.Label + " " + c.To))})");
+
+            // Igual pero sin poder llegar: recomienda la combinación que más mejora, avisa de que no llega.
+            dcs = new FakeVrDcs(saved, v => Model(v) + extra + 4) { SmartSmoothing = false };
+            bench = new DcsBenchmark(saved, exe, dcs) { PollMs = 1, GraceMs = 10, PimaxLogDir = Path.Combine(root, "sin-pimax"), ResultsDirectory = Path.Combine(root, "med") };
+            report = new VrOptimizer(bench, new HeadsetInfo { RefreshHz = 72 }).Run();
+            Check(report.Changes.Count > 0 && report.Notes[0].Contains("aún NO llega") && report.Profile?.Notes.Contains("Aún no llega") == true,
+                  "no llega ni combinando: recomienda la que más mejora y lo dice");
 
             // Visor apagado: ~7 FPS en todas las pruebas = la medición no vale (no un «sin cambios»).
             dcs = new FakeVrDcs(saved, Model) { ForceMs = 137 };

@@ -242,9 +242,13 @@ internal static class Program
                             Console.WriteLine($"  {(t.Holds ? "✔" : "✘")} {t.Description,-60} {t.Result.Total.AvgFps,5:0.0} FPS · {t.Result.Total.MissedPercent,4:0.0} % fuera de tiempo");
                         Console.WriteLine();
                         Console.WriteLine(RigControl.Core.Graphics.VrOptimizer.Describe(report));
-                        file.Profiles.Add(report.Profile);
-                        file.Save();
-                        Console.WriteLine($"Guardado como perfil «{report.Profile.Name}» (sin aplicar): \"graficos comparar\" / \"graficos aplicar\" con ese nombre.");
+                        if (report.Profile is { } profile)
+                        {
+                            file.Profiles.Add(profile);
+                            file.Save();
+                            Console.WriteLine($"Guardado como perfil «{profile.Name}» (sin aplicar): \"graficos comparar\" / \"graficos aplicar\" con ese nombre.");
+                        }
+                        else Console.WriteLine("Sin cambios que recomendar: no se guarda ningún perfil.");
                         return 0;
                     }
                     catch (OperationCanceledException)

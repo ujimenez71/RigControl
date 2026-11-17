@@ -592,6 +592,14 @@ Optimizador a 90 Hz (17/11/2026 20:00, visor encendido todo el rato): NO CONCLUY
 pruebas (450 fotogramas exactos por escena de 10 s; Pimax: mediana 44,75, 99 % < 50 FPS, GPU 55 % de media), así que todas salen
 iguales. Desde entonces `VrOptimizer.LockedAtHalf`: si todas quedan a la mitad, nota «NO CONCLUYENTE» y ningún cambio. Para optimizar
 en un refresco al que DCS no llega hay que DESACTIVAR Smart Smoothing en Pimax Play durante la prueba (y reactivarlo después).
+Optimizador a 72 Hz sin Smart Smoothing (17/11/2026 20:29, ✅ válido): ciudad y nubes a 72 en todas las pruebas; el aeródromo es el
+cuello de botella (60,6 FPS la actual, también ~60 a 90 Hz: el coste por fotograma no depende del refresco); subidas 57-59, bajadas
+solas como mucho 63,4 (bosques 0,7), nubes un nivel 63,0, hierba 1000 61,7. Desde entonces, si no llega y ninguna bajada sola llega:
+2.º arranque con bajadas ACUMULADAS (primero las que mejoran algo, `Helps`, de más a menos; después hasta `MaxExtraDowns` = 3 aún sin
+probar, por puntuación; hasta `MaxCombos` = 6); gana la más pequeña que llega o, si ninguna, la más pequeña a < 1 % de la mejor si
+mejora la media ≥ 5 % (nota «aún NO llega»). Sin cambios = SIN perfil (`OptimizeReport.Profile` null; antes se guardaba una copia de lo
+actual). Usuario: visor a 72 Hz con Smart Smoothing (17/11/2026). Ojo: sin registro de Pimax, 60 FPS justos se confunden con la mitad
+de 120 Hz (el refresco sale del resumen de Pimax).
 Siguiente: probarlo de verdad; luego `graficos optimizar` (varias configuraciones en un solo arranque con los "trials" del script) y
 medir en vuelos reales (y MSFS por SimConnect).
 
