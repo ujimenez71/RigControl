@@ -75,6 +75,19 @@ internal static class VrSessionTests
             Check(all.Count == 5 && again.Count == 5 && again[0].Start > again[^1].Start
                   && again.First(x => x.Seconds == 2128).MedianFps == 36 && again.First(x => x.Seconds == 584).Mission == "Apache Caucaso",
                   "historial propio: lo que Pimax borra se conserva, con su misión, de la más reciente a la más antigua");
+
+            // Configuración de Pimax de la sesión (18/11/2026: tras actualizar Pimax Play, DCS sin quad views).
+            string WithPimax(int qv, int ffr) => Body("2026-11-18 18:43:55", "2026-11-18 19:48M:38S", 3883, "DCS", 90, 1, 44, 38.67, 1, 0)
+                .Replace("\"runtime_dbg_asw_enable\":1", $"\"runtime_dbg_asw_enable\":1,\"runtime_enable_openxr_quadviews_fr\":{qv},\"runtime_enable_foveated_rendering\":{ffr}");
+            var stereo = VrSessions.Parse(WithPimax(0, 0)[(WithPimax(0, 0).IndexOf('{'))..]);
+            var qvOn = VrSessions.Parse(WithPimax(1, 1)[(WithPimax(1, 1).IndexOf('{'))..]);
+            var ffrOn = VrSessions.Parse(WithPimax(0, 1)[(WithPimax(0, 1).IndexOf('{'))..]);
+            Check(stereo?.PimaxRendering == "estéreo" && stereo.QuadViews == false && qvOn?.PimaxRendering == "QV" && ffrOn?.PimaxRendering == "FFR"
+                  && flight.PimaxRendering is null,
+                  $"quad views / foveated de Pimax por sesión; sin el dato (registros viejos) = desconocido ({stereo?.PimaxRendering}, {qvOn?.PimaxRendering}, {ffrOn?.PimaxRendering})");
+            var merged = VrSessions.Merge([stereo! with { QuadViews = null, Foveated = null, Mission = "tempMission" }], [stereo!]);
+            Check(merged.Count == 1 && merged[0].Mission == "tempMission" && merged[0].PimaxRendering == "estéreo",
+                  "historial sin el dato de Pimax: se completa con lo nuevo y conserva la misión");
         }
         finally
         {

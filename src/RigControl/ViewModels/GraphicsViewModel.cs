@@ -34,13 +34,14 @@ public sealed class VrSessionRow(VrSession s)
     public string When => s.Start.ToString("dd/MM HH:mm");
     public string Game => s.Game;
     public string Duration => s.Seconds < 60 ? $"{s.Seconds} s" : $"{s.Seconds / 60} min";
-    public string Hz => s.TargetHz > 0 ? $"{s.TargetHz} Hz" + (s.SmartSmoothing ? " · SS" : "") : "?";
+    public string Hz => s.TargetHz > 0 ? $"{s.TargetHz} Hz" + (s.SmartSmoothing ? " · SS" : "") + (s.PimaxRendering is { } r ? " · " + r : "") : "?";
     public string Median => s.MedianFps.ToString("0");
     public string P5 => s.P5Fps.ToString("0");
     public string Below50 => $"{s.Below50 * 100:0} %";
     public string Gpu => $"{s.AvgGpu:0} %";
     public string GpuDetail => $"GPU media {s.AvgGpu:0} %; por encima del 80 % el {s.GpuOver80 * 100:0} % del tiempo. CPU media {s.AvgCpu:0} %." +
-                               (s.Resolution is null ? "" : $" Resolución por ojo {s.Resolution}.");
+                               (s.Resolution is null ? "" : $" Resolución por ojo {s.Resolution}.") +
+                               (s.PimaxRendering is null ? "" : $" Pimax: quad views {(s.QuadViews == true ? "sí" : "no")}, foveated fijo {(s.Foveated == true ? "sí" : "no")}.");
     /// <summary>Veredicto y, debajo, la misión (o «Medición de RigControl»).</summary>
     public string Result => s.Verdict + (Mission.Length > 0 ? "\n" + Mission : "");
     public string Mission => s.IsBenchmark ? "Medición de RigControl" : s.Mission ?? "";

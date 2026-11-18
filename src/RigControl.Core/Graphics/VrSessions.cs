@@ -35,6 +35,17 @@ public sealed record VrSession
     public double GpuOver80 { get; init; }
     public double AvgCpu { get; init; }
     public string? Mission { get; init; }
+    /// <summary>
+    /// Quad views de Pimax (runtime_enable_openxr_quadviews_fr) y foveated rendering fijo (runtime_enable_foveated_rendering)
+    /// en esa sesión; null = sesión guardada antes de apuntarlo (18/11/2026). Sin quad views en el runtime, DCS pinta los dos
+    /// ojos enteros aunque tenga quad views marcado: así fue el vuelo del 18/11/2026 tras actualizar Pimax Play.
+    /// </summary>
+    public bool? QuadViews { get; init; }
+    public bool? Foveated { get; init; }
+
+    /// <summary>Lo que hizo Pimax con la imagen: "QV" (quad views), "FFR" (foveated fijo), "estéreo" o null si no consta.</summary>
+    public string? PimaxRendering => QuadViews is null && Foveated is null ? null
+        : QuadViews == true ? "QV" : Foveated == true ? "FFR" : "estéreo";
 
     public string Game => Process switch
     {
@@ -117,6 +128,7 @@ public static class VrSessions
             var gpu = game["gpu_analysis"];
             var cpu = game["cpu_analysis"];
             var info = game["session_info"];
+            var ints = game["pimax_play_config"]?["int_configs"];
             if (ParseTime(Str(game["session_start_time"])) is not { } start) return null;
             var seconds = (int)Num(info?["session_duration_seconds"]);
             var end = ParseTime(Str(game["session_end_time"])) ?? start.AddSeconds(seconds);
@@ -127,7 +139,9 @@ public static class VrSessions
                 Seconds = seconds > 0 ? seconds : (int)(end - start).TotalSeconds,
                 Process = Str(game["client_process"]) ?? "?",
                 TargetHz = (int)Num(fps?["fps_target"]),
-                SmartSmoothing = Num(game["pimax_play_config"]?["int_configs"]?["runtime_dbg_asw_enable"]) == 1,
+                SmartSmoothing = Num(ints?["runtime_dbg_asw_enable"]) == 1,
+                QuadViews = Flag(ints?["runtime_enable_openxr_quadviews_fr"]),
+                Foveated = Flag(ints?["runtime_enable_foveated_rendering"]),
                 Resolution = Str(game["client_resolution"]),
                 AvgFps = Math.Round(Num(fps?["avg_fps"]), 1),
                 MedianFps = Math.Round(Num(fps?["median_fps"]), 1),
@@ -144,6 +158,8 @@ public static class VrSessions
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException) { return null; }
     }
+
+    private static bool? Flag(JsonNode? n) => n is null ? null : Num(n) != 0;
 
     private static string? Str(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
 
@@ -214,13 +230,22 @@ public static class VrSessions
     }
 
     /// <summary>Historial + lo nuevo de Pimax (misma hora de inicio y programa = la misma sesión; la del historial
-    /// conserva su misión). Devuelve de la más reciente a la más antigua.</summary>
+    /// conserva su misión y se completa con los datos que le falten). Devuelve de la más reciente a la más antigua.</summary>
     public static List<VrSession> Merge(IEnumerable<VrSession> history, IEnumerable<VrSession> fresh)
     {
         var map = new Dictionary<(DateTime, string), VrSession>();
         foreach (var s in fresh) map[(s.Start, s.Process)] = s;
         foreach (var h in history)
-            map[(h.Start, h.Process)] = map.TryGetValue((h.Start, h.Process), out var f) && h.Mission is null && f.Mission is not null ? f : h;
+        {
+            if (!map.TryGetValue((h.Start, h.Process), out var f)) { map[(h.Start, h.Process)] = h; continue; }
+            // La del historial manda (misión ya resuelta), pero se completa con lo que no tenía apuntado.
+            map[(h.Start, h.Process)] = h with
+            {
+                Mission = h.Mission ?? f.Mission,
+                QuadViews = h.QuadViews ?? f.QuadViews,
+                Foveated = h.Foveated ?? f.Foveated,
+            };
+        }
         return [.. map.Values.OrderByDescending(s => s.Start)];
     }
 

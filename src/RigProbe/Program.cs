@@ -275,9 +275,9 @@ internal static class Program
                     // Sesiones del visor según Pimax (también vuelos normales, sin instalar nada), con historial propio.
                     var sessions = RigControl.Core.Graphics.VrSessions.Refresh();
                     if (sessions.Count == 0) { Console.WriteLine("No hay sesiones de Pimax (¿registro de PiService en otra carpeta?)."); return 0; }
-                    Console.WriteLine("  Inicio       Juego       Dur.   Hz  SS  Mediana  5 % bajo  <50 FPS  GPU   Veredicto / misión");
+                    Console.WriteLine("  Inicio       Juego       Dur.   Hz  SS  Pimax    Mediana  5 % bajo  <50 FPS  GPU   Veredicto / misión");
                     foreach (var s in sessions)
-                        Console.WriteLine($"  {s.Start:dd/MM HH:mm}  {s.Game,-10} {s.Seconds / 60,3} min {s.TargetHz,3}  {(s.SmartSmoothing ? "sí" : "no"),-3} {s.MedianFps,6:0.0} {s.P5Fps,8:0.0} {s.Below50 * 100,7:0} % {s.AvgGpu,4:0} %  " +
+                        Console.WriteLine($"  {s.Start:dd/MM HH:mm}  {s.Game,-10} {s.Seconds / 60,3} min {s.TargetHz,3}  {(s.SmartSmoothing ? "sí" : "no"),-3} {s.PimaxRendering ?? "?",-7} {s.MedianFps,6:0.0} {s.P5Fps,8:0.0} {s.Below50 * 100,7:0} % {s.AvgGpu,4:0} %  " +
                                           $"{s.Verdict}{(s.Mission is null ? "" : $" · {s.Mission}")}");
                     Console.WriteLine($"Historial en {RigControl.Core.Graphics.VrSessions.HistoryPath}");
                     return 0;

@@ -619,6 +619,15 @@ la misión se conserva). Veredicto: llega / casi siempre / el X % del tiempo / a
 como «Medición de RigControl»; las de 15/11 16:40 y 16:56 y 17/11 19:26-21:07 se marcaron a mano. App: pestaña «Vuelos en VR» en
 Gráficos (carga al abrirla; «Solo vuelos» oculta cortas, sin imagen y mediciones). Datos: en sep./oct. a 90 Hz sin SS los vuelos de DCS
 iban a 72-75 FPS de mediana (5 % bajo 57-64); 10/11 y 15/11 (72 Hz con SS) a 36 casi siempre; MSFS 06/10 a 41 FPS a 90 Hz.
+Pimax Play 2.0.5.376 (actualizado el 18/11/2026) BORRÓ todos sus registros viejos (solo queda el del día) y cambió la
+configuración: el vuelo del 18/11 18:43 (64 min, DCS, 90 Hz con SS) fue SIN quad views en el runtime (dcs.log: "Available View
+Configuration Types: (1)", swapchain 4408x5216 por ojo entero; Pimax: `runtime_enable_openxr_quadviews_fr` 0, foveated 0) aunque
+DCS tenga `openxr_quadView = true`: 44 FPS de mediana (5 % bajo 38,7), GPU 96 %, ni siquiera 45 fijos. Gracias al historial propio
+no se perdió nada. Desde entonces cada sesión guarda `QuadViews`/`Foveated` (columna «Pimax»: QV / FFR / estéreo; «?» = sesión
+anterior al cambio). A las 20:00 el `profile.json` de Pimax (`%LOCALAPPDATA%\Pimaxuntime`) ya volvía a tener quad views 1 (nivel 2),
+foveated 1 y `pixels_per_display_pixel_rate` 1,14 (SIN medir aún). El 17/11 21:33 (72 Hz sin SS, misma configuración de DCS que
+los días anteriores) el vuelo real iba a 47 FPS con la GPU al 96 %: en vuelo real DCS no llega a 72 (con SS queda fijo a 36). Durante
+el vuelo del 18/11 el usuario pasó DLSS de Quality (1) a Balanced (2).
 Siguiente: probarlo de verdad; luego `graficos optimizar` (varias configuraciones en un solo arranque con los "trials" del script) y
 medir en vuelos reales (y MSFS por SimConnect).
 
