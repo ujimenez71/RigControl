@@ -628,6 +628,13 @@ anterior al cambio). A las 20:00 el `profile.json` de Pimax (`%LOCALAPPDATA%\Pim
 foveated 1 y `pixels_per_display_pixel_rate` 1,14 (SIN medir aún). El 17/11 21:33 (72 Hz sin SS, misma configuración de DCS que
 los días anteriores) el vuelo real iba a 47 FPS con la GPU al 96 %: en vuelo real DCS no llega a 72 (con SS queda fijo a 36). Durante
 el vuelo del 18/11 el usuario pasó DLSS de Quality (1) a Balanced (2).
+Vuelo del 18/11 20:16 (32 min, DCS, tras reajustar Pimax): CON quad views (dcs.log: 4 vistas, centro 2980x3172, periferia
+1544x1828), 72 Hz con SS: 36 FPS fijos todo el rato (5 % bajo 35,9), GPU 63 % = hay margen, pero SS lo tapa. Frente a antes de
+la actualización: resolución de Pimax mayor (4750x5714 por ojo, ~25 % más píxeles que 4242x5102; `pixels_per_display_pixel_rate`
+1,12) y DLSS en Balanced (2) en vez de Quality (1).
+PENDIENTE PARA EL 19/11/2026 (recomendación dada al usuario): un vuelo igual con Smart Smoothing DESACTIVADO en Pimax Play para ver
+los FPS reales con QV (el 17/11, sin SS y sin QV registrado, daba 47 FPS con GPU 96 %). Con esa cifra decidir: bajar la resolución de
+Pimax a 1,0, volver a DLSS Quality, o quedarse a 72 Hz con SS. Analizar con `RigProbe graficos vuelos` + dcs.log (vistas y swapchains).
 Siguiente: probarlo de verdad; luego `graficos optimizar` (varias configuraciones en un solo arranque con los "trials" del script) y
 medir en vuelos reales (y MSFS por SimConnect).
 
