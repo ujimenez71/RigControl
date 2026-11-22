@@ -24,6 +24,7 @@ internal static class Program
                      ("Luces", LightTests.Run),
                      ("Pantalla del ICP", IcpTests.Run),
                      ("DCS-BIOS", DcsTests.Run),
+                     ("IL-2", Il2Tests.Run),
                      ("Estado del simulador", StateTests.Run),
                      ("Descripciones", DescribeTests.Run),
                      ("Simulador del perfil", SimTests.Run),

@@ -4,7 +4,7 @@ public enum Gesture { Press, Release, Short, Long, Hold, Double, Sequence }
 
 /// <summary>Trigger = una vez; Start/End = inicio y fin de una pulsación mantenida (hold).</summary>
 /// <summary>Simulador al que pertenece un perfil. General = cualquiera (o uso manual).</summary>
-public enum SimKind { General, Msfs, Dcs }
+public enum SimKind { General, Msfs, Dcs, Il2 }
 
 public enum ActionPhase { Trigger, Start, End }
 

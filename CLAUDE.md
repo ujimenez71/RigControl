@@ -89,7 +89,7 @@ Simuladores: DCS World (jets y helicópteros) y MSFS 2024 (aviación general). V
 ## Estado actual
 
 Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <perfil>`, `run <perfil>|auto [--dry]`,
-`sim [eventos [filtro]]`, `sim vars <perfil> [s]`, `sim enviar ACCIÓN` (K:/B:/L:/A: suelta; en A: lee el valor antes y después), `dcs [s]`, `dcs enviar CONTROL [VALOR]`, `dcs leer CONTROL`,
+`sim [eventos [filtro]]`, `sim vars <perfil> [s]`, `sim enviar ACCIÓN` (K:/B:/L:/A: suelta; en A: lee el valor antes y después), `il2 [s]` (telemetría de IL-2), `dcs [s]`, `dcs enviar CONTROL [VALOR]`, `dcs leer CONTROL`,
 `dcs vigilar [filtro]` (cada cambio de los mandos de la cabina con su posición y descripción: para
 comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez; con filtro también luces y salidas, con su valor inicial),
 `hangar` (estado de todos, no lanza nada), `hangar <nombre> --dry` (qué haría), `hangar <nombre>` (abre; Ctrl+C cancela), `ventanas <proceso>` (posición de sus ventanas, para `"window"`),
@@ -177,7 +177,15 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
   tiene `login`/`password` (vacíos el 22/11: se entra por Steam); ojo, entran en las instantáneas. IL-2 no admite órdenes externas: solo
   `key:`. Etapa 1 ✅ (hangar en simulación + instantánea de 11 archivos): hangar «IL-2 Great Battles» (los programas del de DCS +
   `steam://rungameid/307960`, aboveNormal, focus) y grupo de instantáneas «IL-2» (`data`: `input` + `startup.cfg`), en el repo y en
-  %APPDATA% (copias `*.antes-de-il2`). Siguen: telemetría en Core (sim «il2», `il2:` avión, variables `I:`), app, gráficos.
+  %APPDATA% (copias `*.antes-de-il2`).
+  Etapa 2 ✅ (escenarios con un IL-2 falso por UDP en `Il2Tests`; SIN probar aún con IL-2 de verdad): `Il2Telemetry` (Core/Bindings,
+  copia propia del decodificador de HapticSeat, que sigue sin dependencias; socket con ReuseAddress, lectura sin bloquear en Tick).
+  `SimKind.Il2`, `"sim": "il2"`, aviones `"il2:<trozo del nombre>"` (el nombre llega en el evento 0 SOLO al empezar la misión;
+  con datos sin nombre se anuncia "il2:" = comodín de IL-2). Variables `I:` (sin unidades) en luces, `state` e ICP: GEAR[:n]
+  (0 arriba..1 abajo; sin n = la rueda menos bajada), ON_GROUND, FLAPS, AIRBRAKE, RPM[:n], MANIFOLD[:n] (unidades sin verificar),
+  IAS (km/h), IAS_KT, IAS_MPH, AGL (m), AGL_FT, ENGINES, PAUSED (`Il2Telemetry.Vars`). Pausa = paquetes sin indicadores (se mantienen
+  los valores); 2 s sin datos = inactivo, 30 s = se descarta todo. Acciones en IL-2: solo `key:`. `RigProbe il2 [s]` (avión y todas
+  las I: cada segundo) y `sim vars <perfil>` con las I:. Siguen: app (editor, Ejecución, IA) y gráficos de `startup.cfg`.
 - LEDs WinWing (13/11/2026, ✅ cada LED identificado por el usuario con `winwing barrido`; sin Wireshark):
   `Core/WinWing/WinWingPanel.cs`. Output report de 14 B: `02 <módulo lo> <módulo hi> 00 00 03 49 <LED> <valor>
   00 00 00 00 00` (del driver hid-winwing de Linux, capturado de SimAppPro). Solo se envía la orden 0x49.

@@ -60,13 +60,14 @@ public sealed class AutoProfileSource : ProfileSource
     private CompiledProfile _current;
 
     /// <param name="dcs">Opcional: DCS por DCS-BIOS; su avión llega como "dcs:nombre" (p. ej. "dcs:f-15ese").</param>
-    public AutoProfileSource(string dir, SimConnectOutput sim, DcsBiosOutput? dcs = null)
+    public AutoProfileSource(string dir, SimConnectOutput sim, DcsBiosOutput? dcs = null, Il2Telemetry? il2 = null)
     {
         _dir = dir;
         _watch = new FileWatch(Path.Combine(dir, "x.json"), "*.json");
         // Ambos avisan desde el hilo del bucle (en su Tick), así que no hace falta sincronizar.
         sim.AircraftChanged += path => { _aircraft = path; _aircraftChanged = true; };
         if (dcs is not null) dcs.AircraftChanged += name => { _aircraft = name; _aircraftChanged = true; };
+        if (il2 is not null) il2.AircraftChanged += name => { _aircraft = name; _aircraftChanged = true; };
 
         LoadAll(keepPrevious: false);
         _current = Select(announce: true);
@@ -138,11 +139,12 @@ public sealed class AutoProfileSource : ProfileSource
     {
         // Solo perfiles del simulador del avión actual (o generales): un "*" de MSFS no se activa en DCS.
         var sim = _aircraft is null ? (SimKind?)null
-            : _aircraft.StartsWith("dcs:", StringComparison.Ordinal) ? SimKind.Dcs : SimKind.Msfs;
+            : _aircraft.StartsWith("dcs:", StringComparison.Ordinal) ? SimKind.Dcs
+            : _aircraft.StartsWith("il2:", StringComparison.Ordinal) ? SimKind.Il2 : SimKind.Msfs;
         bool Fits(CompiledProfile p) => p.Sim == SimKind.General || p.Sim == sim;
         var chosen =
             (_aircraft is null ? null : _profiles.Values.FirstOrDefault(p => Fits(p) && p.Aircraft.Any(a => a != "*" && _aircraft.Contains(a))))
-            ?? _profiles.Values.FirstOrDefault(p => p.Aircraft.Contains("*") && (sim is null ? p.Sim != SimKind.Dcs : Fits(p)))
+            ?? _profiles.Values.FirstOrDefault(p => p.Aircraft.Contains("*") && (sim is null ? p.Sim is SimKind.Msfs or SimKind.General : Fits(p)))
             ?? None;
         if (announce) Announce(chosen);
         return chosen;
@@ -152,12 +154,13 @@ public sealed class AutoProfileSource : ProfileSource
     {
         SimKind.Msfs => "MSFS 2024",
         SimKind.Dcs => "DCS World",
+        SimKind.Il2 => "IL-2",
         _ => "General",
     };
 
     private void Announce(CompiledProfile p)
     {
-        var aircraft = _aircraft ?? "(todavía sin avión: esperando a MSFS o DCS)";
+        var aircraft = _aircraft ?? "(todavía sin avión: esperando a MSFS, DCS o IL-2)";
         var file = p.SourcePath is null ? "" : $" ({Path.GetFileName(p.SourcePath)})";
         Log.Info($"\n==== Avión: {aircraft}");
         Log.Info(ReferenceEquals(p, None)

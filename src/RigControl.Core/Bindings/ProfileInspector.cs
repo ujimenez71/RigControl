@@ -26,7 +26,7 @@ public sealed class ProfileReport
     public string Notes { get; init; } = "";
     public string SimName => AutoProfileSource.SimLabel(Sim);
     /// <summary>Para ordenar los grupos: MSFS, DCS, general.</summary>
-    public int SimOrder => Sim switch { SimKind.Msfs => 0, SimKind.Dcs => 1, _ => 2 };
+    public int SimOrder => Sim switch { SimKind.Msfs => 0, SimKind.Dcs => 1, SimKind.Il2 => 2, _ => 3 };
     public List<string> Errors { get; } = [];
     public List<Finding> Findings { get; } = [];
     public List<DeviceReport> Devices { get; } = [];

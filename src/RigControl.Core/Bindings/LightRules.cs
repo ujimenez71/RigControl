@@ -11,6 +11,12 @@ public sealed record SimVarSpec(string Name, string Unit)
     /// <summary>Viene de DCS-BIOS, no de SimConnect.</summary>
     public bool IsDcs => Name.StartsWith("D:", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>Viene de la telemetría de IL-2 ("I:GEAR"), no de SimConnect.</summary>
+    public bool IsIl2 => Name.StartsWith("I:", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>La pide SimConnect (A: y L: de MSFS).</summary>
+    public bool IsMsfs => !IsDcs && !IsIl2;
+
     /// <summary>Texto para SimConnect_AddToDataDefinition, p. ej. "A:AUTOPILOT MASTER" -> "AUTOPILOT MASTER".</summary>
     public string DatumName => Name.StartsWith("A:", StringComparison.OrdinalIgnoreCase) ? Name[2..] : Name;
     public override string ToString() => $"{Name}, {Unit}";
@@ -63,6 +69,7 @@ public sealed record LightRule(BravoLed Led, string Name, LightCondition[] Condi
 ///   "A:GEAR CENTER POSITION=0.01..0.99"            -> rango (ambos incluidos)
 ///   operadores: &gt; &gt;= &lt; &lt;= = ; "!" delante niega; también "L:Variable".
 ///   "D:PLT_EXTL_ACOL_L_SW=2"                       -> DCS-BIOS: valor entero del control (sin unidades)
+///   "I:GEAR>=0.99", "I:RPM:2>2000"                 -> telemetría de IL-2 (sin unidades; ver Il2Telemetry.Vars)
 /// </summary>
 public static class LightParser
 {
@@ -76,9 +83,9 @@ public static class LightParser
         if (negate) t = t[1..].TrimStart();
 
         var prefix = t.Length >= 3 && t[1] == ':' ? char.ToUpperInvariant(t[0]) : ' ';
-        if (prefix is not ('A' or 'L' or 'D'))
+        if (prefix is not ('A' or 'L' or 'D' or 'I'))
         {
-            error = $"\"{text}\": se espera una variable \"A:NOMBRE\" o \"L:Nombre\" (MSFS) o \"D:CONTROL\" (DCS-BIOS).";
+            error = $"\"{text}\": se espera una variable \"A:NOMBRE\" o \"L:Nombre\" (MSFS), \"D:CONTROL\" (DCS-BIOS) o \"I:NOMBRE\" (IL-2).";
             return false;
         }
 
@@ -94,7 +101,17 @@ public static class LightParser
             error = $"\"{text}\": falta el nombre de la variable o las unidades.";
             return false;
         }
-        if (prefix == 'D')
+        if (prefix == 'I')
+        {
+            if (comma >= 0)
+            {
+                error = $"\"{text}\": las variables de IL-2 (I:) no llevan unidades.";
+                return false;
+            }
+            if (!Il2Telemetry.TryParseVar(name, out _, out var il2Error)) { error = il2Error; return false; }
+            name = "I:" + string.Concat(name[2..].Where(c => !char.IsWhiteSpace(c))).ToUpperInvariant();
+        }
+        else if (prefix == 'D')
         {
             if (comma >= 0)
             {

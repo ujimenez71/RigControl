@@ -39,35 +39,44 @@ public sealed class ProfileCompiler
         error = null;
         var patterns = file.Aircraft.Where(a => !string.IsNullOrWhiteSpace(a) && a.Trim() != "*").Select(a => a.Trim()).ToList();
         var dcs = patterns.Where(IsDcs).ToList();
-        var msfs = patterns.Where(a => !IsDcs(a)).ToList();
+        var il2 = patterns.Where(IsIl2).ToList();
+        var msfs = patterns.Where(a => !IsDcs(a) && !IsIl2(a)).ToList();
 
         if (string.IsNullOrWhiteSpace(file.Sim))
         {
-            if (dcs.Count > 0 && msfs.Count > 0)
-                error = $"aircraft: mezcla aviones de DCS ({string.Join(", ", dcs)}) y de MSFS ({string.Join(", ", msfs)}); " +
+            var kinds = (dcs.Count > 0 ? 1 : 0) + (il2.Count > 0 ? 1 : 0) + (msfs.Count > 0 ? 1 : 0);
+            if (kinds > 1)
+                error = $"aircraft: mezcla aviones de varios simuladores ({string.Join(", ", patterns)}); " +
                         "haz un perfil para cada simulador.";
-            return dcs.Count > 0 ? SimKind.Dcs : msfs.Count > 0 ? SimKind.Msfs : SimKind.General;
+            return dcs.Count > 0 ? SimKind.Dcs : il2.Count > 0 ? SimKind.Il2 : msfs.Count > 0 ? SimKind.Msfs : SimKind.General;
         }
 
         switch (file.Sim.Trim().ToLowerInvariant())
         {
             case "msfs" or "msfs2024":
-                if (dcs.Count > 0) error = $"sim es \"msfs\" pero aircraft tiene aviones de DCS: {string.Join(", ", dcs)}.";
+                if (dcs.Count + il2.Count > 0) error = $"sim es \"msfs\" pero aircraft tiene aviones de otro simulador: {string.Join(", ", dcs.Concat(il2))}.";
                 return SimKind.Msfs;
             case "dcs":
                 if (msfs.Count > 0)
                     error = $"sim es \"dcs\": los aviones van con el prefijo \"dcs:\" (p. ej. \"dcs:{msfs[0]}\"), no \"{msfs[0]}\".";
+                else if (il2.Count > 0) error = $"sim es \"dcs\" pero aircraft tiene aviones de IL-2: {string.Join(", ", il2)}.";
                 return SimKind.Dcs;
+            case "il2" or "il-2":
+                if (msfs.Count > 0)
+                    error = $"sim es \"il2\": los aviones van con el prefijo \"il2:\" (p. ej. \"il2:{msfs[0]}\"), no \"{msfs[0]}\".";
+                else if (dcs.Count > 0) error = $"sim es \"il2\" pero aircraft tiene aviones de DCS: {string.Join(", ", dcs)}.";
+                return SimKind.Il2;
             case "general" or "any" or "*":
                 if (patterns.Count > 0)
                     error = "sim es \"general\": no puede llevar aviones concretos en aircraft (solo \"*\" o nada).";
                 return SimKind.General;
             default:
-                error = $"sim \"{file.Sim}\" desconocido: usa \"msfs\", \"dcs\" o \"general\".";
+                error = $"sim \"{file.Sim}\" desconocido: usa \"msfs\", \"dcs\", \"il2\" o \"general\".";
                 return SimKind.General;
         }
 
         static bool IsDcs(string a) => a.StartsWith("dcs:", StringComparison.OrdinalIgnoreCase);
+        static bool IsIl2(string a) => a.StartsWith("il2:", StringComparison.OrdinalIgnoreCase);
     }
 
     private CompiledProfile Run()
@@ -215,8 +224,12 @@ public sealed class ProfileCompiler
     {
         if (sim == SimKind.Msfs && _vars.FirstOrDefault(v => v.IsDcs) is { } d)
             _errors.Add($"{d.Name}: es un control de DCS-BIOS y el perfil es de MSFS.");
-        if (sim == SimKind.Dcs && _vars.FirstOrDefault(v => !v.IsDcs) is { } m)
+        if (sim == SimKind.Dcs && _vars.FirstOrDefault(v => v.IsMsfs) is { } m)
             _errors.Add($"{m.Name}: es una variable de MSFS y el perfil es de DCS (usa \"D:CONTROL\").");
+        if (sim is SimKind.Msfs or SimKind.Dcs && _vars.FirstOrDefault(v => v.IsIl2) is { } i)
+            _errors.Add($"{i.Name}: es una variable de IL-2 y el perfil es de {AutoProfileSource.SimLabel(sim)}.");
+        if (sim == SimKind.Il2 && _vars.FirstOrDefault(v => !v.IsIl2) is { } o)
+            _errors.Add($"{o.Name}: no es de IL-2 y el perfil es de IL-2 (usa \"I:VARIABLE\": {string.Join(", ", Il2Telemetry.Vars.Select(x => x.Name))}).");
     }
 
     /// <summary>"lights": { "NombreLuz": "condición" | ["condición", ...] } -> reglas (las variables van a _vars).</summary>
@@ -293,8 +306,8 @@ public sealed class ProfileCompiler
                 _errors.Add($"icp, línea {i + 1}: {error}");
                 continue;
             }
-            if (sim == SimKind.Msfs && line!.Fields.FirstOrDefault(f => f.Kind == IcpFieldKind.Dcs) is { } d)
-                _errors.Add($"icp, línea {i + 1}: D:{d.Text} es un control de DCS-BIOS y el perfil es de MSFS.");
+            if (sim is SimKind.Msfs or SimKind.Il2 && line!.Fields.FirstOrDefault(f => f.Kind == IcpFieldKind.Dcs) is { } d)
+                _errors.Add($"icp, línea {i + 1}: D:{d.Text} es un control de DCS-BIOS y el perfil es de {AutoProfileSource.SimLabel(sim)}.");
             lines.Add(line!);
         }
         return [.. lines];

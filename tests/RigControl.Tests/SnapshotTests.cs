@@ -146,7 +146,7 @@ internal static class SnapshotTests
             // El ejemplo del repo es válido.
             var d = new DirectoryInfo(AppContext.BaseDirectory);
             while (d is not null && !File.Exists(Path.Combine(d.FullName, "RigControl.slnx"))) d = d.Parent;
-            Check(SnapshotsFile.Load(Path.Combine(d!.FullName, "profiles", "snapshots.json")).Groups.Count == 3, "profiles/snapshots.json válido");
+            Check(SnapshotsFile.Load(Path.Combine(d!.FullName, "profiles", "snapshots.json")).Groups.Select(g => g.Name).SequenceEqual(["DCS", "MSFS 2024", "IL-2", "RigControl"]), "profiles/snapshots.json válido (DCS, MSFS 2024, IL-2, RigControl)");
         }
         finally
         {

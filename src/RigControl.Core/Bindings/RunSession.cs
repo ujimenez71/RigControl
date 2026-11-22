@@ -11,6 +11,7 @@ public sealed class RunSession : IDisposable
 {
     private readonly SimConnectOutput _sim = new();
     private readonly DcsBiosOutput _dcs = new();
+    private readonly Il2Telemetry _il2 = new();
     private readonly ProfileSource _source;
     private readonly bool _dryRun;
     private readonly IntPtr _window;
@@ -18,11 +19,12 @@ public sealed class RunSession : IDisposable
     private Thread? _thread;
     private volatile CompiledProfile? _profile;
 
-    private RunSession(ProfileSource? source, bool dryRun, IntPtr window, Func<SimConnectOutput, DcsBiosOutput, ProfileSource>? makeSource)
+    private RunSession(ProfileSource? source, bool dryRun, IntPtr window,
+                       Func<SimConnectOutput, DcsBiosOutput, Il2Telemetry, ProfileSource>? makeSource)
     {
         _dryRun = dryRun;
         _window = window;
-        _source = source ?? makeSource!(_sim, _dcs);
+        _source = source ?? makeSource!(_sim, _dcs, _il2);
     }
 
     /// <summary>
@@ -40,7 +42,7 @@ public sealed class RunSession : IDisposable
                 Directory.CreateDirectory(dir);
                 Log.Warning($"Creada la carpeta de perfiles {dir} (está vacía: copia ahí tus .json).");
             }
-            return new RunSession(null, dryRun, window, (sim, dcs) => new AutoProfileSource(dir, sim, dcs));
+            return new RunSession(null, dryRun, window, (sim, dcs, il2) => new AutoProfileSource(dir, sim, dcs, il2));
         }
 
         var path = ProfileFile.Resolve(target);
@@ -62,6 +64,10 @@ public sealed class RunSession : IDisposable
     public bool DcsActive => _dcs.IsActive;
     public string? DcsAircraft => _dcs.Aircraft;
 
+    /// <summary>Llega telemetría de IL-2.</summary>
+    public bool Il2Active => _il2.IsActive;
+    public string? Il2Aircraft => _il2.Aircraft;
+
     /// <summary>Se dispara (desde el hilo del bucle) cuando la ejecución termina, por Stop o por error.</summary>
     public event Action? Stopped;
 
@@ -72,7 +78,7 @@ public sealed class RunSession : IDisposable
 
         using var di = DInput.DirectInput8Create();
         using var keyboard = new KeyboardOutput();
-        using var dispatcher = new ActionDispatcher(keyboard, _sim, _dryRun, _dcs);
+        using var dispatcher = new ActionDispatcher(keyboard, _sim, _dryRun, _dcs, _il2);
         // Las luces son realimentación local (no envían nada al simulador): funcionan también en simulación.
         using var lights = new BravoLightsOutput();
         using var winwing = new WinWingLightsOutput();
@@ -99,6 +105,7 @@ public sealed class RunSession : IDisposable
     private string AircraftLabel()
     {
         if (_dcs.HasState && _dcs.Aircraft is { } d) return d;
+        if (_il2.HasState && _il2.Aircraft is { } i) return i;
         if (_sim.Aircraft is not { } m) return "";
         var parts = m.Split('\\', StringSplitOptions.RemoveEmptyEntries);
         return parts.Length >= 3 && parts[0].Equals("simobjects", StringComparison.OrdinalIgnoreCase) ? parts[2] : m;
@@ -152,6 +159,7 @@ public sealed class RunSession : IDisposable
         _source.Dispose();
         _sim.Dispose();
         _dcs.Dispose(); // suelta los pulsadores pendientes antes de cerrar
+        _il2.Dispose();
         _cts?.Dispose();
     }
 
@@ -165,8 +173,8 @@ public sealed class RunSession : IDisposable
 
         public void Tick(long timeMs)
         {
-            inner.Tick(timeMs); // incluye SimConnect y DCS-BIOS: aquí llegan los valores nuevos
-            var connected = session._sim.IsConnected || session._dcs.HasState;
+            inner.Tick(timeMs); // incluye SimConnect, DCS-BIOS e IL-2: aquí llegan los valores nuevos
+            var connected = session._sim.IsConnected || session._dcs.HasState || session._il2.HasState;
             lights.Update(inner.Values, connected, timeMs);
             winwing.Update(inner.Values, connected, timeMs);
             // El contexto (nombre del avión, hora) solo se arma cuando toca dibujar; sin "icp", solo un borrado pendiente.

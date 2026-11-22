@@ -100,6 +100,9 @@ internal static class Program
             case "hangar":
                 return HangarCommand(args.Skip(1).Where(a => !a.Equals("--dry", StringComparison.OrdinalIgnoreCase)).FirstOrDefault(),
                                      args.Any(a => a.Equals("--dry", StringComparison.OrdinalIgnoreCase)));
+            case "il2":
+                Il2Listen(args.Length > 1 && int.TryParse(args[1], out var il2Secs) ? il2Secs : 30);
+                return 0;
             case "sim" when args.Length > 2 && args[1].Equals("enviar", StringComparison.OrdinalIgnoreCase):
                 return SimSend(string.Join(' ', args.Skip(2)));
             case "sim" when args.Length > 2 && args[1].Equals("vars", StringComparison.OrdinalIgnoreCase):
@@ -111,7 +114,7 @@ internal static class Program
                 return 0;
             default:
                 Console.WriteLine("Uso: RigProbe list [all] | monitor | catalog | bravo-test | check <perfil> | run <perfil>|auto [--dry]");
-                Console.WriteLine("            | sim | sim eventos [filtro] | sim vars <perfil> [s] | sim enviar ACCIÓN | dcs [s] | dcs enviar CONTROL [VALOR] | dcs leer CONTROL");
+                Console.WriteLine("            | sim | sim eventos [filtro] | sim vars <perfil> [s] | sim enviar ACCIÓN | il2 [s] | dcs [s] | dcs enviar CONTROL [VALOR] | dcs leer CONTROL");
                 Console.WriteLine("            | dcs vigilar [filtro] | hangar [nombre [--dry]] | ventanas <proceso>");
                 Console.WriteLine("            | mods | mods <conjunto> [--dry] | mods importar <biblioteca> [--dry]");
                 Console.WriteLine("            | instantaneas | instantaneas crear <grupo|todo> [nombre] | instantaneas comparar|restaurar <grupo> <n>");
@@ -969,7 +972,8 @@ internal static class Program
         if (profile is null) return;
         using var sim = new SimConnectOutput();
         using var dcs = new DcsBiosOutput();
-        using var values = new ActionDispatcher(null, sim, dryRun: true, dcs); // solo para juntar los valores
+        using var il2 = new Il2Telemetry();
+        using var values = new ActionDispatcher(null, sim, dryRun: true, dcs, il2); // solo para juntar los valores
         values.ProfileLoaded(profile);
         var vars = profile.WatchedVars;
         var clock = System.Diagnostics.Stopwatch.StartNew();
@@ -980,9 +984,9 @@ internal static class Program
             if (clock.ElapsedMilliseconds >= next)
             {
                 next += 1000;
-                Console.WriteLine($"--- {clock.ElapsedMilliseconds / 1000} s  MSFS={sim.IsConnected}  DCS-BIOS={dcs.IsActive} ({dcs.Aircraft ?? "-"})");
+                Console.WriteLine($"--- {clock.ElapsedMilliseconds / 1000} s  MSFS={sim.IsConnected}  DCS-BIOS={dcs.IsActive} ({dcs.Aircraft ?? "-"})  IL-2={il2.IsActive} ({il2.Aircraft ?? "-"})");
                 for (var i = 0; i < vars.Length; i++)
-                    Console.WriteLine($"  {vars[i].Name,-40} {(vars[i].IsDcs ? "" : vars[i].Unit),-8} {values.Values[i]}");
+                    Console.WriteLine($"  {vars[i].Name,-40} {(vars[i].IsMsfs ? vars[i].Unit : ""),-8} {values.Values[i]}");
             }
             Thread.Sleep(20);
         }
@@ -1051,6 +1055,40 @@ internal static class Program
             Console.WriteLine("Si no ha cambiado y no hay aviso, la variable no es modificable o el avión la recalcula: usa un B: o un K:.");
         }
         return 0;
+    }
+
+    /// <summary>
+    /// "il2 [s]": escucha la telemetría de IL-2 (UDP 5678) y enseña cada segundo el avión y todas las variables I:,
+    /// como las verá un perfil. Para comprobar que IL-2 emite y qué valores da cada avión.
+    /// </summary>
+    private static void Il2Listen(int seconds)
+    {
+        using var il2 = new Il2Telemetry();
+        var vars = Il2Telemetry.Vars.Select(v => (v.Name, Var: new Il2Var(v.Kind, -1), v.Indexed)).ToList();
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        long next = 1000;
+        Console.WriteLine($"Escuchando IL-2 en UDP {Il2Telemetry.DefaultPort} durante {seconds} s (data\\startup.cfg, bloque telemetrydevice)...");
+        string Num(double v) => double.IsNaN(v) ? "-" : v.ToString("0.##", System.Globalization.CultureInfo.CurrentCulture);
+        while (clock.ElapsedMilliseconds < seconds * 1000L)
+        {
+            il2.Tick(clock.ElapsedMilliseconds);
+            if (clock.ElapsedMilliseconds >= next)
+            {
+                next += 1000;
+                Console.WriteLine($"--- {clock.ElapsedMilliseconds / 1000} s  datos={(il2.IsActive ? "sí" : "no")}  avión={il2.Aircraft ?? "-"}{(il2.Paused ? "  (pausa/menú)" : "")}");
+                if (!il2.HasState) continue;
+                var parts = new List<string>();
+                foreach (var (name, v, indexed) in vars)
+                {
+                    parts.Add($"{name}={Num(il2.Read(v))}");
+                    if (!indexed) continue;
+                    for (var i = 0; i < 8 && !double.IsNaN(il2.Read(v with { Index = i })); i++)
+                        if (i > 0 || name == "GEAR") parts.Add($"{name}:{i + 1}={Num(il2.Read(v with { Index = i }))}");
+                }
+                Console.WriteLine("  " + string.Join("  ", parts));
+            }
+            Thread.Sleep(20);
+        }
     }
 
     /// <summary>Conecta con MSFS, muestra el avión y, si se pide, sus InputEvents (B:) filtrados.</summary>

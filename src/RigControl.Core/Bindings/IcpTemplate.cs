@@ -30,7 +30,7 @@ public readonly record struct IcpContext(double[] Values, IcpContext.DcsReader? 
 ///   texto tal cual, con la fuente de la DED (minúsculas = mayúsculas);
 ///   [texto] = invertido (fondo encendido), como los campos seleccionados de la DED;
 ///   {D:CONTROL}            DCS-BIOS: texto (frecuencias, pantallas) o valor entero del control;
-///   {A:VAR, unidades} {L:Var}   MSFS, como en las luces;
+///   {A:VAR, unidades} {L:Var}   MSFS, como en las luces;  {I:VAR} IL-2 (telemetría);
 ///   {perfil} {avion} {hora};
 ///   {X|formato}: número ("0.0", "000"), hora ("HH:mm:ss") o recorte "desde..hasta" (base 1: "{D:PLT_EUFD_LINE1|1..25}").
 ///   "[[", "]]", "{{", "}}" = el carácter tal cual. Sin dato, el valor sale en blanco.
@@ -151,7 +151,7 @@ public static partial class IcpTemplate
             field = new IcpField(IcpFieldKind.Dcs, control, inverted, Format: format, From: from, To: to);
             return true;
         }
-        if (name.Length > 2 && name[1] == ':' && char.ToUpperInvariant(name[0]) is 'A' or 'L')
+        if (name.Length > 2 && name[1] == ':' && char.ToUpperInvariant(name[0]) is 'A' or 'L' or 'I')
         {
             if (name.IndexOfAny(['<', '>', '=', '!']) >= 0)
             {
@@ -162,7 +162,7 @@ public static partial class IcpTemplate
             field = new IcpField(IcpFieldKind.Var, "", inverted, Var: c.Var, Format: format, From: from, To: to);
             return true;
         }
-        error = $"{{{body}}}: se espera D:CONTROL, A:VARIABLE[, unidades], L:Variable, perfil, avion u hora.";
+        error = $"{{{body}}}: se espera D:CONTROL, A:VARIABLE[, unidades], L:Variable, I:VARIABLE, perfil, avion u hora.";
         return false;
     }
 

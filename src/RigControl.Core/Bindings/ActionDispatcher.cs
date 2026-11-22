@@ -27,7 +27,8 @@ public interface ISimOutput
 ///  - sin prefijo: solo se registra.
 /// Con dryRun no se envía nada. Sin asignaciones en OnAction/Tick salvo el texto del registro.
 /// </summary>
-public sealed class ActionDispatcher(KeyboardOutput? keyboard, ISimOutput? sim, bool dryRun, DcsBiosOutput? dcs = null)
+public sealed class ActionDispatcher(KeyboardOutput? keyboard, ISimOutput? sim, bool dryRun, DcsBiosOutput? dcs = null,
+                                     Il2Telemetry? il2 = null)
     : IActionSink, IDisposable
 {
     private const int MaxRepeats = 16;
@@ -36,7 +37,7 @@ public sealed class ActionDispatcher(KeyboardOutput? keyboard, ISimOutput? sim, 
     private double[] _values = [];
 
     /// <summary>
-    /// Estado actual de las variables vigiladas del perfil: A:/L: de SimConnect y D: de DCS-BIOS
+    /// Estado actual de las variables vigiladas del perfil: A:/L: de SimConnect, D: de DCS-BIOS e I: de IL-2
     /// juntas, por el índice de CompiledProfile.WatchedVars. Se actualiza en cada Tick.
     /// </summary>
     public double[] Values => _values;
@@ -95,6 +96,7 @@ public sealed class ActionDispatcher(KeyboardOutput? keyboard, ISimOutput? sim, 
         keyboard?.Tick(timeMs);
         sim?.Tick(timeMs); // también en --dry: hace falta para saber qué avión hay ("run auto")
         dcs?.Tick(timeMs);
+        il2?.Tick(timeMs);
         MergeValues();
 
         for (var i = 0; i < MaxRepeats; i++)
@@ -115,6 +117,7 @@ public sealed class ActionDispatcher(KeyboardOutput? keyboard, ISimOutput? sim, 
         Array.Clear(_repeating);
         sim?.Prepare(profile);
         dcs?.Prepare(profile);
+        il2?.Prepare(profile);
         _values = new double[profile.WatchedVars.Length];
         MergeValues();
     }
@@ -125,6 +128,7 @@ public sealed class ActionDispatcher(KeyboardOutput? keyboard, ISimOutput? sim, 
         for (var i = 0; i < _values.Length; i++)
             _values[i] = i < fromSim.Length ? fromSim[i] : double.NaN;
         dcs?.Fill(_values);
+        il2?.Fill(_values);
     }
 
     public void Dispose() => keyboard?.ReleaseAll();
