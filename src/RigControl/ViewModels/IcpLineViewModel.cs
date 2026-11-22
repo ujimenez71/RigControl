@@ -62,6 +62,21 @@ public sealed record IcpFieldOption(string Text, string Label)
         new("{A:TRANSPONDER CODE:1|0000}", "{A:TRANSPONDER CODE:1|0000} · MSFS: transpondedor"),
     ];
 
+    /// <summary>Los fijos sin los de MSFS y las variables de la telemetría de IL-2.</summary>
+    public static readonly IcpFieldOption[] Il2 =
+    [
+        .. Fixed.Take(4),
+        new("{I:IAS|0}", "{I:IAS|0} · IL-2: velocidad indicada, km/h"),
+        new("{I:IAS_MPH|0}", "{I:IAS_MPH|0} · IL-2: velocidad indicada, mph"),
+        new("{I:AGL|0}", "{I:AGL|0} · IL-2: altura sobre el terreno, m"),
+        new("{I:AGL_FT|0}", "{I:AGL_FT|0} · IL-2: altura sobre el terreno, pies"),
+        new("{I:RPM|0}", "{I:RPM|0} · IL-2: RPM del motor 1"),
+        new("{I:RPM:2|0}", "{I:RPM:2|0} · IL-2: RPM del motor 2"),
+        new("{I:MANIFOLD|0.00}", "{I:MANIFOLD|0.00} · IL-2: presión de admisión (unidades sin verificar)"),
+        new("{I:FLAPS|0.0}", "{I:FLAPS|0.0} · IL-2: flaps 0..1"),
+        new("{I:GEAR|0.0}", "{I:GEAR|0.0} · IL-2: tren 0..1"),
+    ];
+
     /// <summary>Los fijos y, con controles de DCS-BIOS, primero los de texto (frecuencias, pantallas) y luego los numéricos.</summary>
     public static IcpFieldOption[] For(IReadOnlyList<RigControl.Core.Bindings.DcsControl> controls)
     {

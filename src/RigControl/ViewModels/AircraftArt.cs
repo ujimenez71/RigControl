@@ -31,7 +31,7 @@ public static class AircraftArt
         if (all.Contains("uh-1") || all.Contains("uh1")) return "uh1h";
         if (all.Contains("c172") || all.Contains("cessna 172") || all.Contains("172")) return "c172";
         if (HeloWords.Any(all.Contains)) return "helo";
-        return p.Sim == SimKind.Dcs ? "jet" : "ga";
+        return p.Sim == SimKind.Dcs ? "jet" : "ga"; // IL-2: aviones de hélice, como la aviación general
     }
 
     public static string KindText(string kind) => kind switch

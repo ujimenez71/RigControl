@@ -30,6 +30,11 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly SimConnectOutput _sim = new();
     private readonly DcsBiosOutput _dcs = new();
+    private readonly Il2Telemetry _il2 = new();
+
+    /// <summary>Variables de IL-2 para las luces y condiciones (con un número por rueda/motor donde vale).</summary>
+    private static readonly string[] Il2LightVars =
+        [.. Il2Telemetry.Vars.SelectMany(v => v.Indexed ? new[] { "I:" + v.Name, $"I:{v.Name}:1", $"I:{v.Name}:2", $"I:{v.Name}:3" } : ["I:" + v.Name])];
     private readonly DeviceCatalog _catalog = DeviceCatalog.Load();
 
     private IDirectInput8? _di;
@@ -269,12 +274,12 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         return result;
     }
 
-    public static string[] SimOptions { get; } = ["msfs", "dcs", "general"];
+    public static string[] SimOptions { get; } = ["msfs", "dcs", "il2", "general"];
     public static TargetOption[] Targets => BindingEditViewModel.Targets;
     public static GestureOption[] Gestures => BindingEditViewModel.Gestures;
 
     public string Name { get => _name; set { if (Set(ref _name, value)) Touch(); } }
-    public string Sim { get => _sim0; set { if (Set(ref _sim0, value)) Touch(); } }
+    public string Sim { get => _sim0; set { if (Set(ref _sim0, value)) { Touch(); _dcsControlsFor = "?"; RefreshDcsControls(); } } }
     public string AircraftText { get => _aircraftText; set { if (Set(ref _aircraftText, value)) Touch(); } }
     public string Notes { get => _notes; set { if (Set(ref _notes, value)) Touch(); } }
 
@@ -370,7 +375,7 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
     // ------------------------------------------------------------ controles de DCS-BIOS
 
     private IReadOnlyList<DcsControl> _dcsControls = [];
-    private string? _dcsControlsFor;
+    private string? _dcsControlsFor = "?"; // "?" = aún sin calcular: la primera vuelta de SimTick rellena las sugerencias
 
     /// <summary>
     /// Avión de DCS cuyos controles se sugieren: el primero "dcs:..." del perfil o, si no hay, el
@@ -385,9 +390,10 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         _dcsControls = aircraft is null ? [] : DcsBiosCatalog.ForAircraft(aircraft);
         foreach (var b in Bindings) b.DcsControls = _dcsControls;
         var dcsVars = _dcsControls.Where(c => c.Address is not null).Select(c => "D:" + c.Name).Distinct().Order().ToArray();
-        LightVars = dcsVars.Length > 0 ? dcsVars : LightTermViewModel.CommonVars;
+        var il2 = _sim0 == "il2";
+        LightVars = il2 ? Il2LightVars : dcsVars.Length > 0 ? dcsVars : LightTermViewModel.CommonVars;
         Raise(nameof(LightVars));
-        IcpFields = IcpFieldOption.For(_dcsControls);
+        IcpFields = il2 ? IcpFieldOption.Il2 : IcpFieldOption.For(_dcsControls);
         Raise(nameof(IcpFields));
         RefreshSuggestions();
     }
@@ -540,7 +546,9 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         var now = _clock.ElapsedMilliseconds;
         _sim.Tick(now);
         _dcs.Tick(now);
-        SimStatus = _dcs.IsActive ? $"DCS: {_dcs.Aircraft ?? "sin avión"}"
+        _il2.Tick(now);
+        SimStatus = _il2.IsActive ? $"IL-2: {_il2.Aircraft ?? "avión sin identificar (se sabe al empezar la misión)"} · acciones solo de teclado"
+            : _dcs.IsActive ? $"DCS: {_dcs.Aircraft ?? "sin avión"}"
             : !_sim.IsConnected ? "MSFS: sin conexión (la lista de controles B: necesita MSFS con un avión cargado)"
             : $"MSFS: {AircraftFolder(_sim.Aircraft) ?? "sin avión"} · {_inputEvents.Count} controles B:";
         if (_dcs.IsActive) SimStatus += $" · {_dcsControls.Count} controles de DCS-BIOS";
@@ -552,17 +560,21 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
     /// <summary>Añade el avión cargado ahora (MSFS o DCS) a la lista de aviones del perfil.</summary>
     public void UseCurrentAircraft()
     {
-        var current = _dcs.IsActive && _dcs.Aircraft is not null ? $"dcs:{_dcs.Aircraft.ToLowerInvariant()}"
+        var current = _il2.IsActive && _il2.Aircraft is not null ? $"il2:{_il2.Aircraft.ToLowerInvariant()}"
+            : _dcs.IsActive && _dcs.Aircraft is not null ? $"dcs:{_dcs.Aircraft.ToLowerInvariant()}"
             : AircraftFolder(_sim.Aircraft);
         if (current is null)
         {
-            Status = "No hay ningún avión cargado en MSFS ni en DCS.";
+            Status = _il2.IsActive
+                ? "IL-2 manda datos pero no el avión: IL-2 solo lo dice al empezar la misión (vuelve a empezarla con el editor abierto)."
+                : "No hay ningún avión cargado en MSFS, DCS ni IL-2.";
             return;
         }
         var list = AircraftList();
         if (!list.Contains(current, StringComparer.OrdinalIgnoreCase)) list.Add(current);
         AircraftText = string.Join(", ", list);
         if (current.StartsWith("dcs:", StringComparison.Ordinal)) Sim = "dcs";
+        else if (current.StartsWith("il2:", StringComparison.Ordinal)) Sim = "il2";
     }
 
     /// <summary>"simobjects\airplanes\asobo_c172sp_g1000\..." -> "asobo_c172sp_g1000".</summary>
@@ -648,6 +660,7 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         if (profile is null) return;
         _sim.Prepare(profile);
         _dcs.Prepare(profile);
+        _il2.Prepare(profile);
         _liveValues = new double[profile.WatchedVars.Length];
     }
 
@@ -660,7 +673,8 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         var fromSim = _sim.Values;
         for (var i = 0; i < values.Length; i++) values[i] = i < fromSim.Length ? fromSim[i] : double.NaN;
         _dcs.Fill(values);
-        var connected = _sim.IsConnected || _dcs.HasState;
+        _il2.Fill(values);
+        var connected = _sim.IsConnected || _dcs.HasState || _il2.HasState;
         foreach (var light in Lights)
         {
             var rule = _liveProfile?.Lights.FirstOrDefault(r => r.Name == light.Led);
@@ -689,7 +703,8 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
     private void UpdateIcpPreview()
     {
         var lines = _liveProfile?.Icp ?? [];
-        var aircraft = _dcs.HasState && _dcs.Aircraft is { } d ? d : AircraftFolder(_sim.Aircraft) ?? "";
+        var aircraft = _dcs.HasState && _dcs.Aircraft is { } d ? d
+            : _il2.HasState && _il2.Aircraft is { } il2Name ? il2Name : AircraftFolder(_sim.Aircraft) ?? "";
         var ctx = new IcpContext(_liveValues, _dcs.ReadForDisplay, _name.Trim(), aircraft, DateTime.Now);
         for (var i = 0; i < IcpLines.Length; i++)
         {
@@ -804,6 +819,7 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
     {
         SimKind.Msfs => "msfs",
         SimKind.Dcs => "dcs",
+        SimKind.Il2 => "il2",
         _ => "general",
     };
 
@@ -816,5 +832,6 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         _di?.Dispose();
         _sim.Dispose();
         _dcs.Dispose();
+        _il2.Dispose();
     }
 }

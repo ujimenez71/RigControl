@@ -185,7 +185,11 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
   (0 arriba..1 abajo; sin n = la rueda menos bajada), ON_GROUND, FLAPS, AIRBRAKE, RPM[:n], MANIFOLD[:n] (unidades sin verificar),
   IAS (km/h), IAS_KT, IAS_MPH, AGL (m), AGL_FT, ENGINES, PAUSED (`Il2Telemetry.Vars`). Pausa = paquetes sin indicadores (se mantienen
   los valores); 2 s sin datos = inactivo, 30 s = se descarta todo. Acciones en IL-2: solo `key:`. `RigProbe il2 [s]` (avión y todas
-  las I: cada segundo) y `sim vars <perfil>` con las I:. Siguen: app (editor, Ejecución, IA) y gráficos de `startup.cfg`.
+  las I: cada segundo) y `sim vars <perfil>` con las I:.
+  Etapa 3 ✅ (editor comprobado fuera de pantalla con un perfil de IL-2): editor con sim «il2», sugerencias I: en luces y condiciones,
+  campos {I:...} en «Insertar en la línea» del ICP, vista en vivo de luces/ICP con IL-2, «Usar el avión actual» (il2:nombre); Ejecución
+  muestra «IL-2 (telemetría)» y el avión; Perfiles agrupa «IL-2». Sin hacer: generar con IA para IL-2 (podría leer las teclas de
+  `data\input\current.actions`). Sigue: gráficos de `startup.cfg`.
 - LEDs WinWing (13/11/2026, ✅ cada LED identificado por el usuario con `winwing barrido`; sin Wireshark):
   `Core/WinWing/WinWingPanel.cs`. Output report de 14 B: `02 <módulo lo> <módulo hi> 00 00 03 49 <LED> <valor>
   00 00 00 00 00` (del driver hid-winwing de Linux, capturado de SimAppPro). Solo se envía la orden 0x49.

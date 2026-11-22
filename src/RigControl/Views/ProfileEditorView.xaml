@@ -155,7 +155,7 @@
             <ComboBox Grid.Column="2" Grid.Row="1" ItemsSource="{x:Static vm:ProfileEditorViewModel.SimOptions}"
                       SelectedItem="{Binding Sim}" />
             <TextBlock Grid.Column="4" Style="{StaticResource Label}" Margin="0,0,0,4"
-                       Text="Aviones (separados por comas; trozos de la ruta en MSFS, dcs:nombre en DCS)" />
+                       Text="Aviones (separados por comas; trozos de la ruta en MSFS, dcs:nombre en DCS, il2:nombre en IL-2)" />
             <DockPanel Grid.Column="4" Grid.Row="1">
                 <Button DockPanel.Dock="Right" Content="Usar el avión actual" Click="UseAircraft_Click" Margin="8,0,0,0"
                         ToolTip="Añade el avión cargado ahora en MSFS o DCS" />

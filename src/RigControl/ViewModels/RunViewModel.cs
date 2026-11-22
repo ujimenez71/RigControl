@@ -258,14 +258,17 @@ public sealed class RunViewModel : ObservableObject, IDisposable
             return;
         }
 
-        SimConnected = s.SimConnected || s.DcsActive;
-        SimText = s.SimConnected ? $"MSFS · {s.SimName}" : s.DcsActive ? "DCS (DCS-BIOS)" : "Esperando a MSFS o DCS…";
+        SimConnected = s.SimConnected || s.DcsActive || s.Il2Active;
+        SimText = s.SimConnected ? $"MSFS · {s.SimName}" : s.DcsActive ? "DCS (DCS-BIOS)"
+            : s.Il2Active ? "IL-2 (telemetría)" : "Esperando a MSFS, DCS o IL-2…";
         DcsText = s.DcsActive ? $"DCS-BIOS: recibiendo datos" : "DCS-BIOS: sin datos";
 
         var aircraft = s.Aircraft;
-        AircraftPath = aircraft ?? (s.DcsAircraft is { } d ? $"DCS: {d}" : "");
+        AircraftPath = aircraft ?? (s.DcsAircraft is { } d ? $"DCS: {d}" : s.Il2Aircraft is { } i ? $"IL-2: {i}" : "");
         AircraftText = aircraft is not null ? ShortAircraft(aircraft)
             : s.DcsAircraft is { } dcsName ? dcsName
+            : s.Il2Aircraft is { } il2Name ? il2Name
+            : s.Il2Active ? "IL-2: se sabe al empezar la misión"
             : s.SimConnected ? "Sin avión (¿en el menú?)" : "—";
 
         var p = s.Profile;
