@@ -96,7 +96,7 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
 `mods` (estado de cada biblioteca), `mods <conjunto> [--dry]`, `mods importar <biblioteca> [--dry]`,
 `instantaneas` (grupos e instantáneas numeradas), `instantaneas crear <grupo|todo> [nombre]`,
 `instantaneas comparar <grupo> <n>`, `instantaneas restaurar <grupo> <n>` (pide confirmación),
-`ia` (generar perfiles con Claude, ver "Generar perfiles con IA"), `hoja <perfil> [--pdf]` (hoja de mandos, ver abajo), `graficos` / `graficos actual dcs|msfs [--monitor]` / `graficos guardar dcs|msfs <nombre> [--monitor]` / `graficos comparar|aplicar <nombre> [--dry]` (perfiles gráficos, ver abajo), `graficos vuelos` (sesiones del visor según Pimax).
+`ia` (generar perfiles con Claude, ver "Generar perfiles con IA"), `hoja <perfil> [--pdf]` (hoja de mandos, ver abajo), `graficos` / `graficos actual dcs|msfs|il2 [--monitor]` / `graficos guardar dcs|msfs|il2 <nombre> [--monitor]` / `graficos comparar|aplicar <nombre> [--dry]` (perfiles gráficos, ver abajo), `graficos vuelos` (sesiones del visor según Pimax).
 - Fase 5, App Hangar (08/11/2026; escenarios con host falso + ping real, pantalla comprobada fuera de
   pantalla; ✅ verificado por el usuario con los programas reales: ningún paso en rojo, MSFS arranca,
   HapticSeat aparece en la bandeja y SimAppPro abre sin aviso de UAC): `Core/Hangar/`
@@ -171,7 +171,7 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
   restaurar"; solo SOBRESCRIBE (lo nuevo se queda; decisión por defecto, el usuario no eligió); rutas con ".." en
   el .zip se rechazan. Crear sí se puede con el simulador abierto.
   ✅ Fase 5 completa.
-- IL-2 Great Battles (22/11/2026, en curso por etapas): instalado por Steam en `F:\SteamLibrary\steamapps\common\IL-2 Sturmovik
+- IL-2 Great Battles (22/11/2026, 4 etapas ✅, falta probarlo con IL-2 de verdad): instalado por Steam en `F:\SteamLibrary\steamapps\common\IL-2 Sturmovik
   Battle of Stalingrad` (appid 307960, `bin\game\Il-2.exe`, proceso `Il-2`); IL-2 Korea aparte en `E:\IL2Series`. Telemetría ya
   activa en `data\startup.cfg` (motiondevice + telemetrydevice, UDP 5678 a 127.255.255.255, la puso HapticSeat el 20/10).`startup.cfg`
   tiene `login`/`password` (vacíos el 22/11: se entra por Steam); ojo, entran en las instantáneas. IL-2 no admite órdenes externas: solo
@@ -189,7 +189,14 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
   Etapa 3 ✅ (editor comprobado fuera de pantalla con un perfil de IL-2): editor con sim «il2», sugerencias I: en luces y condiciones,
   campos {I:...} en «Insertar en la línea» del ICP, vista en vivo de luces/ICP con IL-2, «Usar el avión actual» (il2:nombre); Ejecución
   muestra «IL-2 (telemetría)» y el avión; Perfiles agrupa «IL-2». Sin hacer: generar con IA para IL-2 (podría leer las teclas de
-  `data\input\current.actions`). Sigue: gráficos de `startup.cfg`.
+  `data\input\current.actions`).
+  Etapa 4 ✅ (escenarios sobre una copia de prueba en `GraphicsTests`; leído el real: 34 ajustes; SIN aplicar nada al real): perfiles
+  gráficos de IL-2 (sim "il2") sobre `data\startup.cfg` (`Il2StartupFile`: "bloque.clave", solo claves existentes, conserva CRLF y
+  tabuladores; `GraphicsManager.FindIl2Startup` busca en las bibliotecas de Steam de cada disco o en la instalación propia). Entra
+  `graphics.*` menos los del equipo (adapter, resoluciones y ventana, mgpu) y los que IL-2 toma del visor (or_width, or_height, or_ipd);
+  sin VR, también sin `or_*`. Aplicar solo con IL-2 cerrado (proceso `Il-2`). Sin reglas de VR para IL-2 aún (lo dice la revisión).
+  Pantalla Gráficos y `RigProbe graficos actual|guardar il2`; el Hangar ya puede aplicar un perfil de IL-2 («graphicsProfile»).
+  IL-2 Korea (`E:\IL2Series`) NO está incluido en nada de esto.
 - LEDs WinWing (13/11/2026, ✅ cada LED identificado por el usuario con `winwing barrido`; sin Wireshark):
   `Core/WinWing/WinWingPanel.cs`. Output report de 14 B: `02 <módulo lo> <módulo hi> 00 00 03 49 <LED> <valor>
   00 00 00 00 00` (del driver hid-winwing de Linux, capturado de SimAppPro). Solo se envía la orden 0x49.

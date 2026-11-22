@@ -118,7 +118,7 @@ internal static class Program
                 Console.WriteLine("            | dcs vigilar [filtro] | hangar [nombre [--dry]] | ventanas <proceso>");
                 Console.WriteLine("            | mods | mods <conjunto> [--dry] | mods importar <biblioteca> [--dry]");
                 Console.WriteLine("            | instantaneas | instantaneas crear <grupo|todo> [nombre] | instantaneas comparar|restaurar <grupo> <n>");
-                Console.WriteLine("            | graficos | graficos actual dcs|msfs [--monitor] | graficos guardar dcs|msfs <nombre> [--monitor] | graficos comparar|aplicar <nombre> [--dry] | graficos medir [perfil] [--monitor] | graficos optimizar | graficos mediciones | graficos vuelos");
+                Console.WriteLine("            | graficos | graficos actual dcs|msfs|il2 [--monitor] | graficos guardar dcs|msfs|il2 <nombre> [--monitor] | graficos comparar|aplicar <nombre> [--dry] | graficos medir [perfil] [--monitor] | graficos optimizar | graficos mediciones | graficos vuelos");
                 Console.WriteLine("            | hoja <perfil> [--pdf] | ia | ia clave [borrar] | ia contexto <avión|actual> | ia <avión|actual> \"lo que quieres\" [--base <perfil>]");
                 Console.WriteLine("            | winwing | winwing luces | winwing led <disp> <n> <valor> [--modulo XXXX] | winwing barrido <disp> [desde] [hasta] [--modulo XXXX] [--valor N]");
                 Console.WriteLine($"  <perfil> es una ruta a un .json o un nombre en {ProfileFile.ProfilesDir}");
@@ -148,7 +148,7 @@ internal static class Program
             Console.WriteLine($"{RigControl.Core.Graphics.GraphicsFile.DefaultPath} está roto: {ex.Message}");
             return 1;
         }
-        static string? Sim(string s) => s.ToLowerInvariant() switch { "dcs" => "dcs", "msfs" => "msfs", _ => null };
+        static string? Sim(string s) => s.ToLowerInvariant() switch { "dcs" => "dcs", "msfs" => "msfs", "il2" or "il-2" => "il2", _ => null };
 
         try
         {
@@ -306,7 +306,7 @@ internal static class Program
             Console.WriteLine(ex.Message);
             return 1;
         }
-        Console.WriteLine("Uso: graficos | graficos actual dcs|msfs [--monitor] | graficos guardar dcs|msfs <nombre> [--monitor] | graficos comparar|aplicar <nombre> [--dry] | graficos medir [perfil] [--monitor] | graficos optimizar | graficos mediciones | graficos vuelos");
+        Console.WriteLine("Uso: graficos | graficos actual dcs|msfs|il2 [--monitor] | graficos guardar dcs|msfs|il2 <nombre> [--monitor] | graficos comparar|aplicar <nombre> [--dry] | graficos medir [perfil] [--monitor] | graficos optimizar | graficos mediciones | graficos vuelos");
         return 1;
 
         static void PrintAdvice(List<RigControl.Core.Graphics.GraphicsAdvice> advice)

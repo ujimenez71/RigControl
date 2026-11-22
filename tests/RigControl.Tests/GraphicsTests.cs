@@ -126,6 +126,41 @@ internal static class GraphicsTests
               "VR: eye gaze vale con un visor con seguimiento ocular");
         Check(VrAdvisor.Check("msfs", new Dictionary<string, string> { ["GraphicsVR.DOF.Enabled"] = "1", ["GraphicsVR.MotionBlur.Enabled"] = "0" }, headset).Count == 1,
               "VR MSFS: profundidad de campo activada");
+
+        // --- startup.cfg de IL-2 (copia de prueba con el formato real: tabuladores, CRLF)
+        const string Startup = "[KEY = account]\r\n\tlogin = \"\"\r\n\tpassword = \"\"\r\n[END]\r\n\r\n[KEY = graphics]\r\n\tadapter = 0\r\n" +
+                               "\tfull_width = 1280\r\n\tor_enable = 1\r\n\tor_width = 5280\r\n\tshadows_quality = 4\r\n\tgrass_distance = 100.00000\r\n" +
+                               "\tvsync = 0\r\n[END]\r\n\r\n[KEY = telemetrydevice]\r\n\taddr = \"127.255.255.255\"\r\n\tport = 5678\r\n[END]\r\n\r\n";
+        var il2 = new Il2StartupFile(Startup);
+        Check(il2.Get("graphics.shadows_quality") == "4" && il2.Get("telemetrydevice.addr") == "\"127.255.255.255\"" && il2.Get("graphics.nada") is null,
+              "startup.cfg: valores por bloque.clave");
+        il2.Set("graphics.shadows_quality", "2");
+        Check(il2.Text == Startup.Replace("shadows_quality = 4", "shadows_quality = 2"), "startup.cfg: cambiar un valor no toca nada más (CRLF y tabuladores)");
+        threw = false;
+        try { il2.Set("graphics.nueva", "1"); } catch (InvalidDataException) { threw = true; }
+        Check(threw, "startup.cfg: clave que no existe = error (IL-2 escribe todas)");
+
+        var il2Dir = Directory.CreateTempSubdirectory().FullName;
+        var il2Path = Path.Combine(il2Dir, "startup.cfg");
+        File.WriteAllText(il2Path, Startup);
+        var il2Running = false;
+        var gm = new GraphicsManager(null, null, _ => il2Running, il2Path);
+        var il2Now = gm.Current("il2");
+        Check(il2Now.Keys.Order().SequenceEqual(["graphics.grass_distance", "graphics.or_enable", "graphics.shadows_quality", "graphics.vsync"]),
+              $"IL-2 VR: graphics sin los del equipo ni la resolución del visor ({string.Join(", ", il2Now.Keys.Order())})");
+        Check(!gm.Current("il2", vr: false).ContainsKey("graphics.or_enable"), "IL-2 monitor: sin los ajustes del visor (or_*)");
+        var il2Profile = new GraphicsProfile { Name = "IL-2 bajo", Sim = "il2", Settings = new() { ["graphics.shadows_quality"] = "1", ["graphics.grass_distance"] = "100" } };
+        Check(gm.Diff(il2Profile) is [{ Key: "graphics.shadows_quality", Current: "4", Wanted: "1" }], "IL-2: qué cambiaría (100 = 100.00000)");
+        il2Running = true;
+        threw = false;
+        try { gm.Apply(il2Profile); } catch (InvalidOperationException ex) { threw = ex.Message.Contains("IL-2"); }
+        Check(threw && File.ReadAllText(il2Path) == Startup, "IL-2 abierto: no se aplica nada");
+        il2Running = false;
+        gm.Apply(il2Profile);
+        Check(File.ReadAllText(il2Path) == Startup.Replace("shadows_quality = 4", "shadows_quality = 1") && GraphicsManager.Backups(il2Path).Count() == 1,
+              "IL-2: aplicar cambia solo esa línea y deja copia .bak");
+        Check(GraphicsManager.ProcessName("il2") == "Il-2" && il2Profile.SimName == "IL-2", "IL-2: proceso Il-2 y nombre");
+        Directory.Delete(il2Dir, true);
         return fails;
     }
 }

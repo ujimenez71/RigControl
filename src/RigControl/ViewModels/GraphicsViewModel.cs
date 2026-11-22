@@ -294,7 +294,7 @@ public sealed class GraphicsViewModel : ObservableObject, IDisposable
     /// <summary>Al cerrar la app a mitad de una medición: cancela (cierra DCS y restaura).</summary>
     public void Dispose() => _measureCts?.Cancel();
 
-    public IReadOnlyList<string> SimNames { get; } = ["DCS World", "MSFS 2024"];
+    public IReadOnlyList<string> SimNames { get; } = ["DCS World", "MSFS 2024", "IL-2"];
     public IReadOnlyList<int> RefreshRates { get; } = [72, 90, 120];
 
     public string FilePath => GraphicsFile.DefaultPath;
@@ -387,7 +387,7 @@ public sealed class GraphicsViewModel : ObservableObject, IDisposable
     private void ReviewCurrent()
     {
         CurrentReview.Clear();
-        foreach (var (sim, name) in new[] { ("dcs", "DCS"), ("msfs", "MSFS") })
+        foreach (var (sim, name) in new[] { ("dcs", "DCS"), ("msfs", "MSFS"), ("il2", "IL-2") })
         {
             try
             {
@@ -430,7 +430,7 @@ public sealed class GraphicsViewModel : ObservableObject, IDisposable
     public void Capture()
     {
         if (!CanCapture) return;
-        var sim = _newSim == "MSFS 2024" ? "msfs" : "dcs";
+        var sim = _newSim switch { "MSFS 2024" => "msfs", "IL-2" => "il2", _ => "dcs" };
         try
         {
             var name = _newName.Trim();

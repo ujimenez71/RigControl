@@ -3,13 +3,26 @@ using System.Diagnostics;
 namespace RigControl.Core.Graphics;
 
 /// <summary>
-/// Lee los ajustes gráficos actuales de DCS (options.lua + autoexec.cfg) y MSFS 2024 (UserCfg.opt), los
+/// Lee los ajustes gráficos actuales de DCS (options.lua + autoexec.cfg), MSFS 2024 (UserCfg.opt) e IL-2 Great
+/// Battles (data\startup.cfg), los
 /// compara con un perfil y los aplica: solo con el simulador cerrado (los dos reescriben su archivo al
 /// salir), con copia .bak antes de cada cambio (se guardan las 5 últimas) y escribiendo temporal + renombrar.
 /// Rutas y "¿está abierto?" inyectables para las pruebas.
 /// </summary>
-public sealed class GraphicsManager(string? dcsConfigDir = null, string? msfsUserCfg = null, Func<string, bool>? isRunning = null)
+public sealed class GraphicsManager(string? dcsConfigDir = null, string? msfsUserCfg = null, Func<string, bool>? isRunning = null,
+                                    string? il2Startup = null)
 {
+    /// <summary>
+    /// Claves de graphics de IL-2 que son del equipo o del visor y no de la calidad (nunca entran en un perfil):
+    /// tarjeta, ventana y resolución del monitor, y la resolución e IPD que IL-2 toma del visor.
+    /// </summary>
+    private static readonly HashSet<string> Il2MachineKeys = new(StringComparer.Ordinal)
+    {
+        "graphics.adapter", "graphics.full_height", "graphics.full_width", "graphics.win_height", "graphics.win_width",
+        "graphics.fullscreen", "graphics.desktop_center", "graphics.mgpu_compatible", "graphics.or_width", "graphics.or_height",
+        "graphics.or_ipd",
+    };
+
     private const int KeepBackups = 5;
 
     /// <summary>Claves de "Video" de MSFS que son del equipo y no de la calidad (nunca se guardan en un perfil).</summary>
@@ -31,7 +44,35 @@ public sealed class GraphicsManager(string? dcsConfigDir = null, string? msfsUse
 
     public string? MsfsUserCfgPath => msfsUserCfg ?? FindMsfsUserCfg();
 
-    public static string ProcessName(string sim) => sim == "msfs" ? "FlightSimulator2024" : "DCS";
+    public string? Il2StartupPath => il2Startup ?? FindIl2Startup();
+
+    public static string ProcessName(string sim) => sim switch { "msfs" => "FlightSimulator2024", "il2" => "Il-2", _ => "DCS" };
+
+    /// <summary>
+    /// data\startup.cfg de IL-2 Great Battles: la versión de Steam («IL-2 Sturmovik Battle of Stalingrad») en una
+    /// biblioteca de Steam de cualquier disco, o la del instalador propio («IL-2 Sturmovik Great Battles»).
+    /// </summary>
+    public static string? FindIl2Startup()
+    {
+        string[] relative =
+        [
+            @"SteamLibrary\steamapps\common\IL-2 Sturmovik Battle of Stalingrad",
+            @"Program Files (x86)\Steam\steamapps\common\IL-2 Sturmovik Battle of Stalingrad",
+            @"Steam\steamapps\common\IL-2 Sturmovik Battle of Stalingrad",
+            @"IL-2 Sturmovik Great Battles",
+            @"Program Files\1C Game Studios\IL-2 Sturmovik Great Battles",
+        ];
+        foreach (var drive in DriveInfo.GetDrives())
+        {
+            if (drive.DriveType != DriveType.Fixed || !drive.IsReady) continue;
+            foreach (var r in relative)
+            {
+                var path = Path.Combine(drive.RootDirectory.FullName, r, "data", "startup.cfg");
+                if (File.Exists(path)) return path;
+            }
+        }
+        return null;
+    }
 
     public static string? FindDcsConfig()
     {
@@ -60,11 +101,19 @@ public sealed class GraphicsManager(string? dcsConfigDir = null, string? msfsUse
     /// <summary>
     /// Ajustes actuales que entran en un perfil. DCS: graphics.*, VR.* y autoexec.*. MSFS con VR: los de
     /// "Video" que acaban en VR + GraphicsVR.*; sin VR: el resto de "Video" (menos los del equipo) + Graphics.*.
+    /// IL-2: graphics.* menos los del equipo; sin VR, también sin los del visor (or_*).
     /// </summary>
     public Dictionary<string, string> Current(string sim, bool vr = true)
     {
         var result = new Dictionary<string, string>(StringComparer.Ordinal);
-        if (sim == "dcs")
+        if (sim == "il2")
+        {
+            var cfg = LoadIl2();
+            foreach (var k in cfg.Keys.Where(k => k.StartsWith("graphics.", StringComparison.Ordinal) && !Il2MachineKeys.Contains(k)
+                                                  && (vr || !k.StartsWith("graphics.or_", StringComparison.Ordinal))))
+                result[k] = cfg.Get(k)!;
+        }
+        else if (sim == "dcs")
         {
             var (options, autoexec) = LoadDcs();
             foreach (var k in options.Keys.Where(k => k.StartsWith("graphics.", StringComparison.Ordinal) || k.StartsWith("VR.", StringComparison.Ordinal)))
@@ -90,7 +139,16 @@ public sealed class GraphicsManager(string? dcsConfigDir = null, string? msfsUse
     public List<GraphicsChange> Diff(GraphicsProfile profile)
     {
         List<GraphicsChange> changes = [];
-        if (profile.Sim == "dcs")
+        if (profile.Sim == "il2")
+        {
+            var cfg = LoadIl2();
+            foreach (var (key, wanted) in profile.Settings)
+            {
+                var current = cfg.Get(key);
+                if (current is null || !Same(current, wanted)) changes.Add(new GraphicsChange(key, current, wanted));
+            }
+        }
+        else if (profile.Sim == "dcs")
         {
             var (options, autoexec) = LoadDcs();
             foreach (var (key, wanted) in profile.Settings)
@@ -134,7 +192,14 @@ public sealed class GraphicsManager(string? dcsConfigDir = null, string? msfsUse
         if (_isRunning(ProcessName(profile.Sim)))
             throw new InvalidOperationException($"{profile.SimName} está abierto: ciérralo antes (al salir reescribe su configuración y perdería el cambio).");
 
-        if (profile.Sim == "dcs")
+        if (profile.Sim == "il2")
+        {
+            var path = Il2StartupPath ?? throw new InvalidOperationException("No se encuentra data\\startup.cfg de IL-2 Great Battles.");
+            var cfg = LoadIl2();
+            foreach (var c in changes) cfg.Set(c.Key, c.Wanted);
+            Write(path, cfg.Text);
+        }
+        else if (profile.Sim == "dcs")
         {
             var dir = DcsConfigDir ?? throw new InvalidOperationException("No se encuentra la carpeta Config de DCS (Saved Games).");
             var (options, autoexec) = LoadDcs();
@@ -207,6 +272,12 @@ public sealed class GraphicsManager(string? dcsConfigDir = null, string? msfsUse
         var optionsPath = Path.Combine(dir, "options.lua");
         if (!File.Exists(optionsPath)) throw new InvalidOperationException($"No existe {optionsPath}.");
         return (LuaOptionsFile.Load(optionsPath), AutoexecFile.Load(Path.Combine(dir, "autoexec.cfg")));
+    }
+
+    private Il2StartupFile LoadIl2()
+    {
+        var path = Il2StartupPath ?? throw new InvalidOperationException("No se encuentra data\\startup.cfg de IL-2 Great Battles.");
+        return Il2StartupFile.Load(path);
     }
 
     private UserCfgFile LoadMsfs()

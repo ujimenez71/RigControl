@@ -9,7 +9,7 @@ public sealed class GraphicsProfile
 {
     public string Name { get; set; } = "";
 
-    /// <summary>"dcs" o "msfs".</summary>
+    /// <summary>"dcs", "msfs" o "il2".</summary>
     public string Sim { get; set; } = "dcs";
 
     /// <summary>Pensado para VR: se revisa con las reglas de VR (y en MSFS solo toca los ajustes de VR).</summary>
@@ -24,7 +24,9 @@ public sealed class GraphicsProfile
     /// </summary>
     public Dictionary<string, string> Settings { get; set; } = new(StringComparer.Ordinal);
 
-    public string SimName => Sim == "msfs" ? "MSFS 2024" : "DCS World";
+    public string SimName => NameOf(Sim);
+
+    public static string NameOf(string sim) => sim switch { "msfs" => "MSFS 2024", "il2" => "IL-2", _ => "DCS World" };
 }
 
 /// <summary>El visor, para las reglas de VR.</summary>
@@ -108,6 +110,12 @@ public static class VrAdvisor
         double? Num(string key) => s.TryGetValue(key, out var v)
                                    && double.TryParse(LuaOptionsFile.Display(v), NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? d : null;
         bool On(string key) => s.TryGetValue(key, out var v) && LuaOptionsFile.Display(v).Trim() is "true" or "1";
+
+        if (sim == "il2")
+        {
+            list.Add(new(AdviceLevel.Info, "", "Aún no hay reglas de VR para IL-2 (se pueden guardar, comparar y aplicar perfiles)."));
+            return list;
+        }
 
         if (sim == "dcs")
         {
