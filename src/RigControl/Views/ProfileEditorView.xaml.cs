@@ -18,7 +18,9 @@ public partial class ProfileEditorView : UserControl
                 "El perfil tiene errores. Se guardará, pero la ejecución seguirá usando la versión anterior hasta que los corrijas.\n\n¿Guardar de todos modos?",
                 "RigControl", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
-        Vm.Save();
+        if (Vm.Save() is { } error)
+            MessageBox.Show(Window.GetWindow(this)!, $"No se ha guardado: {error}", "RigControl",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     private void Discard_Click(object sender, RoutedEventArgs e)

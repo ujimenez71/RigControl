@@ -82,6 +82,8 @@ public sealed class ProfilesViewModel : ObservableObject, IDisposable
             editor.Dispose();
             Editor = null;
             Refresh();
+            // Al renombrar el archivo, seguir en el mismo perfil con su nombre nuevo.
+            Selected = Profiles.FirstOrDefault(p => p.Path == editor.Path) ?? Selected;
         };
         Editor = editor;
         return null;
@@ -119,7 +121,7 @@ public sealed class ProfilesViewModel : ObservableObject, IDisposable
             editor.Dispose();
             Editor = null;
             Refresh();
-            Selected = Profiles.FirstOrDefault(p => p.Path == path) ?? Selected;
+            Selected = Profiles.FirstOrDefault(p => p.Path == editor.Path) ?? Selected;
         };
         Editor = editor;
     }

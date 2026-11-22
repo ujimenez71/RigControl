@@ -53,6 +53,7 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
     public ProfileEditorViewModel(string path, ProfileFile file, IntPtr window)
     {
         Path = path;
+        _fileBase = System.IO.Path.GetFileNameWithoutExtension(path);
         _original = file;
         _window = window;
         _devices = new Dictionary<string, string>(file.Devices, StringComparer.OrdinalIgnoreCase);
@@ -85,8 +86,41 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         Dirty = false;
     }
 
-    public string Path { get; }
+    public string Path { get; private set; }
     public string FileName => System.IO.Path.GetFileName(Path);
+
+    private string _fileBase;
+    private string _fileError = "";
+
+    /// <summary>Nombre del archivo sin ".json"; si cambia, al guardar se renombra el perfil.</summary>
+    public string FileBase
+    {
+        get => _fileBase;
+        set
+        {
+            if (!Set(ref _fileBase, value)) return;
+            FileError = CheckFileName(value.Trim());
+            Dirty = true;
+        }
+    }
+
+    /// <summary>Por qué no vale el nombre de archivo escrito ("" = vale).</summary>
+    public string FileError { get => _fileError; private set { if (Set(ref _fileError, value)) Raise(nameof(HasFileError)); } }
+    public bool HasFileError => _fileError.Length > 0;
+
+    /// <summary>Ruta con el nombre de archivo escrito (la actual si no cambia).</summary>
+    private string TargetPath => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Path)!, _fileBase.Trim() + ".json");
+
+    private string CheckFileName(string name)
+    {
+        if (name.Length == 0) return "El archivo necesita un nombre.";
+        if (name.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) >= 0) return "No valen \\ / : * ? \" < > | en el nombre.";
+        if (name.EndsWith('.') || name.StartsWith('.')) return "El nombre no puede empezar ni acabar en punto.";
+        var target = TargetPath;
+        if (!string.Equals(target, Path, StringComparison.OrdinalIgnoreCase) && File.Exists(target))
+            return $"Ya hay otro perfil llamado {name}.json.";
+        return "";
+    }
 
     public ObservableCollection<BindingEditViewModel> Bindings { get; } = [];
     public ObservableCollection<ProblemItem> Problems { get; } = [];
@@ -667,12 +701,56 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
             : $"{errors} error(es): se puede guardar, pero la ejecución no usará el perfil hasta corregirlos";
     }
 
-    public void Save()
+    /// <summary>
+    /// Guarda el perfil. Si se ha cambiado el nombre del archivo, escribe primero el nuevo y luego deja el viejo
+    /// como .json.bak (como al borrar); una foto propia en aviones\ con el nombre viejo pasa al nuevo.
+    /// Devuelve un mensaje si no se puede guardar.
+    /// </summary>
+    public string? Save()
     {
         Validate();
-        BuildFile().Save(Path);
+        FileError = CheckFileName(_fileBase.Trim());
+        if (HasFileError) return FileError;
+
+        var target = TargetPath;
+        var old = Path;
+        BuildFile().Save(target);
+        if (!string.Equals(target, old, StringComparison.Ordinal) && File.Exists(old))
+        {
+            if (string.Equals(target, old, StringComparison.OrdinalIgnoreCase))
+            {
+                // Solo cambian mayúsculas: Save ya escribió encima del mismo archivo; falta el nombre.
+                var tmp = old + ".renombrando";
+                File.Move(old, tmp, overwrite: true);
+                File.Move(tmp, target);
+            }
+            else
+            {
+                File.Move(old, old + ".bak", overwrite: true);
+                RenameAircraftArt(System.IO.Path.GetFileNameWithoutExtension(old), System.IO.Path.GetFileNameWithoutExtension(target));
+            }
+        }
+        Path = target;
+        Raise(nameof(FileName));
         Dirty = false;
         Closed?.Invoke(true);
+        return null;
+    }
+
+    /// <summary>Renombra la foto propia del perfil (aviones\&lt;archivo&gt;.jpg/.png/.webp) si existe y no hay ya una con el nombre nuevo.</summary>
+    private static void RenameAircraftArt(string oldBase, string newBase)
+    {
+        try
+        {
+            foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".webp" })
+            {
+                var from = System.IO.Path.Combine(AircraftArt.UserDir, oldBase + ext);
+                var to = System.IO.Path.Combine(AircraftArt.UserDir, newBase + ext);
+                if (File.Exists(from) && !File.Exists(to)) File.Move(from, to);
+            }
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
     }
 
     public void Discard() => Closed?.Invoke(false);

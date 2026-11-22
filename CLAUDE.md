@@ -432,6 +432,10 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
   `SimConnectOutput.Prepare`: valor actual de cada condición y si la luz se encendería).
   Verificado: c172 y ejemplo-ga pasan por el editor y se guardan idénticos (bindings, capas,
   luces). Sin editar aún: secuencias (entradas), timing, axisHysteresis.
+  Renombrar (22/11/2026, probado fuera de pantalla en carpeta temporal): campo de archivo junto al nombre (sin ".json",
+  error en vivo si está vacío, con caracteres no válidos o ya existe); al guardar se escribe el nuevo y el viejo queda como
+  .json.bak; solo mayúsculas = se renombra en su sitio; la foto propia de `aviones\` con el nombre viejo pasa al nuevo.
+  Un `run` con perfil fijo sigue con el archivo viejo hasta reiniciarlo.
   `"notes"` en el perfil = notas libres (se ven en Perfiles). Lista agrupada por simulador (MSFS 2024 / DCS World / General).
 - `"sim"` en el perfil (02/11/2026): "msfs", "dcs" o "general"; si falta se deduce de "aircraft"
   (`ProfileCompiler.ResolveSim`; mezclar aviones de los dos = error). En `run auto` solo se eligen
@@ -639,8 +643,7 @@ Siguiente: probarlo de verdad; luego `graficos optimizar` (varias configuracione
 medir en vuelos reales (y MSFS por SimConnect).
 
 Otros pendientes (02/11/2026): (el Bravo NO se usará con DCS, decisión del usuario del 04/11/2026:
-no hace falta probar luces `D:` en él; la función sigue disponible); renombrar archivo de perfil en
-el editor; editar secuencias/timing/histéresis; escribir A:; perfil de jet (el usuario NO tiene el F-15E aunque su carpeta está en `Mods\aircraft`); limpiar la instalación
+no hace falta probar luces `D:` en él; la función sigue disponible); editar secuencias/timing/histéresis; escribir A:; perfil de jet (el usuario NO tiene el F-15E aunque su carpeta está en `Mods\aircraft`); limpiar la instalación
 errónea de DCS-BIOS en `Saved Games\DCS` (inactiva). (✅ El Yoke y el Bravo vuelven a detectarse: `list` y `catalog`
 el 13/11/2026, los 10 dispositivos conectados con sus claves de siempre.)
 
