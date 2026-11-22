@@ -256,14 +256,35 @@
                                              FontFamily="Cascadia Mono, Consolas"
                                              ToolTip="alias:b12 (botón), alias:hat1.up (hat), alias:y&gt;90 (zona de eje en %)" />
                                 </DockPanel>
-                                <TextBlock Style="{StaticResource Hint}"
-                                           Text="{Binding DataContext.CaptureStatus, RelativeSource={RelativeSource AncestorType=UserControl}}" />
-                                <TextBlock Text="Gesto" Style="{StaticResource Label}" />
-                                <ComboBox ItemsSource="{x:Static vm:BindingEditViewModel.Gestures}" DisplayMemberPath="Label"
-                                          SelectedValuePath="Value" SelectedValue="{Binding Gesture}" />
                             </StackPanel>
-                            <TextBlock Style="{StaticResource Hint}" Visibility="{Binding IsSequence, Converter={StaticResource BoolToVisibility}}"
-                                       Text="Secuencia: las entradas no se editan aquí (se conservan tal cual)." />
+                            <!-- Secuencia: un paso por fila, cada uno con su captura -->
+                            <StackPanel Visibility="{Binding IsSequence, Converter={StaticResource BoolToVisibility}}">
+                                <ItemsControl ItemsSource="{Binding Steps}" Margin="0,6,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <DockPanel Margin="0,0,0,4">
+                                                <TextBlock DockPanel.Dock="Left" Width="24" VerticalAlignment="Center" Opacity="0.6"
+                                                           Text="{Binding Number}" />
+                                                <Button DockPanel.Dock="Right" Content="✕" Click="RemoveStep_Click" Margin="4,0,0,0"
+                                                        Style="{StaticResource SmallButton}" ToolTip="Quitar este paso" />
+                                                <Button DockPanel.Dock="Right" Content="🎯" Click="CaptureStep_Click" Margin="4,0,0,0"
+                                                        Style="{StaticResource SmallButton}" ToolTip="Capturar: pulsa el botón del mando" />
+                                                <TextBox Text="{Binding Input, UpdateSourceTrigger=PropertyChanged}" FontFamily="Cascadia Mono, Consolas"
+                                                         ToolTip="alias:b12 (botón), alias:hat1.up (hat), alias:y&gt;90 (zona de eje en %)" />
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <Button Content="＋  Añadir paso" Click="AddStep_Click" HorizontalAlignment="Left" Margin="0,2,0,0"
+                                        ToolTip="Añade un paso y espera a que pulses su botón" />
+                                <TextBlock Style="{StaticResource Hint}"
+                                           Text="{Binding DataContext.SequenceHint, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                            </StackPanel>
+                            <TextBlock Style="{StaticResource Hint}"
+                                       Text="{Binding DataContext.CaptureStatus, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                            <TextBlock Text="Gesto" Style="{StaticResource Label}" />
+                            <ComboBox ItemsSource="{x:Static vm:BindingEditViewModel.Gestures}" DisplayMemberPath="Label"
+                                      SelectedValuePath="Value" SelectedValue="{Binding Gesture}" />
                             <TextBlock Text="Condición" Style="{StaticResource Label}" />
                             <ContentControl Content="{Binding Condition}" ContentTemplate="{StaticResource ConditionEditor}" />
                             <TextBlock Style="{StaticResource Hint}"
@@ -542,6 +563,61 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+        <!-- Tiempos de los gestos e histéresis de las zonas de eje (valen para todo el perfil) -->
+        <TabItem Header="Tiempos">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
+                <Grid MaxWidth="900" HorizontalAlignment="Left">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="90" />
+                        <ColumnDefinition Width="30" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.ColumnSpan="6" Style="{StaticResource Hint}" Margin="0,0,0,12"
+                               Text="Valen para todos los bindings del perfil. Si no sabes qué poner, deja los de serie: 500, 300 y 1000 ms, y 2 %." />
+
+                    <TextBlock Grid.Row="1" Text="Pulsación larga a partir de" VerticalAlignment="Center" />
+                    <TextBox Grid.Row="1" Grid.Column="2" Text="{Binding LongMs, UpdateSourceTrigger=PropertyChanged}" Margin="0,4" />
+                    <TextBlock Grid.Row="1" Grid.Column="3" Text=" ms" VerticalAlignment="Center" Opacity="0.7" />
+                    <TextBlock Grid.Row="1" Grid.Column="5" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0"
+                               Text="Mantenida al menos este tiempo = «Pulsación larga»; menos = «Pulsación corta»." />
+
+                    <TextBlock Grid.Row="2" Text="Doble toque: máximo entre toques" VerticalAlignment="Center" />
+                    <TextBox Grid.Row="2" Grid.Column="2" Text="{Binding DoubleMs, UpdateSourceTrigger=PropertyChanged}" Margin="0,4" />
+                    <TextBlock Grid.Row="2" Grid.Column="3" Text=" ms" VerticalAlignment="Center" Opacity="0.7" />
+                    <TextBlock Grid.Row="2" Grid.Column="5" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0"
+                               Text="Entre soltar y volver a pulsar. Un botón con doble toque espera este tiempo antes de dar la pulsación corta." />
+
+                    <TextBlock Grid.Row="3" Text="Secuencia: máximo entre pasos" VerticalAlignment="Center" />
+                    <TextBox Grid.Row="3" Grid.Column="2" Text="{Binding SequenceMs, UpdateSourceTrigger=PropertyChanged}" Margin="0,4" />
+                    <TextBlock Grid.Row="3" Grid.Column="3" Text=" ms" VerticalAlignment="Center" Opacity="0.7" />
+                    <TextBlock Grid.Row="3" Grid.Column="5" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0"
+                               Text="Si tardas más entre un paso y el siguiente, la secuencia vuelve a empezar." />
+
+                    <TextBlock Grid.Row="4" Grid.ColumnSpan="6" Text="{Binding TimingError}" Foreground="#D9342B" FontSize="12"
+                               TextWrapping="Wrap" Margin="0,4,0,0" />
+
+                    <TextBlock Grid.Row="5" Text="Histéresis de las zonas de eje" VerticalAlignment="Center" Margin="0,12,0,0" />
+                    <TextBox Grid.Row="5" Grid.Column="2" Text="{Binding Hysteresis, UpdateSourceTrigger=PropertyChanged}" Margin="0,16,0,4" />
+                    <TextBlock Grid.Row="5" Grid.Column="3" Text=" %" VerticalAlignment="Center" Opacity="0.7" Margin="0,12,0,0" />
+                    <TextBlock Grid.Row="5" Grid.Column="5" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="0,12,0,0"
+                               Text="Para entrar en una zona (p. ej. y&gt;90) hay que meterse este margen dentro; para salir basta con cruzar el borde. Evita que un eje en el límite entre y salga sin parar. De 0 a 20." />
+                    <TextBlock Grid.Row="6" Grid.ColumnSpan="6" Text="{Binding HysteresisError}" Foreground="#D9342B" FontSize="12"
+                               TextWrapping="Wrap" Margin="0,4,0,0" />
+                </Grid>
             </ScrollViewer>
         </TabItem>
         </TabControl>

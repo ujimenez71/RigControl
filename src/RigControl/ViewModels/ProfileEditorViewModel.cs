@@ -61,6 +61,10 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         _sim0 = string.IsNullOrWhiteSpace(file.Sim) ? SimFromFile(file) : file.Sim.Trim().ToLowerInvariant();
         _aircraftText = string.Join(", ", file.Aircraft);
         _notes = file.Notes ?? "";
+        _longMs = file.Timing.LongMs.ToString();
+        _doubleMs = file.Timing.DoubleMs.ToString();
+        _sequenceMs = file.Timing.SequenceMs.ToString();
+        _hysteresis = file.AxisHysteresis.ToString(System.Globalization.CultureInfo.CurrentCulture);
 
         foreach (var b in file.Bindings) Add(BindingEditViewModel.FromFile(b));
         Selected = Bindings.FirstOrDefault();
@@ -121,6 +125,27 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
             return $"Ya hay otro perfil llamado {name}.json.";
         return "";
     }
+
+    // ------------------------------------------------------------ tiempos e histéresis (texto: se valida al compilar)
+    private string _longMs, _doubleMs, _sequenceMs, _hysteresis;
+    private string _timingError = "", _hysteresisError = "";
+
+    public string LongMs { get => _longMs; set { if (Set(ref _longMs, value.Trim())) Touch(); } }
+    public string DoubleMs { get => _doubleMs; set { if (Set(ref _doubleMs, value.Trim())) Touch(); } }
+    public string SequenceMs { get => _sequenceMs; set { if (Set(ref _sequenceMs, value.Trim())) { Touch(); Raise(nameof(SequenceHint)); } } }
+    public string Hysteresis { get => _hysteresis; set { if (Set(ref _hysteresis, value.Trim())) Touch(); } }
+    public string TimingError { get => _timingError; private set => Set(ref _timingError, value); }
+    public string HysteresisError { get => _hysteresisError; private set => Set(ref _hysteresisError, value); }
+
+    /// <summary>Ayuda bajo los pasos de una secuencia, con el tiempo del perfil.</summary>
+    public string SequenceHint => $"Hay que pulsarlas en este orden, con menos de {(int.TryParse(_sequenceMs, out var ms) ? ms : 0)} ms entre una y otra (pestaña Tiempos). Se dispara al pulsar el último paso.";
+
+    /// <summary>Número entero en ms; lo que no lo es vale 0 y el compilador lo da por error.</summary>
+    private static int ParseMs(string text) => int.TryParse(text, out var v) ? v : 0;
+
+    /// <summary>Porcentaje con coma o punto; lo que no es número vale -1 (error del compilador).</summary>
+    private static double ParsePercent(string text) =>
+        double.TryParse(text.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : -1;
 
     public ObservableCollection<BindingEditViewModel> Bindings { get; } = [];
     public ObservableCollection<ProblemItem> Problems { get; } = [];
@@ -419,6 +444,21 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         StartCapture(v => target.Input = v);
     }
 
+    /// <summary>Captura un paso de la secuencia del binding seleccionado.</summary>
+    public void CaptureStep(SequenceStepViewModel step)
+    {
+        if (_isCapturing) { StopCapture("Cancelado."); return; }
+        StartCapture(v => step.Input = v);
+    }
+
+    /// <summary>Añade un paso a la secuencia del binding seleccionado y lo captura.</summary>
+    public void AddStepAndCapture()
+    {
+        if (_selected is not { IsSequence: true }) return;
+        if (_isCapturing) StopCapture("");
+        CaptureStep(_selected.AddStep());
+    }
+
     /// <summary>Captura la entrada de una pieza de condición (un modificador, p. ej.).</summary>
     public void CaptureInto(ConditionTermViewModel term)
     {
@@ -549,9 +589,9 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         Name = _name.Trim(),
         Sim = _sim0,
         Notes = string.IsNullOrWhiteSpace(_notes) ? null : _notes.Trim(),
-        Timing = _original.Timing,
+        Timing = new TimingFile { LongMs = ParseMs(_longMs), DoubleMs = ParseMs(_doubleMs), SequenceMs = ParseMs(_sequenceMs) },
         Aircraft = AircraftList(),
-        AxisHysteresis = _original.AxisHysteresis,
+        AxisHysteresis = ParsePercent(_hysteresis),
         Devices = UsedDevices(),
         Layers = Layers.Where(l => l.Name.Length > 0).GroupBy(l => l.Name)
                        .ToDictionary(g => g.Key, g => g.First().Condition.ToFile() ?? new ConditionFile()),
@@ -683,6 +723,10 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
             b.Error = string.Join("\n", report.Errors.Where(e => e.StartsWith(prefix, StringComparison.Ordinal))
                                                       .Select(e => e[prefix.Length..].Trim()));
         }
+
+        TimingError = report.Errors.Any(e => e.StartsWith("timing:", StringComparison.Ordinal))
+            ? "Los tres tiempos tienen que ser números enteros de milisegundos, mayores que 0." : "";
+        HysteresisError = string.Join("\n", report.Errors.Where(e => e.StartsWith("axisHysteresis:", StringComparison.Ordinal) || e.Contains("\"axisHysteresis\"", StringComparison.Ordinal)));
 
         // Errores de cada luz, junto a ella.
         foreach (var light in Lights)

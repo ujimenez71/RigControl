@@ -8,10 +8,21 @@ public enum ActionTarget { Cabin, Event, Variable, Key, Dcs, Text }
 public sealed record TargetOption(ActionTarget Value, string Label, string Help);
 public sealed record GestureOption(string Value, string Label);
 
+/// <summary>Un paso de una secuencia ("alias:b3").</summary>
+public sealed class SequenceStepViewModel(string input) : ObservableObject
+{
+    private string _input = input;
+    private int _number;
+    public event Action? Changed;
+    public string Number => $"{_number}.";
+    internal void SetNumber(int n) { if (_number != n) { _number = n; Raise(nameof(Number)); } }
+    public string Input { get => _input; set { if (Set(ref _input, value.Trim())) Changed?.Invoke(); } }
+}
+
 /// <summary>
 /// Un binding en el editor. La acción se edita por partes (destino + nombre + valor) y se compone
-/// en el texto del JSON ("B:NOMBRE=valor", "key:CTRL+G", "D:CONTROL VALOR"...). Lo que el editor no
-/// sabe editar (secuencias, condiciones) se conserva tal cual.
+/// en el texto del JSON ("B:NOMBRE=valor", "key:CTRL+G", "D:CONTROL VALOR"...). Una secuencia es el
+/// gesto "sequence" con su lista de pasos (en el JSON: "sequence" sin "input" ni "gesture").
 /// </summary>
 public sealed class BindingEditViewModel : ObservableObject
 {
@@ -29,7 +40,10 @@ public sealed class BindingEditViewModel : ObservableObject
     [
         new("press", "Al pulsar"), new("release", "Al soltar"), new("short", "Pulsación corta"),
         new("long", "Pulsación larga"), new("hold", "Mientras se mantiene"), new("double", "Doble toque"),
+        new(SequenceGesture, "Secuencia (varias entradas en orden)"),
     ];
+
+    public const string SequenceGesture = "sequence";
 
     private string _input = "";
     private string _gesture = "press";
@@ -45,23 +59,59 @@ public sealed class BindingEditViewModel : ObservableObject
     /// <summary>Se dispara con cualquier cambio que afecte al perfil (para validar y marcar "sin guardar").</summary>
     public event Action? Changed;
 
-    public List<string>? Sequence { get; private init; }
+    /// <summary>Pasos de la secuencia (solo cuentan con el gesto "sequence").</summary>
+    public System.Collections.ObjectModel.ObservableCollection<SequenceStepViewModel> Steps { get; } = [];
     /// <summary>Condición del binding (editable: ninguna, todas o alguna de varias piezas).</summary>
     public ConditionEditViewModel Condition { get; private set; } = ConditionEditViewModel.FromFile(null);
     private string _conditionText = "";
     public string ConditionText { get => _conditionText; set { if (Set(ref _conditionText, value)) Raise(nameof(TriggerDetail)); } }
 
-    public bool IsSequence => Sequence is not null;
-    public bool IsNotSequence => Sequence is null;
+    public bool IsSequence => _gesture == SequenceGesture;
+    public bool IsNotSequence => !IsSequence;
     public bool HasCondition => Condition.ToFile() is not null;
-    public string SequenceText => Sequence is null ? "" : string.Join("  >  ", Sequence);
+    public string SequenceText => string.Join("  >  ", Steps.Select(s => s.Input.Length == 0 ? "?" : s.Input));
 
     public string Input { get => _input; set { if (Set(ref _input, value.Trim())) OnChanged(); } }
 
     public string Gesture
     {
         get => _gesture;
-        set { if (Set(ref _gesture, value)) { Raise(nameof(GestureText)); Raise(nameof(TriggerDetail)); Raise(nameof(ShowRepeat)); OnChanged(); } }
+        set
+        {
+            var wasSequence = IsSequence;
+            if (!Set(ref _gesture, value)) return;
+            if (IsSequence && !wasSequence)
+            {
+                // De una entrada a secuencia: la entrada pasa a ser el primer paso.
+                if (Steps.Count == 0) { AddStep(_input); AddStep(""); }
+            }
+            else if (wasSequence && !IsSequence && _input.Length == 0 && Steps.Count > 0)
+                _input = Steps[0].Input;
+            Raise(nameof(Input)); Raise(nameof(IsSequence)); Raise(nameof(IsNotSequence));
+            Raise(nameof(GestureText)); Raise(nameof(TriggerDetail)); Raise(nameof(ShowRepeat)); OnChanged();
+        }
+    }
+
+    public SequenceStepViewModel AddStep(string input = "")
+    {
+        var step = new SequenceStepViewModel(input);
+        step.Changed += OnChanged;
+        Steps.Add(step);
+        Renumber();
+        OnChanged();
+        return step;
+    }
+
+    public void RemoveStep(SequenceStepViewModel step)
+    {
+        if (!Steps.Remove(step)) return;
+        Renumber();
+        OnChanged();
+    }
+
+    private void Renumber()
+    {
+        for (var i = 0; i < Steps.Count; i++) Steps[i].SetNumber(i + 1);
     }
 
     public ActionTarget Target
@@ -149,12 +199,12 @@ public sealed class BindingEditViewModel : ObservableObject
         var vm = new BindingEditViewModel
         {
             _input = f.Input ?? "",
-            _gesture = f.Gesture?.ToLowerInvariant() ?? "press",
-            Sequence = f.Sequence is null ? null : [.. f.Sequence],
+            _gesture = f.Sequence is not null ? SequenceGesture : f.Gesture?.ToLowerInvariant() ?? "press",
             Condition = ConditionEditViewModel.FromFile(f.When),
             _desc = f.Desc ?? "",
             _repeatMs = f.RepeatMs?.ToString() ?? "",
         };
+        foreach (var s in f.Sequence ?? []) vm.AddStep(s);
         vm.SplitAction(f.Action);
         vm._inputText = vm.IsSequence ? vm.SequenceText : vm._input;
         vm.Condition.Changed += () => { vm.Raise(nameof(HasCondition)); vm.OnChanged(); };
@@ -165,7 +215,7 @@ public sealed class BindingEditViewModel : ObservableObject
     {
         Input = IsSequence ? null : _input,
         Gesture = IsSequence ? null : _gesture,
-        Sequence = Sequence is null ? null : [.. Sequence],
+        Sequence = IsSequence ? [.. Steps.Select(s => s.Input)] : null,
         When = Condition.ToFile(),
         Action = Action,
         Desc = string.IsNullOrWhiteSpace(_desc) ? null : _desc.Trim(),

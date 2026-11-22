@@ -43,6 +43,18 @@ public partial class ProfileEditorView : UserControl
 
     private void Capture_Click(object sender, RoutedEventArgs e) => Vm.ToggleCapture();
 
+    private void CaptureStep_Click(object sender, RoutedEventArgs e)
+    {
+        if (Ctx<SequenceStepViewModel>(sender) is { } step) Vm.CaptureStep(step);
+    }
+
+    private void RemoveStep_Click(object sender, RoutedEventArgs e)
+    {
+        if (Ctx<SequenceStepViewModel>(sender) is { } step) Vm.Selected?.RemoveStep(step);
+    }
+
+    private void AddStep_Click(object sender, RoutedEventArgs e) => Vm.AddStepAndCapture();
+
     private void UseAircraft_Click(object sender, RoutedEventArgs e) => Vm.UseCurrentAircraft();
 
     // ---- condiciones (de bindings y de capas): el DataContext del botón dice sobre qué actúa
