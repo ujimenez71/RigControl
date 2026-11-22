@@ -1,5 +1,8 @@
 using System.Collections.ObjectModel;
+using System.IO;
+using System.Windows.Media.Imaging;
 using RigControl.Core;
+using RigControl.Core.Sheets;
 
 namespace RigControl.ViewModels;
 
@@ -36,7 +39,28 @@ public sealed class HatViewModel(int number) : ObservableObject
     private static readonly string[] Arrows = ["↑", "↗", "→", "↘", "↓", "↙", "←", "↖"];
 }
 
-/// <summary>Un mando en la pantalla Monitor: sus ejes, botones y hats, y si ha habido actividad reciente.</summary>
+/// <summary>
+/// Marcador de una entrada sobre la foto del mando (de "Fotos de los mandos"), en píxeles de la imagen.
+/// Se enciende mientras su botón está pulsado o su hat apunta en esa dirección (o a cualquiera, el hat entero).
+/// </summary>
+public sealed class PhotoMarkerViewModel(string text, string tip, double x, double y, double size) : ObservableObject
+{
+    private bool _isActive;
+    public string Text { get; } = text;
+    public string Tip { get; } = tip;
+    public double Size { get; } = size;
+    public double Left { get; } = x - size / 2;
+    public double Top { get; } = y - size / 2;
+    public double FontSize => Size * 0.45;
+    public bool IsActive { get => _isActive; set => Set(ref _isActive, value); }
+
+    // Qué lo enciende: botón (índice base 0), hat (índice) con dirección (-1 = cualquiera) o nada (ejes).
+    internal int Button = -1;
+    internal int Hat = -1;
+    internal int HatDir = -1;
+}
+
+/// <summary>Un mando en la pantalla Dispositivos: sus ejes, botones y hats, y si ha habido actividad reciente.</summary>
 public sealed class DeviceViewModel : ObservableObject
 {
     /// <summary>Cambio mínimo de un eje para anotarlo en el registro (~2 %, filtra el ruido).</summary>
@@ -48,15 +72,122 @@ public sealed class DeviceViewModel : ObservableObject
     private bool _isActive;
     private bool _ok = true;
 
-    public DeviceViewModel(MonitoredDevice device)
+    private readonly CatalogEntry? _entry;
+    private bool _photoLoaded;
+    private BitmapSource? _photo;
+
+    public DeviceViewModel(MonitoredDevice device, CatalogEntry? entry = null)
     {
         _device = device;
+        _entry = entry;
+        Manufacturer = DeviceManufacturer.ForKey(device.Key);
         Axes = [.. device.AxisIndices.Select(i => new AxisViewModel(MonitoredDevice.AxisNames[i]))];
         Buttons = [.. Enumerable.Range(1, device.ButtonCount).Select(n => new ButtonViewModel(n))];
         Hats = [.. Enumerable.Range(1, device.PovCount).Select(n => new HatViewModel(n))];
     }
 
     public string Name => _device.Name;
+
+    /// <summary>Fabricante (por el VID), o null si no se sabe.</summary>
+    public string? Manufacturer { get; }
+
+    /// <summary>Nombre con el fabricante delante, salvo que ya lo lleve ("WinWing Throttle F-15EX").</summary>
+    public string DisplayName => DeviceManufacturer.WithName(Manufacturer, Name);
+
+    // ------------------------------------------------------------ foto
+
+    public ObservableCollection<PhotoMarkerViewModel> PhotoMarkers { get; } = [];
+    public BitmapSource? Photo { get => _photo; private set { if (Set(ref _photo, value)) { Raise(nameof(HasPhoto)); Raise(nameof(NoPhoto)); Raise(nameof(NoMarkers)); Raise(nameof(PhotoWidth)); Raise(nameof(PhotoHeight)); } } }
+    public bool HasPhoto => _photo is not null;
+    public bool NoPhoto => _photo is null;
+    /// <summary>Hay foto pero ninguna entrada colocada en ella.</summary>
+    public bool NoMarkers => _photo is not null && PhotoMarkers.Count == 0;
+    public double PhotoWidth => _photo?.PixelWidth ?? 0;
+    public double PhotoHeight => _photo?.PixelHeight ?? 0;
+
+    /// <summary>Carga la foto y sus marcadores la primera vez que hace falta (al elegir el mando), o de nuevo si force.</summary>
+    public void EnsurePhoto(bool force = false)
+    {
+        if (_photoLoaded && !force) return;
+        _photoLoaded = true;
+        PhotoMarkers.Clear();
+        var layout = DeviceLayout.Load(Key);
+        var photo = LoadImage(layout.ImagePath);
+        Photo = photo;
+        if (photo is null) return;
+
+        var w = photo.PixelWidth;
+        var h = photo.PixelHeight;
+        var size = Math.Max(22, Math.Min(w, h) / 22.0);
+        foreach (var (part, pos) in layout.Markers)
+        {
+            var p = part.ToLowerInvariant();
+            var label = _entry?.InputLabel(p);
+            var m = new PhotoMarkerViewModel(ShortText(p), label is null ? p : $"{p} · {label}", pos.X * w, pos.Y * h, size);
+            if (p.StartsWith('b') && int.TryParse(p[1..], out var b)) m.Button = b - 1;
+            else if (p.StartsWith("hat", StringComparison.Ordinal))
+            {
+                var dot = p.IndexOf('.');
+                if (int.TryParse(dot < 0 ? p[3..] : p[3..dot], out var n)) m.Hat = n - 1;
+                m.HatDir = dot < 0 ? -1 : p[(dot + 1)..] switch { "up" => 0, "right" => 1, "down" => 2, "left" => 3, _ => -2 };
+            }
+            PhotoMarkers.Add(m);
+        }
+        Raise(nameof(NoMarkers));
+        UpdateMarkers();
+    }
+
+    /// <summary>"b12" -> "12", "hat1.up" -> "↑", "hat2" -> "H2", "y" -> "Y".</summary>
+    private static string ShortText(string part)
+    {
+        if (part.StartsWith('b') && part.Length > 1 && char.IsDigit(part[1])) return part[1..];
+        if (part.StartsWith("hat", StringComparison.Ordinal))
+        {
+            var dot = part.IndexOf('.');
+            return dot < 0 ? "H" + part[3..] : part[(dot + 1)..] switch { "up" => "↑", "right" => "→", "down" => "↓", "left" => "←", _ => "?" };
+        }
+        return part.ToUpperInvariant();
+    }
+
+    private void UpdateMarkers()
+    {
+        foreach (var m in PhotoMarkers)
+        {
+            if (m.Button >= 0) m.IsActive = m.Button < Buttons.Count && Buttons[m.Button].IsPressed;
+            else if (m.Hat >= 0 && m.Hat < Hats.Count)
+            {
+                var v = Hats[m.Hat].Value;
+                m.IsActive = v >= 0 && (m.HatDir == -1 || HatPoints(v, m.HatDir));
+            }
+        }
+    }
+
+    /// <summary>¿El hat (centésimas de grado) apunta hacia esa dirección (0 arriba, 1 derecha...)? Las diagonales cuentan para las dos.</summary>
+    private static bool HatPoints(int value, int dir)
+    {
+        var diff = Math.Abs(value - dir * 9000) % 36000;
+        return Math.Min(diff, 36000 - diff) <= 4500;
+    }
+
+    private static BitmapSource? LoadImage(string? path)
+    {
+        if (path is null) return null;
+        try
+        {
+            var bmp = new BitmapImage();
+            bmp.BeginInit();
+            bmp.CacheOption = BitmapCacheOption.OnLoad; // sin bloquear el archivo
+            bmp.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+            bmp.UriSource = new Uri(path);
+            bmp.EndInit();
+            bmp.Freeze();
+            return bmp;
+        }
+        catch (Exception ex) when (ex is IOException or NotSupportedException or FileFormatException)
+        {
+            return null;
+        }
+    }
     public string ProductName => _device.ProductName;
     public string Key => _device.Key;
     public string Summary => $"{Axes.Count} ejes · {Buttons.Count} botones · {Hats.Count} hats";
@@ -90,7 +221,7 @@ public sealed class DeviceViewModel : ObservableObject
             if (Math.Abs(raw - a.LoggedRaw) < AxisLogThreshold) continue;
             a.LoggedRaw = raw;
             changed = true;
-            addLog($"{Name}  Eje {a.Name,-2} {raw,6}  ({a.Percent,5:0.0} %)");
+            addLog($"{DisplayName}  Eje {a.Name,-2} {raw,6}  ({a.Percent,5:0.0} %)");
         }
 
         for (var i = 0; i < Buttons.Count; i++)
@@ -101,7 +232,7 @@ public sealed class DeviceViewModel : ObservableObject
             b.IsPressed = pressed;
             if (!log) continue;
             changed = true;
-            addLog($"{Name}  Botón {b.Number,3} {(pressed ? "PULSADO" : "suelto")}");
+            addLog($"{DisplayName}  Botón {b.Number,3} {(pressed ? "PULSADO" : "suelto")}");
         }
 
         for (var i = 0; i < Hats.Count; i++)
@@ -111,10 +242,11 @@ public sealed class DeviceViewModel : ObservableObject
             h.Value = _device.Povs[i];
             if (!log) continue;
             changed = true;
-            addLog($"{Name}  Hat {h.Number} {h.Text}");
+            addLog($"{DisplayName}  Hat {h.Number} {h.Text}");
         }
 
         if (changed) _lastActivity = nowMs;
+        if (changed || !log) UpdateMarkers();
         IsActive = nowMs - _lastActivity < ActivityMs;
     }
 }

@@ -403,6 +403,10 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
   con ejes (barra + % + valor bruto, solo los que existen según `GetObjects`), hats con flecha y
   botones que se iluminan; registro de cambios (pausable). Lee a ~60 Hz con un DispatcherTimer en
   el hilo de la interfaz usando `DeviceMonitor` (Core); se para mientras la pantalla está oculta.
+  Fabricante y foto (22/11/2026, comprobado fuera de pantalla con los mandos reales): nombre con el fabricante delante
+  (`Core/DeviceManufacturer`: tabla por VID -MOZA, WinWing, Virpil, Honeycomb...- o la cadena Manufacturer del USB; no
+  se repite si el alias ya lo lleva) y, bajo los botones, la foto de «Fotos de los mandos» con sus marcadores encendidos
+  en directo (botones; hats por dirección o enteros; ejes sin encender); «Fotos del mando…» abre esa ventana en el mando.
 - App WPF, pantalla Ejecución (01/11/2026): automático o perfil fijo, casilla Simulación (= --dry),
   Iniciar/Detener; tarjetas Simulador / Avión / Perfil activo; registro coloreado por nivel.
   Probado con UI Automation (simulación) y ✅ verificada por el usuario con MSFS y el rig

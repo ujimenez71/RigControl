@@ -43,7 +43,7 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <StackPanel>
-                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                 <TextBlock Text="{Binding Summary}" FontSize="11" Opacity="0.65" />
                             </StackPanel>
                             <!-- Punto de actividad: se enciende al tocar un control de ese mando -->
@@ -70,7 +70,7 @@
 
             <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" DataContext="{Binding Selected}">
                 <StackPanel>
-                    <TextBlock Text="{Binding Name}" FontSize="20" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding DisplayName}" FontSize="20" FontWeight="SemiBold" />
                     <TextBlock Opacity="0.7">
                         <Run Text="{Binding ProductName, Mode=OneWay}" /><Run Text="  ·  " /><Run Text="{Binding Key, Mode=OneWay}" />
                     </TextBlock>
@@ -179,6 +179,61 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+
+                    <!-- Foto del mando (la de «Fotos de los mandos»), con sus entradas encendidas en directo -->
+                    <DockPanel Margin="0,16,0,6">
+                        <Button DockPanel.Dock="Right" Content="Fotos del mando…" Click="Photos_Click"
+                                ToolTip="Cargar o cambiar la foto y colocar las entradas (la misma que usa la hoja de mandos)" />
+                        <TextBlock Text="Foto" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <TextBlock Opacity="0.6" TextWrapping="Wrap" Visibility="{Binding NoPhoto, Converter={StaticResource BoolToVisibility}}"
+                               Text="Este mando no tiene foto. Cárgala con «Fotos del mando…» y coloca en ella sus botones: aquí se encenderán al pulsarlos." />
+                    <TextBlock Opacity="0.6" TextWrapping="Wrap" Margin="0,0,0,6" Visibility="{Binding NoMarkers, Converter={StaticResource BoolToVisibility}}"
+                               Text="Aún no hay entradas colocadas en esta foto: colócalas con «Fotos del mando…» y se encenderán al pulsarlas." />
+                    <Border HorizontalAlignment="Left" CornerRadius="6" BorderThickness="1" Padding="6" Margin="0,0,0,8"
+                            BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}"
+                            Visibility="{Binding HasPhoto, Converter={StaticResource BoolToVisibility}}">
+                        <Viewbox Stretch="Uniform" MaxHeight="440" StretchDirection="DownOnly">
+                            <Grid Width="{Binding PhotoWidth}" Height="{Binding PhotoHeight}">
+                                <Image Source="{Binding Photo}" Stretch="Fill" />
+                                <ItemsControl ItemsSource="{Binding PhotoMarkers}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <Canvas />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemContainerStyle>
+                                        <Style TargetType="ContentPresenter">
+                                            <Setter Property="Canvas.Left" Value="{Binding Left}" />
+                                            <Setter Property="Canvas.Top" Value="{Binding Top}" />
+                                        </Style>
+                                    </ItemsControl.ItemContainerStyle>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type vm:PhotoMarkerViewModel}">
+                                            <Border x:Name="Dot" Height="{Binding Size}" MinWidth="{Binding Size}" CornerRadius="999"
+                                                    Background="#B3070C12" BorderBrush="#99FFFFFF" BorderThickness="2" Padding="3,0"
+                                                    ToolTip="{Binding Tip}">
+                                                <TextBlock x:Name="DotText" Text="{Binding Text}" Foreground="White" FontWeight="Bold"
+                                                           FontSize="{Binding FontSize}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <DataTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                    <Setter TargetName="Dot" Property="Background" Value="{StaticResource HudGreenBrush}" />
+                                                    <Setter TargetName="Dot" Property="BorderBrush" Value="White" />
+                                                    <Setter TargetName="DotText" Property="Foreground" Value="#070C12" />
+                                                    <Setter TargetName="Dot" Property="Effect">
+                                                        <Setter.Value>
+                                                            <DropShadowEffect Color="#3DFFA0" BlurRadius="24" ShadowDepth="0" Opacity="0.9" />
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </DataTrigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Grid>
+                        </Viewbox>
+                    </Border>
                 </StackPanel>
             </ScrollViewer>
         </Grid>

@@ -7,7 +7,7 @@ using Vortice.DirectInput;
 namespace RigControl.ViewModels;
 
 /// <summary>
-/// Pantalla Monitor: abre todos los mandos en modo compartido y los lee a ~60 Hz en el hilo de la
+/// Pantalla Dispositivos: abre todos los mandos en modo compartido y los lee a ~60 Hz en el hilo de la
 /// interfaz (DirectInput es rápido y así no hay que sincronizar nada). Equivale a "RigProbe monitor".
 /// </summary>
 public sealed class MonitorViewModel : ObservableObject, IDisposable
@@ -28,7 +28,14 @@ public sealed class MonitorViewModel : ObservableObject, IDisposable
     public ObservableCollection<DeviceViewModel> Devices { get; } = [];
     public ObservableCollection<string> Log { get; } = [];
 
-    public DeviceViewModel? Selected { get => _selected; set => Set(ref _selected, value); }
+    public DeviceViewModel? Selected
+    {
+        get => _selected;
+        set { if (Set(ref _selected, value)) value?.EnsurePhoto(); }
+    }
+
+    /// <summary>Vuelve a leer la foto del mando elegido (tras cambiarla en «Fotos de los mandos»).</summary>
+    public void ReloadPhoto() => Selected?.EnsurePhoto(force: true);
     public string Status { get => _status; private set => Set(ref _status, value); }
 
     /// <summary>Con el registro en pausa se siguen viendo los mandos, pero no se anotan cambios.</summary>
@@ -51,7 +58,8 @@ public sealed class MonitorViewModel : ObservableObject, IDisposable
         Devices.Clear();
 
         _monitor = DeviceMonitor.Open(_di, _window);
-        foreach (var d in _monitor.Devices) Devices.Add(new DeviceViewModel(d));
+        var catalog = DeviceCatalog.Load();
+        foreach (var d in _monitor.Devices) Devices.Add(new DeviceViewModel(d, catalog.Find(d.Key)));
         Selected = Devices.FirstOrDefault(d => d.Key == previous) ?? Devices.FirstOrDefault();
 
         Status = $"{Devices.Count} dispositivo(s) abiertos en modo compartido a ~60 Hz." +
