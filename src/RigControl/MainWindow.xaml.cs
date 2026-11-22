@@ -11,7 +11,7 @@ public partial class MainWindow : Window
     /// <summary>Cabecera de cada pantalla (en el orden del menú): ilustración de Assets/Banners, rótulo, título y subtítulo.</summary>
     private static readonly (string Image, string Caption, string Title, string Subtitle)[] Banners =
     [
-        ("monitor", "◢ 01 · ENTRADAS", "MONITOR", "Todos los mandos en directo: ejes, botones y hats."),
+        ("monitor", "◢ 01 · ENTRADAS", "DISPOSITIVOS", "Todos los mandos en directo: ejes, botones y hats."),
         ("ejecucion", "◢ 02 · MISIÓN", "EJECUCIÓN", "Simulador, avión y perfil activo: los mandos en vuelo."),
         ("perfiles", "◢ 03 · CONFIGURACIÓN", "PERFILES", "Bindings por avión, luces, pantalla del ICP y generación con IA."),
         ("hangar", "◢ 04 · ARRANQUE", "HANGAR", "Secuencias de arranque: programas, prioridad, ventanas, mods y gráficos."),

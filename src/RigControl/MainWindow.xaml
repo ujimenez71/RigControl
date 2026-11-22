@@ -128,7 +128,7 @@
                 <ListBox x:Name="Nav" SelectedIndex="0" BorderThickness="0" Background="Transparent" Padding="0"
                          ItemContainerStyle="{StaticResource NavItem}" SelectionChanged="Nav_SelectionChanged"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                    <ListBoxItem Content="MONITOR" Tag="&#xE7FC;" />
+                    <ListBoxItem Content="DISPOSITIVOS" Tag="&#xE7FC;" />
                     <ListBoxItem Content="EJECUCIÓN" Tag="&#xE768;" />
                     <ListBoxItem Content="PERFILES" Tag="&#xE70F;" />
                     <ListBoxItem Content="HANGAR" Tag="&#xE709;" />
