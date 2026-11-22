@@ -9,6 +9,7 @@ namespace RigControl.Core.Bindings;
 ///
 ///  - K:  se registra con MapClientEventToSimEvent al cargar el perfil y se envía con TransmitClientEvent_EX1.
 ///  - L:  una definición de datos por variable ("L:Nombre", unidades "Number") y SetDataOnSimObject.
+///  - A:  igual, una definición por variable y unidades. Solo las variables "settable" del SDK cambian algo.
 ///  - B:  los InputEvents dependen del avión: se enumeran al conectar y al cargar avión, y se
 ///        envían con SetInputEvent por su hash.
 /// Los errores del simulador llegan después, como excepción con el id del paquete: se guardan los
@@ -31,6 +32,8 @@ public sealed class SimConnectOutput : ISimOutput, IDisposable
 
     private readonly Dictionary<string, uint> _eventIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, uint> _lvarDefs = new(StringComparer.Ordinal);
+    /// <summary>A: por "NOMBRE, unidades" (la misma variable con otras unidades es otra definición).</summary>
+    private readonly Dictionary<string, uint> _avarDefs = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, ulong> _inputEvents = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, ulong> _inputEventsLoading = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<uint, string> _registrations = [];
@@ -123,6 +126,12 @@ public sealed class SimConnectOutput : ISimOutput, IDisposable
                 hr = SimConnect_SetDataOnSimObject(_handle, def, 0, 0, 0, sizeof(double), ref value);
                 break;
 
+            case ActionKind.AVar:
+                if (!_avarDefs.TryGetValue(AVarKey(action), out var adef)) return false;
+                var avalue = action.Value;
+                hr = SimConnect_SetDataOnSimObject(_handle, adef, 0, 0, 0, sizeof(double), ref avalue);
+                break;
+
             case ActionKind.InputEvent:
                 if (!_inputEvents.TryGetValue(action.Name, out var hash))
                 {
@@ -174,6 +183,7 @@ public sealed class SimConnectOutput : ISimOutput, IDisposable
 
         _eventIds.Clear();
         _lvarDefs.Clear();
+        _avarDefs.Clear();
         _registrations.Clear();
         _rejected.Clear();
         _inputEvents.Clear();
@@ -204,7 +214,7 @@ public sealed class SimConnectOutput : ISimOutput, IDisposable
         foreach (var b in _profile!.Bindings)
         {
             var a = b.Output;
-            if (_rejected.Contains($"{(a.Kind == ActionKind.SimEvent ? "K" : "L")}:{a.Name}")) continue;
+            if (a.Kind is ActionKind.SimEvent or ActionKind.LVar or ActionKind.AVar && _rejected.Contains(Label(a))) continue;
 
             if (a.Kind == ActionKind.SimEvent && !_eventIds.ContainsKey(a.Name))
             {
@@ -220,8 +230,26 @@ public sealed class SimConnectOutput : ISimOutput, IDisposable
                 Remember($"L:{a.Name}");
                 _lvarDefs[a.Name] = def;
             }
+            else if (a.Kind == ActionKind.AVar && !_avarDefs.ContainsKey(AVarKey(a)))
+            {
+                var def = _nextDefinition++;
+                SimConnect_AddToDataDefinition(_handle, def, a.Name, a.Unit, 4 /* FLOAT64 */, 0, uint.MaxValue);
+                Remember(Label(a));
+                _avarDefs[AVarKey(a)] = def;
+            }
         }
     }
+
+    private static string AVarKey(ActionSpec a) => $"{a.Name}, {a.Unit}";
+
+    /// <summary>Texto de una acción de MSFS para los avisos ("K:GEAR_UP", "A:NOMBRE, unidades").</summary>
+    private static string Label(ActionSpec a) => a.Kind switch
+    {
+        ActionKind.SimEvent => $"K:{a.Name}",
+        ActionKind.LVar => $"L:{a.Name}",
+        ActionKind.AVar => $"A:{AVarKey(a)}",
+        _ => $"B:{a.Name}",
+    };
 
     /// <summary>
     /// Pide a MSFS las variables de las luces del perfil, cada una cuando cambie (por fotograma de
@@ -370,17 +398,22 @@ public sealed class SimConnectOutput : ISimOutput, IDisposable
             _rejected.Add(what);
             if (what.StartsWith("K:")) _eventIds.Remove(what[2..]);
             else if (what.StartsWith("L:")) _lvarDefs.Remove(what[2..]);
+            else if (what.StartsWith("A:")) _avarDefs.Remove(what[2..]);
         }
         else
             for (var i = 0; i < SentRing; i++)
                 if (_sentIds[i] == sendId && _sentActions[i] is { } a)
-                    what = $"{a.Kind switch { ActionKind.SimEvent => "K", ActionKind.LVar => "L", _ => "B" }}:{a.Name}";
+                    what = Label(a);
+        var isAVar = what?.StartsWith("A:") == true;
 
         var reason = code switch
         {
             1 => "error del simulador",
             7 => "nombre no reconocido (¿está bien escrito?); no se enviará",
+            20 when isAVar => "MSFS no la deja cambiar (¿es de solo lectura? solo valen las «settable» del SDK) o las unidades no le sirven",
             20 => "error en los datos",
+            25 when isAVar => "MSFS no la deja cambiar (¿es de solo lectura? solo valen las «settable» del SDK)",
+            28 when isAVar => "variable o unidades no reconocidas (¿están bien escritas?); no se enviará",
             28 => "definición de datos no válida",
             43 => "el avión no aceptó el InputEvent",
             _ => $"excepción {code}",

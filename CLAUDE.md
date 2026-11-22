@@ -89,7 +89,7 @@ Simuladores: DCS World (jets y helicópteros) y MSFS 2024 (aviación general). V
 ## Estado actual
 
 Comandos de RigProbe: `list [all]`, `monitor`, `catalog`, `bravo-test`, `check <perfil>`, `run <perfil>|auto [--dry]`,
-`sim [eventos [filtro]]`, `sim vars <perfil> [s]`, `dcs [s]`, `dcs enviar CONTROL [VALOR]`, `dcs leer CONTROL`,
+`sim [eventos [filtro]]`, `sim vars <perfil> [s]`, `sim enviar ACCIÓN` (K:/B:/L:/A: suelta; en A: lee el valor antes y después), `dcs [s]`, `dcs enviar CONTROL [VALOR]`, `dcs leer CONTROL`,
 `dcs vigilar [filtro]` (cada cambio de los mandos de la cabina con su posición y descripción: para
 comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez; con filtro también luces y salidas, con su valor inicial),
 `hangar` (estado de todos, no lanza nada), `hangar <nombre> --dry` (qué haría), `hangar <nombre>` (abre; Ctrl+C cancela), `ventanas <proceso>` (posición de sus ventanas, para `"window"`),
@@ -484,7 +484,11 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
    dispositivo; Conflict Guard (detectar bindings duplicados)
 3. ✅ Salidas: SimConnect para MSFS 2024 (eventos K:, L:, A:, B:), detección del avión y cambio
    automático de perfil; teclado con SendInput como respaldo; hold con repetición (`repeatMs`).
-   Falta: escribir A: (simvars).
+   Escribir A: (22/11/2026, escenarios del parser y editor; SIN probar aún con MSFS): `A:NOMBRE[:índice][, unidades]=valor`
+   (unidades "Number" por defecto, valor obligatorio; `ActionKind.AVar`, una definición por variable+unidades y
+   SetDataOnSimObject como las L:). Solo cambian algo las "settable" del SDK; las excepciones 20/25/28 de una A: se
+   explican (solo lectura, unidades). Editor: destino «MSFS (variable de simulación)» con sugerencias
+   (`ActionDescriber.CommonSettableVars`). Probar con `RigProbe sim enviar "A:FLAPS HANDLE INDEX, number=2"`.
 4. (en curso) DCS por UDP (Export.lua / DCS-BIOS), bidireccional; feedback a LEDs WinWing (requiere
    capturar el protocolo con Wireshark + USBPcap) y al Bravo. Hecho: luces del Bravo desde MSFS
    y cliente DCS-BIOS, ✅ verificado con DCS y el AH-64D (ver "Fase 4" arriba); luces y
@@ -646,7 +650,7 @@ Siguiente: probarlo de verdad; luego `graficos optimizar` (varias configuracione
 medir en vuelos reales (y MSFS por SimConnect).
 
 Otros pendientes (02/11/2026): (el Bravo NO se usará con DCS, decisión del usuario del 04/11/2026:
-no hace falta probar luces `D:` en él; la función sigue disponible); escribir A:; perfil de jet (el usuario NO tiene el F-15E aunque su carpeta está en `Mods\aircraft`); limpiar la instalación
+no hace falta probar luces `D:` en él; la función sigue disponible); probar las A: con MSFS; perfil de jet (el usuario NO tiene el F-15E aunque su carpeta está en `Mods\aircraft`); limpiar la instalación
 errónea de DCS-BIOS en `Saved Games\DCS` (inactiva). (✅ El Yoke y el Bravo vuelven a detectarse: `list` y `catalog`
 el 13/11/2026, los 10 dispositivos conectados con sus claves de siempre.)
 

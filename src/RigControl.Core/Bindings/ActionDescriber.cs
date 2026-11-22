@@ -131,6 +131,21 @@ public static class ActionDescriber
 
     /// <param name="dcsControls">Controles de DCS-BIOS del avión del perfil (DcsBiosCatalog), para
     /// describir las acciones D: con la descripción del control y el nombre de la posición.</param>
+    /// <summary>
+    /// Variables de simulación de MSFS que el SDK marca como modificables y tienen sentido en un mando
+    /// (sugerencias del editor para A:). Con sus unidades, tal como van en la acción.
+    /// </summary>
+    public static readonly string[] CommonSettableVars =
+    [
+        "GENERAL ENG THROTTLE LEVER POSITION:1, percent", "GENERAL ENG THROTTLE LEVER POSITION:2, percent",
+        "GENERAL ENG MIXTURE LEVER POSITION:1, percent", "GENERAL ENG PROPELLER LEVER POSITION:1, percent",
+        "FLAPS HANDLE INDEX, number", "SPOILERS HANDLE POSITION, percent", "ELEVATOR TRIM POSITION, degrees",
+        "RUDDER TRIM PCT, percent over 100", "AILERON TRIM PCT, percent over 100", "BRAKE PARKING POSITION, bool",
+        "AUTOPILOT HEADING LOCK DIR, degrees", "AUTOPILOT ALTITUDE LOCK VAR, feet", "AUTOPILOT VERTICAL HOLD VAR, feet per minute",
+        "AUTOPILOT AIRSPEED HOLD VAR, knots", "KOHLSMAN SETTING MB, millibars", "NAV OBS:1, degrees", "NAV OBS:2, degrees",
+        "FUEL SELECTED QUANTITY PERCENT, percent", "WATER RUDDER HANDLE POSITION, percent", "CANOPY OPEN, percent",
+    ];
+
     public static string Describe(string action, IReadOnlyList<DcsControl>? dcsControls = null)
     {
         var text = action.Trim();
@@ -151,6 +166,16 @@ public static class ActionDescriber
             }
             case "L":
                 return $"Variable local {text[(colon + 1)..].Replace("=", " = ")}";
+            case "A":
+            {
+                var body = text[(colon + 1)..];
+                var eq = body.LastIndexOf('=');
+                var left = eq < 0 ? body : body[..eq];
+                var comma = left.IndexOf(',');
+                var name = (comma < 0 ? left : left[..comma]).Trim();
+                var unit = comma < 0 ? "" : " " + left[(comma + 1)..].Trim();
+                return eq < 0 ? $"Variable {name}" : $"Variable {name} = {body[(eq + 1)..].Trim()}{unit}";
+            }
             case "KEY":
                 return $"Tecla {text[(colon + 1)..].Trim()}";
             case "D":

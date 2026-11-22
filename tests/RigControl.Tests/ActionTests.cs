@@ -32,6 +32,10 @@ internal static class ActionTests
         Good("B:AUTOPILOT_HEADING_HOLD", ActionKind.InputEvent, "AUTOPILOT_HEADING_HOLD", 1);
         Good("B:LIGHTING_LANDING_1=0", ActionKind.InputEvent, "LIGHTING_LANDING_1", 0);
         Good("L:A32NX_Efis_Mode=2.5", ActionKind.LVar, "A32NX_Efis_Mode", 2.5);
+        Good("A:GENERAL ENG THROTTLE LEVER POSITION:1, percent=50", ActionKind.AVar, "GENERAL ENG THROTTLE LEVER POSITION:1", 50);
+        Good("A:plane  altitude=1500.5", ActionKind.AVar, "PLANE ALTITUDE", 1500.5);
+        Check(ActionSpec.Parse("A:FLAPS HANDLE INDEX, number=2", out _) is { Unit: "number" }
+              && ActionSpec.Parse("A:PLANE ALTITUDE=1", out _) is { Unit: "Number" }, "A: unidades (dadas y por defecto)");
         Good("key:G", ActionKind.Key, keys: "G");
         Good("key:ctrl+shift+g", ActionKind.Key, keys: "CTRL+SHIFT+G");
         Good("key:F12", ActionKind.Key, keys: "F12");
@@ -46,6 +50,11 @@ internal static class ActionTests
         Bad("K:HEADING_BUG_SET=1.5");
         Bad("K:X=abc");
         Bad("L:MiVar");
+        Bad("A:PLANE ALTITUDE");
+        Bad("A:PLANE ALTITUDE, =5");
+        Bad("A:=5");
+        Bad("A:PLANE ALTITUDE, feet=alto");
+        Bad("A:PLANE-ALTITUDE=5");
         Bad("key:");
         Bad("key:CTRL+");
         Bad("key:CTRL+PATATA");

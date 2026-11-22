@@ -3,13 +3,16 @@ using System.Runtime.InteropServices;
 
 namespace RigControl.Core.Bindings;
 
-public enum ActionKind { Print, SimEvent, InputEvent, LVar, Key, DcsBios }
+public enum ActionKind { Print, SimEvent, InputEvent, LVar, Key, DcsBios, AVar }
 
 /// <summary>
 /// Acción compilada (se interpreta al cargar el perfil, nunca en el bucle caliente).
 ///   "K:GEAR_UP", "K:HEADING_BUG_SET=180"   -> evento clásico de MSFS (valor entero opcional)
 ///   "B:AUTOPILOT_HEADING_HOLD", "B:X=0"     -> InputEvent de MSFS 2024 (valor por defecto 1)
 ///   "L:MiVar=1"                             -> variable local del avión (valor obligatorio)
+///   "A:GENERAL ENG THROTTLE LEVER POSITION:1, percent=50" -> escribe una variable de simulación de MSFS
+///                                              (unidades opcionales, "Number" por defecto; valor obligatorio;
+///                                              solo las que el SDK marca como "settable")
 ///   "key:CTRL+SHIFT+G"                      -> teclado con SendInput (respaldo)
 ///   "D:UFC_1", "D:MASTER_ARM_SW 1", "D:HDG_KNOB INC" -> DCS por DCS-BIOS. Sin valor = pulsador:
 ///                                              1 al pulsar y 0 al soltar (en un toque, 0 a los 50 ms)
@@ -27,7 +30,10 @@ public sealed class ActionSpec
 
     public KeyChord? Keys { get; init; }
 
-    public bool IsSim => Kind is ActionKind.SimEvent or ActionKind.InputEvent or ActionKind.LVar;
+    /// <summary>Solo en A:: unidades de SimConnect ("percent", "bool", "feet"...; "Number" si no se dan).</summary>
+    public string Unit { get; init; } = "";
+
+    public bool IsSim => Kind is ActionKind.SimEvent or ActionKind.InputEvent or ActionKind.LVar or ActionKind.AVar;
 
     /// <summary>Orden DCS-BIOS ya codificada ("NOMBRE VALOR\n"): la del pulsar, o la única si lleva valor.</summary>
     public byte[]? DcsMessage { get; init; }
@@ -60,10 +66,47 @@ public sealed class ActionSpec
             : new ActionSpec { Kind = ActionKind.DcsBios, Name = name, DcsMessage = Msg($"{name} 1"), DcsRelease = Msg($"{name} 0") };
     }
 
+    /// <summary>"NOMBRE[:índice][, unidades]=valor": el nombre lleva espacios, como en el SDK.</summary>
+    private static ActionSpec? ParseSimVar(string text, string body, out string? error)
+    {
+        error = null;
+        var eq = body.LastIndexOf('=');
+        var left = eq < 0 ? body : body[..eq];
+        var comma = left.IndexOf(',');
+        var name = string.Join(' ', (comma < 0 ? left : left[..comma]).Split(' ', StringSplitOptions.RemoveEmptyEntries)).ToUpperInvariant();
+        var unit = comma < 0 ? "Number" : left[(comma + 1)..].Trim();
+        var valueText = eq < 0 ? null : body[(eq + 1)..].Trim();
+
+        if (name.Length == 0 || !name.All(c => char.IsAsciiLetterOrDigit(c) || c is ' ' or '_' or ':'))
+        {
+            error = $"acción \"{text}\": se espera \"A:NOMBRE, unidades=valor\" (p. ej. \"A:GENERAL ENG THROTTLE LEVER POSITION:1, percent=50\").";
+            return null;
+        }
+        if (unit.Length == 0)
+        {
+            error = $"acción \"{text}\": faltan las unidades tras la coma (o quita la coma para usar \"Number\").";
+            return null;
+        }
+        if (valueText is null)
+        {
+            error = $"acción \"{text}\": una A: necesita valor, p. ej. \"A:{name}, {unit}=1\".";
+            return null;
+        }
+        if (!double.TryParse(valueText, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+        {
+            error = $"acción \"{text}\": el valor \"{valueText}\" no es un número (usa punto decimal).";
+            return null;
+        }
+        return new ActionSpec { Kind = ActionKind.AVar, Name = name, Unit = unit, Value = value, HasValue = true };
+    }
+
     public static ActionSpec? Parse(string text, out string? error)
     {
         error = null;
         var t = text.Trim();
+
+        if (t.Length >= 2 && t[1] == ':' && char.ToUpperInvariant(t[0]) == 'A')
+            return ParseSimVar(text, t[2..], out error);
 
         if (t.StartsWith("key:", StringComparison.OrdinalIgnoreCase))
         {

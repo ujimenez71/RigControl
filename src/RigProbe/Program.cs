@@ -100,6 +100,8 @@ internal static class Program
             case "hangar":
                 return HangarCommand(args.Skip(1).Where(a => !a.Equals("--dry", StringComparison.OrdinalIgnoreCase)).FirstOrDefault(),
                                      args.Any(a => a.Equals("--dry", StringComparison.OrdinalIgnoreCase)));
+            case "sim" when args.Length > 2 && args[1].Equals("enviar", StringComparison.OrdinalIgnoreCase):
+                return SimSend(string.Join(' ', args.Skip(2)));
             case "sim" when args.Length > 2 && args[1].Equals("vars", StringComparison.OrdinalIgnoreCase):
                 SimVars(args[2], args.Length > 3 && int.TryParse(args[3], out var secs) ? secs : 10);
                 return 0;
@@ -109,7 +111,7 @@ internal static class Program
                 return 0;
             default:
                 Console.WriteLine("Uso: RigProbe list [all] | monitor | catalog | bravo-test | check <perfil> | run <perfil>|auto [--dry]");
-                Console.WriteLine("            | sim | sim eventos [filtro] | sim vars <perfil> [s] | dcs [s] | dcs enviar CONTROL [VALOR] | dcs leer CONTROL");
+                Console.WriteLine("            | sim | sim eventos [filtro] | sim vars <perfil> [s] | sim enviar ACCIÓN | dcs [s] | dcs enviar CONTROL [VALOR] | dcs leer CONTROL");
                 Console.WriteLine("            | dcs vigilar [filtro] | hangar [nombre [--dry]] | ventanas <proceso>");
                 Console.WriteLine("            | mods | mods <conjunto> [--dry] | mods importar <biblioteca> [--dry]");
                 Console.WriteLine("            | instantaneas | instantaneas crear <grupo|todo> [nombre] | instantaneas comparar|restaurar <grupo> <n>");
@@ -984,6 +986,71 @@ internal static class Program
             }
             Thread.Sleep(20);
         }
+    }
+
+    /// <summary>
+    /// "sim enviar ACCIÓN": manda a MSFS una acción K:, B:, L: o A: (como la haría un binding) y avisa si la
+    /// rechaza. En una A: lee la variable antes y después, para ver si de verdad ha cambiado.
+    /// </summary>
+    private static int SimSend(string actionText)
+    {
+        var action = ActionSpec.Parse(actionText, out var error);
+        if (action is null || !action.IsSim)
+        {
+            Console.WriteLine(error ?? "Solo acciones de MSFS: K:EVENTO[=n], B:INPUT_EVENT[=v], L:Var=v o A:VARIABLE[, unidades]=v.");
+            return 1;
+        }
+
+        // Perfil de un solo binding para que SimConnectOutput registre la acción; en una A:, la misma
+        // variable como condición "state" para leerla.
+        var binding = new BindingFile { Input = "x:b1", Gesture = "press", Action = actionText };
+        if (action.Kind == ActionKind.AVar) binding.When = new ConditionFile { State = $"A:{action.Name}, {action.Unit}" };
+        var (profile, errors) = ProfileCompiler.Compile(new ProfileFile
+        {
+            Name = "sim enviar", Sim = "msfs", Devices = new() { ["x"] = "0000:0000" }, Bindings = [binding],
+        });
+        if (profile is null)
+        {
+            foreach (var e in errors) Console.WriteLine(e);
+            return 1;
+        }
+
+        using var sim = new SimConnectOutput();
+        var eventsReady = false;
+        sim.InputEventsReady += _ => eventsReady = true;
+        sim.Prepare(profile);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        void Wait(long ms)
+        {
+            var until = clock.ElapsedMilliseconds + ms;
+            while (clock.ElapsedMilliseconds < until) { sim.Tick(clock.ElapsedMilliseconds); Thread.Sleep(20); }
+        }
+        string Value() => sim.Values.Length > 0 ? sim.Values[0].ToString(System.Globalization.CultureInfo.CurrentCulture) : "";
+
+        Console.WriteLine("Conectando con MSFS (máx. 15 s)...");
+        while (clock.ElapsedMilliseconds < 15000 && !(sim.IsConnected && (eventsReady || action.Kind != ActionKind.InputEvent)))
+            Wait(50);
+        if (!sim.IsConnected)
+        {
+            Console.WriteLine("No se pudo conectar. ¿Está MSFS abierto?");
+            return 1;
+        }
+        Wait(1000); // registro de la acción y primer valor de la variable
+        if (action.Kind == ActionKind.AVar) Console.WriteLine($"Antes:   A:{action.Name} = {Value()} {action.Unit}");
+
+        if (!sim.Send(action))
+        {
+            Console.WriteLine("No se ha podido enviar (mira los avisos de arriba).");
+            return 1;
+        }
+        Console.WriteLine($"Enviado: {actionText}");
+        Wait(1500); // excepciones de MSFS y valor nuevo
+        if (action.Kind == ActionKind.AVar)
+        {
+            Console.WriteLine($"Después: A:{action.Name} = {Value()} {action.Unit}");
+            Console.WriteLine("Si no ha cambiado y no hay aviso, la variable no es modificable o el avión la recalcula: usa un B: o un K:.");
+        }
+        return 0;
     }
 
     /// <summary>Conecta con MSFS, muestra el avión y, si se pide, sus InputEvents (B:) filtrados.</summary>

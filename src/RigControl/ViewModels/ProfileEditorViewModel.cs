@@ -412,6 +412,7 @@ public sealed class ProfileEditorViewModel : ObservableObject, IDisposable
         {
             ActionTarget.Cabin => _inputEvents,
             ActionTarget.Event => ActionDescriber.CommonSimEvents,
+            ActionTarget.SimVar => ActionDescriber.CommonSettableVars,
             _ => [],
         };
         foreach (var s in source.Where(s => filter.Length == 0 || s.Contains(filter, StringComparison.OrdinalIgnoreCase)).Take(200))

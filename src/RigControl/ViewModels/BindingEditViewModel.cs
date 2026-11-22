@@ -3,7 +3,7 @@ using RigControl.Core.Bindings;
 namespace RigControl.ViewModels;
 
 /// <summary>A dónde se envía una acción (el prefijo de la acción en el JSON).</summary>
-public enum ActionTarget { Cabin, Event, Variable, Key, Dcs, Text }
+public enum ActionTarget { Cabin, Event, Variable, SimVar, Key, Dcs, Text }
 
 public sealed record TargetOption(ActionTarget Value, string Label, string Help);
 public sealed record GestureOption(string Value, string Label);
@@ -31,6 +31,7 @@ public sealed class BindingEditViewModel : ObservableObject
         new(ActionTarget.Cabin, "MSFS (cabina del avión)", "B: un control de la cabina del avión cargado: interruptores, botones, mandos. La lista sale del avión que tengas cargado en MSFS."),
         new(ActionTarget.Event, "MSFS (evento general)", "K: un evento de MSFS que vale para cualquier avión (trim, tren, autopiloto...)."),
         new(ActionTarget.Variable, "MSFS (variable del avión)", "L: una variable local del avión; la usan aviones con sistemas propios. Necesita un valor."),
+        new(ActionTarget.SimVar, "MSFS (variable de simulación)", "A: escribe una variable de simulación. Solo cambian algo las que el SDK marca como modificables («settable»); si existe un B: o un K: para lo mismo, mejor ese. Necesita un valor."),
         new(ActionTarget.Key, "Teclado", "Simula una tecla o combinación en la ventana que tenga el foco."),
         new(ActionTarget.Dcs, "DCS (cabina)", "D: un control de la cabina de DCS a través de DCS-BIOS. Sin valor = pulsador (1 al pulsar, 0 al soltar)."),
         new(ActionTarget.Text, "Nada (solo registro)", "No envía nada: el texto solo aparece en el registro de Ejecución."),
@@ -137,9 +138,9 @@ public sealed class BindingEditViewModel : ObservableObject
 
     public bool IsKey => _target == ActionTarget.Key;
     public bool IsNotKey => _target != ActionTarget.Key;
-    public bool HasValue => _target is ActionTarget.Cabin or ActionTarget.Event or ActionTarget.Variable or ActionTarget.Dcs;
+    public bool HasValue => _target is ActionTarget.Cabin or ActionTarget.Event or ActionTarget.Variable or ActionTarget.SimVar or ActionTarget.Dcs;
     /// <summary>"repeatMs" solo vale en un hold con acción de MSFS.</summary>
-    public bool ShowRepeat => _gesture == "hold" && _target is ActionTarget.Cabin or ActionTarget.Event or ActionTarget.Variable;
+    public bool ShowRepeat => _gesture == "hold" && _target is ActionTarget.Cabin or ActionTarget.Event or ActionTarget.Variable or ActionTarget.SimVar;
     public string TargetHelp => Targets.First(t => t.Value == _target).Help;
 
     public string NameLabel => _target switch
@@ -147,6 +148,7 @@ public sealed class BindingEditViewModel : ObservableObject
         ActionTarget.Cabin => "Control de cabina (B:)",
         ActionTarget.Event => "Evento (K:)",
         ActionTarget.Variable => "Variable (L:)",
+        ActionTarget.SimVar => "Variable de simulación (A:), con las unidades tras una coma",
         ActionTarget.Key => "Tecla (haz clic aquí y pulsa la combinación)",
         ActionTarget.Dcs => "Control de DCS-BIOS",
         _ => "Texto para el registro",
@@ -157,6 +159,7 @@ public sealed class BindingEditViewModel : ObservableObject
         ActionTarget.Cabin => "Valor (vacío = 1). Interruptores: 1 encender, 0 apagar.",
         ActionTarget.Event => "Valor (opcional, número entero).",
         ActionTarget.Variable => "Valor (obligatorio).",
+        ActionTarget.SimVar => "Valor (obligatorio), en las unidades de la variable. Sin unidades = \"Number\".",
         ActionTarget.Dcs => "Valor: vacío = pulsador; INC, DEC, TOGGLE o un número.",
         _ => "",
     };
@@ -167,6 +170,7 @@ public sealed class BindingEditViewModel : ObservableObject
         ActionTarget.Cabin => "B:" + _name + (_value.Length > 0 ? "=" + _value : ""),
         ActionTarget.Event => "K:" + _name + (_value.Length > 0 ? "=" + _value : ""),
         ActionTarget.Variable => "L:" + _name + "=" + _value,
+        ActionTarget.SimVar => "A:" + _name + "=" + _value,
         ActionTarget.Key => "key:" + _name,
         ActionTarget.Dcs => "D:" + _name + (_value.Length > 0 ? " " + _value : ""),
         _ => _name,
@@ -242,6 +246,7 @@ public sealed class BindingEditViewModel : ObservableObject
             case "B": _target = ActionTarget.Cabin; (_name, _value) = SplitAt('='); break;
             case "K": _target = ActionTarget.Event; (_name, _value) = SplitAt('='); break;
             case "L": _target = ActionTarget.Variable; (_name, _value) = SplitAt('='); break;
+            case "A": _target = ActionTarget.SimVar; (_name, _value) = SplitAt('='); break;
             case "KEY": _target = ActionTarget.Key; _name = body.Trim(); break;
             case "D": _target = ActionTarget.Dcs; (_name, _value) = SplitAt(' '); break;
             default: _target = ActionTarget.Text; _name = a; break;

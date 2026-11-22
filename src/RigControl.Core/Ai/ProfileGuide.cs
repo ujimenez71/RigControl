@@ -102,7 +102,9 @@ No puede haber dos bindings con el mismo disparador (entrada + gesto) y la misma
   · Interruptor físico de dos posiciones que da un botón por posición: press de cada botón -> su posición.
   · Interruptor físico que da un botón solo en una posición: press -> posición A, release -> posición B.
 - MSFS: "B:INPUT_EVENT[=valor]" (control de la cabina del avión; valor 1 por defecto),
-  "K:EVENTO[=entero]" (evento clásico, p. ej. K:GEAR_TOGGLE, K:ELEV_TRIM_UP), "L:Var=valor".
+  "K:EVENTO[=entero]" (evento clásico, p. ej. K:GEAR_TOGGLE, K:ELEV_TRIM_UP), "L:Var=valor",
+  "A:VARIABLE[, unidades]=valor" (escribe una variable de simulación; solo las "settable" del SDK, p. ej.
+  "A:GENERAL ENG THROTTLE LEVER POSITION:1, percent=50"; prefiere B: o K: si existen).
 - Teclado: "key:CTRL+SHIFT+G" (va a la ventana con el foco; con "hold" se mantiene la tecla).
 - Sin prefijo: solo se escribe en el registro (no hace nada).
 
