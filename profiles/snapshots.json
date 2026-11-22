@@ -4,21 +4,49 @@
     {
       "name": "DCS",
       "root": "%USERPROFILE%\\Saved Games\\DCS.openbeta",
-      "include": [ "Config", "Scripts\\Export.lua", "Scripts\\Hooks" ],
-      "exclude": [ "authdata.bin", "network.vault" ],
+      "include": [
+        "Config",
+        "Scripts\\Export.lua",
+        "Scripts\\Hooks"
+      ],
+      "exclude": [
+        "authdata.bin",
+        "network.vault"
+      ],
       "process": "DCS"
     },
     {
       "name": "MSFS 2024",
       "root": "%LOCALAPPDATA%\\Packages\\Microsoft.Limitless_8wekyb3d8bbwe\\LocalCache",
-      "include": [ "UserCfg.opt", "FlightSimulator2024.CFG", "Cameras.CFG", "EXE.xml", "SimConnect.xml" ],
+      "include": [
+        "UserCfg.opt",
+        "FlightSimulator2024.CFG",
+        "Cameras.CFG",
+        "EXE.xml",
+        "SimConnect.xml"
+      ],
       "process": "FlightSimulator2024"
+    },
+    {
+      "name": "IL-2",
+      "root": "F:\\SteamLibrary\\steamapps\\common\\IL-2 Sturmovik Battle of Stalingrad\\data",
+      "include": [
+        "input",
+        "startup.cfg"
+      ],
+      "process": "Il-2"
     },
     {
       "name": "RigControl",
       "root": "%APPDATA%\\RigControl",
-      "include": [ "." ],
-      "exclude": [ "snapshots\\*", "*.bak", "*.tmp" ]
+      "include": [
+        "."
+      ],
+      "exclude": [
+        "snapshots\\*",
+        "*.bak",
+        "*.tmp"
+      ]
     }
   ]
 }

@@ -171,6 +171,13 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
   restaurar"; solo SOBRESCRIBE (lo nuevo se queda; decisión por defecto, el usuario no eligió); rutas con ".." en
   el .zip se rechazan. Crear sí se puede con el simulador abierto.
   ✅ Fase 5 completa.
+- IL-2 Great Battles (22/11/2026, en curso por etapas): instalado por Steam en `F:\SteamLibrary\steamapps\common\IL-2 Sturmovik
+  Battle of Stalingrad` (appid 307960, `bin\game\Il-2.exe`, proceso `Il-2`); IL-2 Korea aparte en `E:\IL2Series`. Telemetría ya
+  activa en `data\startup.cfg` (motiondevice + telemetrydevice, UDP 5678 a 127.255.255.255, la puso HapticSeat el 20/10).`startup.cfg`
+  tiene `login`/`password` (vacíos el 22/11: se entra por Steam); ojo, entran en las instantáneas. IL-2 no admite órdenes externas: solo
+  `key:`. Etapa 1 ✅ (hangar en simulación + instantánea de 11 archivos): hangar «IL-2 Great Battles» (los programas del de DCS +
+  `steam://rungameid/307960`, aboveNormal, focus) y grupo de instantáneas «IL-2» (`data`: `input` + `startup.cfg`), en el repo y en
+  %APPDATA% (copias `*.antes-de-il2`). Siguen: telemetría en Core (sim «il2», `il2:` avión, variables `I:`), app, gráficos.
 - LEDs WinWing (13/11/2026, ✅ cada LED identificado por el usuario con `winwing barrido`; sin Wireshark):
   `Core/WinWing/WinWingPanel.cs`. Output report de 14 B: `02 <módulo lo> <módulo hi> 00 00 03 49 <LED> <valor>
   00 00 00 00 00` (del driver hid-winwing de Linux, capturado de SimAppPro). Solo se envía la orden 0x49.
