@@ -255,7 +255,8 @@ comprobar un perfil o saber qué control es cada interruptor; con `run` a la vez
     `dofile(lfs.writedir() .. [[Scripts\DCS-BIOS\BIOS.lua]])` al final (también encadena con pcall).
     Claude NO puede modificar Export.lua ni Scripts de DCS (lo bloquea el sistema de permisos): se
     le da al usuario el comando para que lo ejecute con "!". El 02/11/2026 se instaló primero por
-    error en `Saved Games\DCS` (inactiva; copia en export.lua.antes-de-dcs-bios).
+    error en `Saved Games\DCS` (inactiva); limpiado el 22/11/2026: export.lua devuelto a su copia previa
+    (solo diferían las 3 líneas de DCS-BIOS) y Scripts\DCS-BIOS borrado. Ese borrado sí lo permitió el sistema de permisos.
     Definiciones de controles: `Scripts\DCS-BIOS\doc\json\<avión>.json`. `RigProbe dcs [s]` escucha
     y muestra el avión; `RigProbe dcs enviar CONTROL [VALOR]` manda una orden.
   - Estado del simulador en condiciones y luces (03/11/2026, probado con escenarios y el DCS falso, y
@@ -650,8 +651,7 @@ Siguiente: probarlo de verdad; luego `graficos optimizar` (varias configuracione
 medir en vuelos reales (y MSFS por SimConnect).
 
 Otros pendientes (02/11/2026): (el Bravo NO se usará con DCS, decisión del usuario del 04/11/2026:
-no hace falta probar luces `D:` en él; la función sigue disponible); probar las A: con MSFS; perfil de jet (el usuario NO tiene el F-15E aunque su carpeta está en `Mods\aircraft`); limpiar la instalación
-errónea de DCS-BIOS en `Saved Games\DCS` (inactiva). (✅ El Yoke y el Bravo vuelven a detectarse: `list` y `catalog`
+no hace falta probar luces `D:` en él; la función sigue disponible); probar las A: con MSFS; perfil de jet (el usuario NO tiene el F-15E aunque su carpeta está en `Mods\aircraft`). (✅ El Yoke y el Bravo vuelven a detectarse: `list` y `catalog`
 el 13/11/2026, los 10 dispositivos conectados con sus claves de siempre.)
 
 ## Convenciones
