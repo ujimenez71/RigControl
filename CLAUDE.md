@@ -501,7 +501,7 @@ Generar perfiles con IA (15/11/2026; escenarios sin API en `AiTests`, ventana co
 clave del usuario guardada el 15/11/2026, vencimiento 90 días aprox.; ✅ primera prueba real con `RigProbe ia dcs:uh-1h`
 "solo luces exteriores en el hat izquierdo del Moza": 20 s, 2 turnos, ~37 000 tokens de entrada casi todos de caché y
 2 000 de salida (unos 0,15 $), borrador OK con NAV_LTS_SW/POS_LTS_SW/ANTICOLL_LTS_SW correctos y dudas bien señaladas;
-falta probarlo desde la app y en DCS): `Core/Ai/`.
+✅ verificado por el usuario desde la app el 22/11/2026, "funciona perfectamente"): `Core/Ai/`.
 `ProfileGenerator` (SDK oficial `Anthropic` 13.8.0, `claude-opus-5-5`, esfuerzo high, `fallbacks: "default"` con la beta
 `server-side-fallback-2026-07-01`, caché automática del prompt): prompt de sistema fijo (`ProfileGuide`: formato
 completo del perfil y reglas, p. ej. NO inventar qué hace un botón) + un mensaje con el catálogo de mandos (claves,
