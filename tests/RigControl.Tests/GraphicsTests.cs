@@ -102,7 +102,7 @@ internal static class GraphicsTests
             var json = Path.Combine(dir, "graficos.json");
             file.Save(json);
             var back = GraphicsFile.Load(json);
-            Check(back.Find("actual")?.Settings["graphics.AA"] == "\"DLAA\"" && back.Headset.Name == "Pimax Crystal Light" && back.Headset.RefreshHz == 90,
+            Check(back.Find("actual")?.Settings["graphics.AA"] == "\"DLAA\"" && back.Headset.Name == "Pimax Dream Air" && back.Headset.RefreshHz == 90 && back.Headset.EyeTracking,
                   "graficos.json: se guarda y se lee (con el visor por defecto)");
         }
         finally
@@ -111,7 +111,7 @@ internal static class GraphicsTests
         }
 
         // --- reglas de VR
-        var headset = new HeadsetInfo();
+        var headset = new HeadsetInfo { Name = "Pimax Crystal Light", EyeTracking = false };
         var bad = new Dictionary<string, string>
         {
             ["graphics.maxFPS"] = "60", ["VR.openxr_quadView"] = "false", ["VR.openxr_eyeGaze"] = "true",
@@ -124,6 +124,29 @@ internal static class GraphicsTests
         Check(VrAdvisor.Check("dcs", good, headset).Count == 0, "VR DCS: configuración buena = nada que decir");
         Check(VrAdvisor.Check("dcs", new Dictionary<string, string> { ["VR.openxr_eyeGaze"] = "true" }, new HeadsetInfo { Name = "Crystal", EyeTracking = true }).Count == 0,
               "VR: eye gaze vale con un visor con seguimiento ocular");
+        var dream = new HeadsetInfo();
+        Check(VrAdvisor.Check("dcs", new Dictionary<string, string> { ["VR.openxr_quadView"] = "true", ["VR.openxr_eyeGaze"] = "false" }, dream)
+                  .Any(a => a.Key == "VR.openxr_eyeGaze") &&
+              !VrAdvisor.Check("dcs", new Dictionary<string, string> { ["VR.openxr_quadView"] = "true", ["VR.openxr_eyeGaze"] = "false" }, headset).Any(),
+              "VR: con seguimiento ocular (Dream Air) se aconseja «Eye gaze» con quad views; sin él, no");
+        Check(VrAdvisor.Check("dcs", new Dictionary<string, string> { ["VR.openxr_quadView"] = "false" }, dream).Single().Text.Contains("foveado dinámico"),
+              "VR: quad views apagado con seguimiento ocular = foveado dinámico");
+
+        // --- modelos de visor
+        Check(HeadsetModels.Find("Dream Air")?.RefreshRates.SequenceEqual([72, 90]) == true && HeadsetModels.Find("pimax crystal light")?.EyeTracking == false
+              && HeadsetModels.Find("Crystal")?.Name == "Pimax Crystal" && HeadsetModels.Find("Quest 3") is null,
+              "modelos de visor: por nombre, con o sin «Pimax»");
+        var old = new HeadsetInfo { Name = "Pimax Crystal Light", RefreshHz = 120, EyeTracking = false };
+        old.SetModel(HeadsetModels.Find("Pimax Dream Air")!);
+        Check(old.Name == "Pimax Dream Air" && old.RefreshHz == 90 && old.EyeTracking && old.RefreshRates.Count == 2,
+              "cambiar de Crystal Light a 120 Hz a Dream Air: 90 Hz (no admite 120) y seguimiento ocular");
+        var keep = new HeadsetInfo { Name = "Pimax Crystal Light", RefreshHz = 72, EyeTracking = false };
+        keep.SetModel(HeadsetModels.Find("Pimax Dream Air")!);
+        Check(keep.RefreshHz == 72, "cambiar de visor conserva el refresco si el nuevo lo admite");
+        Check(PimaxInfo.HeadsetInLine("2026-11-23 17:34:51.480 I 25420 [Device::HmdConnected] HMD connected: Pimax K11, product name: Pimax Dream Air, serial number: X") == "Pimax Dream Air"
+              && PimaxInfo.HeadsetInLine("2026-11-23 17:34:53.235 I 26812 [System::SetHidStatus] connected hmd name:Pimax Dream Air") is null,
+              "visor conectado desde la línea «HMD connected» de PiService");
+
         Check(VrAdvisor.Check("msfs", new Dictionary<string, string> { ["GraphicsVR.DOF.Enabled"] = "1", ["GraphicsVR.MotionBlur.Enabled"] = "0" }, headset).Count == 1,
               "VR MSFS: profundidad de campo activada");
 

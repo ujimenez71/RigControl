@@ -38,7 +38,10 @@
         <!-- Cabecera -->
         <DockPanel Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,8">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
-                <TextBlock Text="{Binding HeadsetName}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <Button Content="{Binding UseDetectedText}" Click="UseDetectedHeadset_Click" Margin="0,0,8,0"
+                        Visibility="{Binding HasOtherHeadset, Converter={StaticResource BoolToVisibility}}"
+                        ToolTip="Pimax Play tiene conectado otro visor: pasa a él (refrescos y seguimiento ocular de ese modelo)." />
+                <TextBlock Text="{Binding HeadsetName}" ToolTip="{Binding HeadsetDetail}" VerticalAlignment="Center" Margin="0,0,8,0" />
                 <ComboBox ItemsSource="{Binding RefreshRates}" SelectedItem="{Binding RefreshHz}" MinWidth="90"
                           ToolTip="Refresco con el que vuelas (Pimax Play). Las reglas de VR comparan con él el límite de FPS.">
                     <ComboBox.ItemTemplate>

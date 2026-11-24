@@ -43,6 +43,12 @@ public sealed record VrSession
     public bool? QuadViews { get; init; }
     public bool? Foveated { get; init; }
 
+    /// <summary>
+    /// Visor de la sesión: el último "HMD connected" del mismo registro de PiService antes de cerrarla. Null = no consta
+    /// (las sesiones anteriores al 23/11/2026 eran todas con la Crystal Light).
+    /// </summary>
+    public string? Headset { get; init; }
+
     /// <summary>Lo que hizo Pimax con la imagen: "QV" (quad views), "FFR" (foveated fijo), "estéreo" o null si no consta.</summary>
     public string? PimaxRendering => QuadViews is null && Foveated is null ? null
         : QuadViews == true ? "QV" : Foveated == true ? "FFR" : "estéreo";
@@ -107,10 +113,12 @@ public static class VrSessions
                 text = reader.ReadToEnd();
             }
             catch (IOException) { continue; }
+            string? headset = null;
             foreach (var line in text.Split('\n'))
             {
+                if (PimaxInfo.HeadsetInLine(line) is { } hmd) { headset = hmd; continue; }
                 var at = line.IndexOf(Mark, StringComparison.Ordinal);
-                if (at >= 0 && Parse(line[(at + Mark.Length)..]) is { } s) list.Add(s);
+                if (at >= 0 && Parse(line[(at + Mark.Length)..]) is { } s) list.Add(headset is null ? s : s with { Headset = headset });
             }
         }
         return [.. list.OrderBy(s => s.Start)];
@@ -244,6 +252,7 @@ public static class VrSessions
                 Mission = h.Mission ?? f.Mission,
                 QuadViews = h.QuadViews ?? f.QuadViews,
                 Foveated = h.Foveated ?? f.Foveated,
+                Headset = h.Headset ?? f.Headset,
             };
         }
         return [.. map.Values.OrderByDescending(s => s.Start)];

@@ -29,16 +29,58 @@ public sealed class GraphicsProfile
     public static string NameOf(string sim) => sim switch { "msfs" => "MSFS 2024", "il2" => "IL-2", _ => "DCS World" };
 }
 
+/// <summary>Un modelo de visor conocido: refrescos que admite y si tiene seguimiento ocular.</summary>
+public sealed record HeadsetModel(string Name, IReadOnlyList<int> RefreshRates, bool EyeTracking);
+
+/// <summary>
+/// Visores conocidos. Pimax los nombra así en PiService ("HMD connected: Pimax K11, product name: Pimax Dream Air").
+/// Dream Air (desde el 23/11/2026): micro-OLED 3840x3552 por ojo, 72 y 90 Hz, seguimiento ocular Tobii.
+/// Crystal Light (hasta el 22/11/2026): 72/90/120 Hz, sin seguimiento ocular.
+/// </summary>
+public static class HeadsetModels
+{
+    public static IReadOnlyList<HeadsetModel> Known { get; } =
+    [
+        new("Pimax Dream Air", [72, 90], true),
+        new("Pimax Crystal Light", [72, 90, 120], false),
+        new("Pimax Crystal Super", [72, 90, 120], true),
+        new("Pimax Crystal", [72, 90, 120], true),
+    ];
+
+    public static IReadOnlyList<int> DefaultRates { get; } = [72, 90, 120];
+
+    /// <summary>El modelo por nombre (sin distinguir mayúsculas; vale "Dream Air" sin "Pimax"); null si no se conoce.</summary>
+    public static HeadsetModel? Find(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return null;
+        var n = name.Trim();
+        return Known.FirstOrDefault(m => m.Name.Equals(n, StringComparison.OrdinalIgnoreCase))
+               ?? Known.FirstOrDefault(m => m.Name.EndsWith(" " + n, StringComparison.OrdinalIgnoreCase));
+    }
+}
+
 /// <summary>El visor, para las reglas de VR.</summary>
 public sealed class HeadsetInfo
 {
-    public string Name { get; set; } = "Pimax Crystal Light";
+    public string Name { get; set; } = "Pimax Dream Air";
 
-    /// <summary>Refresco con el que se vuela (la Crystal Light admite 72, 90 y 120 Hz).</summary>
+    /// <summary>Refresco con el que se vuela (la Dream Air admite 72 y 90 Hz).</summary>
     public int RefreshHz { get; set; } = 90;
 
-    /// <summary>La Crystal Light no tiene seguimiento ocular (la Crystal "normal" sí).</summary>
-    public bool EyeTracking { get; set; }
+    /// <summary>La Dream Air tiene seguimiento ocular (Tobii); la Crystal Light no.</summary>
+    public bool EyeTracking { get; set; } = true;
+
+    /// <summary>Refrescos del modelo (si no se conoce, 72/90/120 Hz).</summary>
+    [JsonIgnore]
+    public IReadOnlyList<int> RefreshRates => HeadsetModels.Find(Name)?.RefreshRates ?? HeadsetModels.DefaultRates;
+
+    /// <summary>Pasa a ser el modelo dado: nombre, seguimiento ocular y un refresco que admita (el actual o el mayor).</summary>
+    public void SetModel(HeadsetModel model)
+    {
+        Name = model.Name;
+        EyeTracking = model.EyeTracking;
+        if (!model.RefreshRates.Contains(RefreshHz)) RefreshHz = model.RefreshRates.Max();
+    }
 }
 
 /// <summary>%APPDATA%\RigControl\graficos.json: visor y perfiles gráficos. Editable a mano.</summary>
@@ -124,7 +166,13 @@ public static class VrAdvisor
                     $"Límite de FPS de DCS = {max:0}, por debajo del refresco del visor ({headset.RefreshHz} Hz): nunca llegará a {headset.RefreshHz}."));
             if (s.ContainsKey("VR.openxr_quadView") && !On("VR.openxr_quadView"))
                 list.Add(new(AdviceLevel.Info, "VR.openxr_quadView",
-                    $"Quad views desactivado. Con la {headset.Name} el foveado fijo de quad views suele ahorrar bastante GPU en DCS."));
+                    headset.EyeTracking
+                        ? $"Quad views desactivado. Con la {headset.Name} (seguimiento ocular) quad views + «Eye gaze» = foveado dinámico: suele ahorrar mucha GPU en DCS."
+                        : $"Quad views desactivado. Con la {headset.Name} el foveado fijo de quad views suele ahorrar bastante GPU en DCS."));
+            if (headset.EyeTracking && On("VR.openxr_quadView") && !On("VR.openxr_eyeGaze"))
+                list.Add(new(AdviceLevel.Info, "VR.openxr_eyeGaze",
+                    $"Quad views sin «Eye gaze»: la {headset.Name} tiene seguimiento ocular; con «Eye gaze» la zona nítida sigue la mirada " +
+                    "y se puede encoger (más FPS). Requiere el seguimiento ocular calibrado en Pimax Play."));
             if (On("VR.openxr_eyeGaze") && !headset.EyeTracking)
                 list.Add(new(AdviceLevel.Aviso, "VR.openxr_eyeGaze",
                     $"«Eye gaze» activado, pero la {headset.Name} no tiene seguimiento ocular: el foveado no seguirá la mirada."));

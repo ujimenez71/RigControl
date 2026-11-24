@@ -116,6 +116,9 @@ public sealed class DcsBenchmark
     public string SavedGamesDir { get; }
     public string DcsExe { get; }
 
+    /// <summary>El visor: su nombre en los mensajes y sus refrescos al detectar a cuál iba (null = 72/90/120 Hz).</summary>
+    public HeadsetInfo? Headset { get; init; }
+
     /// <summary>Esperas (en las pruebas, mucho más cortas).</summary>
     public int PollMs { get; init; } = 1000;
     public int GraceMs { get; init; } = GraceSeconds * 1000;
@@ -381,7 +384,7 @@ public sealed class DcsBenchmark
         {
             KeepFailureLog();
             throw new InvalidOperationException("DCS no pudo mostrar la imagen en el visor (OpenXR no arrancó): la medición no vale. " +
-                                                "Comprueba que la Crystal Light está encendida, despierta y funcionando en Pimax Play.");
+                                                $"Comprueba que el visor{(Headset is null ? "" : $" ({Headset.Name})")} está encendido, despierto y funcionando en Pimax Play.");
         }
     }
 
@@ -411,7 +414,7 @@ public sealed class DcsBenchmark
         if (vr)
         {
             var firstAll = raw[0].SelectMany(s => s.Ms).ToList();
-            var detected = PimaxInfo.DetectRefresh(firstAll, refreshHz, PimaxInfo.WaitSession(started, PimaxLogDir), started);
+            var detected = PimaxInfo.DetectRefresh(firstAll, refreshHz, PimaxInfo.WaitSession(started, PimaxLogDir), started, Headset?.RefreshRates);
             refreshHz = detected;
             // Ni con Smart Smoothing (mitad del refresco) se baja de 36 FPS: muchísimo menos es que la imagen no
             // llegaba al visor (dormido, apagado). Por si no hay registro de Pimax que lo diga.

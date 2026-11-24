@@ -99,6 +99,8 @@ internal static class OptimizerTests
         // Como el 17/11/2026 a 90 Hz: una escena a ~87 FPS y dos a 45 (mediana 17 ms ≈ mitad de 120): debe dar 90.
         List<double> mixed = [.. Enumerable.Range(0, 2158).Select(i => 11.1 + (i % 10) * 0.1), .. Enumerable.Range(0, 2266).Select(i => 22.2 + (i % 5) * 0.05)];
         Check(PimaxInfo.DetectRefresh(mixed, 120, null, DateTime.Now) == 90, "refresco por el ritmo con escenas a 90 y a 45 = 90 (no 120)");
+        Check(PimaxInfo.DetectRefresh(16.67, 90, null, DateTime.Now) == 120 && PimaxInfo.DetectRefresh(16.67, 90, null, DateTime.Now, [72, 90]) == 90,
+              "refresco: 60 FPS = mitad de 120 Hz solo si el visor admite 120 (la Dream Air no: se queda el configurado)");
         var pimax = new PimaxSession(72, true, "4242x5102", 39.5, 65.8, DateTime.Now);
         Check(PimaxInfo.DetectRefresh(11.1, 90, pimax, DateTime.Now.AddMinutes(-5)) == 72, "refresco: manda el de Pimax si es de esta medición");
 

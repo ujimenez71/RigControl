@@ -37,6 +37,7 @@ internal static class VrSessionTests
                 Body("2026-11-15 17:58:24", "2026-11-15 18:33M:52S", 2128, "DCS", 72, 1, 36, 35.86, 1, 0) +
                 Body("2026-11-15 17:14:59", "2026-11-15 17:15M:47S", 48, "DCS", 72, 1, 0, 0, 1, 0));
             File.WriteAllText(Path.Combine(logs, "PiService__2026-11-17-19.log"),
+                "2026-11-17 19:00:00.000 I 1 [Device::HmdConnected] HMD connected: Pimax P3C9, product name: Pimax Crystal Light, serial number: X\n" +
                 Body("2026-11-17 20:29:35", "2026-11-17 20:39M:19S", 584, "DCS", 72, 0, 72, 72, 0, 1) +
                 Body("2026-11-17 21:07:31", "2026-11-17 21:13M:57S", 386, "DCS", 72, 0, 72, 0, 0.37, 0.62) +
                 Body("2026-10-06 17:48:15", "2026-10-06 18:30M:30S", 2535, "FlightSimulator2024", 90, 0, 40.89, 35, 1, 0) +
@@ -49,6 +50,8 @@ internal static class VrSessionTests
             Check(flight.End == new DateTime(2026, 11, 15, 18, 33, 52) && flight.TargetHz == 72 && flight.SmartSmoothing
                   && flight.MedianFps == 36 && Math.Abs(flight.GpuOver80 - 0.63) < 1e-9 && flight.Game == "DCS World",
                   "final con el formato raro de Pimax («18:33M:52S»), refresco, Smart Smoothing, mediana y GPU");
+            Check(flight.Headset is null && s.First(x => x.Seconds == 584).Headset == "Pimax Crystal Light",
+                  "visor de cada sesión: el último «HMD connected» de su archivo (sin él, no consta)");
             Check(flight.Verdict == "A la mitad (36 FPS), Smart Smoothing", $"veredicto: a la mitad ({flight.Verdict})");
             Check(s.First(x => x.Seconds == 584).Verdict == "Llega a 72 Hz", "veredicto: llega");
             Check(s.First(x => x.Seconds == 386).Verdict == "Llega a 72 Hz el 63 % del tiempo", $"veredicto: llega a ratos ({s.First(x => x.Seconds == 386).Verdict})");

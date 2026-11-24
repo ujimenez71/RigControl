@@ -577,7 +577,7 @@ solo) y, en el detalle del perfil, "Hoja de mandos" (abre el HTML) y "PDF".
 Optimizador gráfico para VR, fase 1 = perfiles gráficos (15/11/2026; escenarios en `GraphicsTests` y prueba sobre COPIAS de los
 archivos reales: solo cambian las líneas tocadas; pantalla comprobada fuera de pantalla; SIN aplicar aún nada a la configuración real).
 Idea del usuario, parecida a github.com/Fox3Luck/DCS-Graphics-Optimizer (MIT; ese mide con una misión de prueba en el MONITOR y no
-toca VR). Equipo: RTX 4090, i9-14900K, 64 GB; visor Pimax Crystal Light (SIN seguimiento ocular; 72/90/120 Hz), runtime OpenXR de
+toca VR). Equipo: RTX 4090, i9-14900K, 64 GB; visor Pimax Dream Air desde el 23/11/2026 (antes Crystal Light; ver «Cambio de visor» abajo), runtime OpenXR de
 Pimax (`PiOpenXR_64.json`); DCS y MSFS se vuelan siempre en VR. `Core/Graphics/`: `LuaOptionsFile` (options.lua de DCS editado en su
 sitio: claves "graphics.AA", "VR.pixel_density"; solo literales simples; clave nueva al final de su tabla), `AutoexecFile`
 (autoexec.cfg, conserva comentarios y el final sin salto), `UserCfgFile` (UserCfg.opt de MSFS, "GraphicsVR.Shadows.Size"; solo claves
@@ -677,6 +677,18 @@ la actualización: resolución de Pimax mayor (4750x5714 por ojo, ~25 % más pí
 PENDIENTE PARA EL 19/11/2026 (recomendación dada al usuario): un vuelo igual con Smart Smoothing DESACTIVADO en Pimax Play para ver
 los FPS reales con QV (el 17/11, sin SS y sin QV registrado, daba 47 FPS con GPU 96 %). Con esa cifra decidir: bajar la resolución de
 Pimax a 1,0, volver a DLSS Quality, o quedarse a 72 Hz con SS. Analizar con `RigProbe graficos vuelos` + dcs.log (vistas y swapchains).
+Cambio de visor (24/11/2026, petición del usuario; escenarios en `GraphicsTests`/`OptimizerTests`/`VrSessionTests`): Pimax Dream Air
+(PiService: "HMD connected: Pimax K11, product name: Pimax Dream Air"; micro-OLED 3840x3552 por ojo, 72 y 90 Hz, seguimiento ocular Tobii,
+calibrado el 24/11; render de Pimax 5082x4168 por ojo con `pixels_per_display_pixel_rate` 1). Antes Crystal Light (72/90/120 Hz, sin
+seguimiento ocular). `HeadsetModels` (Core/Graphics/GraphicsProfiles.cs: Dream Air, Crystal Light, Crystal, Crystal Super) da refrescos y
+seguimiento ocular por nombre; `HeadsetInfo.RefreshRates`/`SetModel` (al cambiar, conserva el refresco si el nuevo lo admite). Por defecto =
+Dream Air, 90 Hz, con seguimiento ocular. `PimaxInfo.ConnectedHeadset` = último "HMD connected" de PiService: la pantalla Gráficos enseña
+«Usar <visor>» si no coincide con graficos.json; `RigProbe graficos visor [nombre] [hz]`. `DetectRefresh` solo prueba los refrescos del
+visor (`DcsBenchmark.Headset`: sin 120 Hz, 60 FPS ya no es "la mitad de 120"); el optimizador solo sugiere subir a un refresco que exista.
+`VrAdvisor` con seguimiento ocular: quad views sin «Eye gaze» = consejo (foveado dinámico); DCS ya tiene `openxr_eyeGaze` y `openxr_quadView`
+a true. Cada sesión de «Vuelos en VR» guarda `Headset` (último "HMD connected" del mismo archivo de PiService); las 24 del historial
+anteriores al 23/11 se marcaron a mano «Pimax Crystal Light» (copias `*.antes-de-dream-air` de graficos.json y sesiones-vr.json).
+graficos.json del usuario: Dream Air, 90 Hz. Primer vuelo con ella (23/11 18:01, DCS, 90 Hz con SS, QV): 45 FPS fijos, GPU 88 %.
 Siguiente: probarlo de verdad; luego `graficos optimizar` (varias configuraciones en un solo arranque con los "trials" del script) y
 medir en vuelos reales (y MSFS por SimConnect).
 

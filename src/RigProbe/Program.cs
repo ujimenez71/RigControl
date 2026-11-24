@@ -118,7 +118,7 @@ internal static class Program
                 Console.WriteLine("            | dcs vigilar [filtro] | hangar [nombre [--dry]] | ventanas <proceso>");
                 Console.WriteLine("            | mods | mods <conjunto> [--dry] | mods importar <biblioteca> [--dry]");
                 Console.WriteLine("            | instantaneas | instantaneas crear <grupo|todo> [nombre] | instantaneas comparar|restaurar <grupo> <n>");
-                Console.WriteLine("            | graficos | graficos actual dcs|msfs|il2 [--monitor] | graficos guardar dcs|msfs|il2 <nombre> [--monitor] | graficos comparar|aplicar <nombre> [--dry] | graficos medir [perfil] [--monitor] | graficos optimizar | graficos mediciones | graficos vuelos");
+                Console.WriteLine("            | graficos | graficos actual dcs|msfs|il2 [--monitor] | graficos guardar dcs|msfs|il2 <nombre> [--monitor] | graficos comparar|aplicar <nombre> [--dry] | graficos medir [perfil] [--monitor] | graficos optimizar | graficos mediciones | graficos vuelos | graficos visor [nombre] [hz]");
                 Console.WriteLine("            | hoja <perfil> [--pdf] | ia | ia clave [borrar] | ia contexto <avión|actual> | ia <avión|actual> \"lo que quieres\" [--base <perfil>]");
                 Console.WriteLine("            | winwing | winwing luces | winwing led <disp> <n> <valor> [--modulo XXXX] | winwing barrido <disp> [desde] [hasta] [--modulo XXXX] [--valor N]");
                 Console.WriteLine($"  <perfil> es una ruta a un .json o un nombre en {ProfileFile.ProfilesDir}");
@@ -154,7 +154,9 @@ internal static class Program
         {
             if (args.Length == 0)
             {
-                Console.WriteLine($"Visor: {file.Headset.Name}, {file.Headset.RefreshHz} Hz, seguimiento ocular: {(file.Headset.EyeTracking ? "sí" : "no")}");
+                Console.WriteLine($"Visor: {file.Headset.Name}, {file.Headset.RefreshHz} Hz (admite {string.Join("/", file.Headset.RefreshRates)}), seguimiento ocular: {(file.Headset.EyeTracking ? "sí" : "no")}");
+                if (RigControl.Core.Graphics.PimaxInfo.ConnectedHeadset() is { } hmd && !hmd.Equals(file.Headset.Name, StringComparison.OrdinalIgnoreCase))
+                    Console.WriteLine($"  OJO: Pimax Play tiene conectada la {hmd}. Para usarla: graficos visor");
                 Console.WriteLine($"DCS:  {manager.DcsConfigDir ?? "(no encontrado)"}");
                 Console.WriteLine($"MSFS: {manager.MsfsUserCfgPath ?? "(no encontrado)"}");
                 Console.WriteLine($"Perfiles ({RigControl.Core.Graphics.GraphicsFile.DefaultPath}):");
@@ -206,7 +208,7 @@ internal static class Program
                     Console.WriteLine("  Tu options.lua y autoexec.cfg quedan como estaban. Ctrl+C cancela (cierra DCS y restaura).");
                     using var cts = new CancellationTokenSource();
                     Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
-                    var bench = new RigControl.Core.Graphics.DcsBenchmark(saved, exe);
+                    var bench = new RigControl.Core.Graphics.DcsBenchmark(saved, exe) { Headset = file.Headset };
                     var progress = new Progress<string>(m => Console.WriteLine($"{DateTime.Now:HH:mm:ss}  {m}"));
                     try
                     {
@@ -241,7 +243,7 @@ internal static class Program
                     var progress = new Progress<string>(m => Console.WriteLine($"{DateTime.Now:HH:mm:ss}  {m}"));
                     try
                     {
-                        var report = new RigControl.Core.Graphics.VrOptimizer(new RigControl.Core.Graphics.DcsBenchmark(saved, exe), file.Headset).Run(progress, cts.Token);
+                        var report = new RigControl.Core.Graphics.VrOptimizer(new RigControl.Core.Graphics.DcsBenchmark(saved, exe) { Headset = file.Headset }, file.Headset).Run(progress, cts.Token);
                         Console.WriteLine();
                         foreach (var t in report.Tests)
                             Console.WriteLine($"  {(t.Holds ? "✔" : "✘")} {t.Description,-60} {t.Result.Total.AvgFps,5:0.0} FPS · {t.Result.Total.MissedPercent,4:0.0} % fuera de tiempo");
@@ -275,6 +277,22 @@ internal static class Program
                         Console.WriteLine($"  {r.When:dd/MM HH:mm}  {(r.Vr ? $"VR {r.RefreshHz} Hz" : "monitor"),-9} {r.Profile,-24} {r.Total}");
                     return 0;
                 }
+                case "visor":
+                {
+                    // graficos visor [nombre] [hz]: sin nombre = el que tiene conectado Pimax Play.
+                    var name = args.Length > 1 && !int.TryParse(args[1], out _) ? args[1] : RigControl.Core.Graphics.PimaxInfo.ConnectedHeadset();
+                    if (name is null) { Console.WriteLine("Pimax Play no dice qué visor hay conectado: graficos visor \"Pimax Dream Air\" [hz]"); return 1; }
+                    if (RigControl.Core.Graphics.HeadsetModels.Find(name) is { } model) file.Headset.SetModel(model);
+                    else { file.Headset.Name = name; Console.WriteLine("Modelo desconocido: refresco y seguimiento ocular sin cambiar (edita graficos.json)."); }
+                    if (args.Length > 1 && int.TryParse(args[^1], out var hz))
+                    {
+                        if (!file.Headset.RefreshRates.Contains(hz)) { Console.WriteLine($"La {file.Headset.Name} no admite {hz} Hz ({string.Join("/", file.Headset.RefreshRates)})."); return 1; }
+                        file.Headset.RefreshHz = hz;
+                    }
+                    file.Save();
+                    Console.WriteLine($"Visor: {file.Headset.Name}, {file.Headset.RefreshHz} Hz, seguimiento ocular: {(file.Headset.EyeTracking ? "sí" : "no")}");
+                    return 0;
+                }
                 case "vuelos":
                 {
                     // Sesiones del visor según Pimax (también vuelos normales, sin instalar nada), con historial propio.
@@ -283,7 +301,7 @@ internal static class Program
                     Console.WriteLine("  Inicio       Juego       Dur.   Hz  SS  Pimax    Mediana  5 % bajo  <50 FPS  GPU   Veredicto / misión");
                     foreach (var s in sessions)
                         Console.WriteLine($"  {s.Start:dd/MM HH:mm}  {s.Game,-10} {s.Seconds / 60,3} min {s.TargetHz,3}  {(s.SmartSmoothing ? "sí" : "no"),-3} {s.PimaxRendering ?? "?",-7} {s.MedianFps,6:0.0} {s.P5Fps,8:0.0} {s.Below50 * 100,7:0} % {s.AvgGpu,4:0} %  " +
-                                          $"{s.Verdict}{(s.Mission is null ? "" : $" · {s.Mission}")}");
+                                          $"{s.Verdict}{(s.Mission is null ? "" : $" · {s.Mission}")}{(s.Headset is null ? "" : $" · {s.Headset.Replace("Pimax ", "")}")}");
                     Console.WriteLine($"Historial en {RigControl.Core.Graphics.VrSessions.HistoryPath}");
                     return 0;
                 }
@@ -306,7 +324,7 @@ internal static class Program
             Console.WriteLine(ex.Message);
             return 1;
         }
-        Console.WriteLine("Uso: graficos | graficos actual dcs|msfs|il2 [--monitor] | graficos guardar dcs|msfs|il2 <nombre> [--monitor] | graficos comparar|aplicar <nombre> [--dry] | graficos medir [perfil] [--monitor] | graficos optimizar | graficos mediciones | graficos vuelos");
+        Console.WriteLine("Uso: graficos | graficos actual dcs|msfs|il2 [--monitor] | graficos guardar dcs|msfs|il2 <nombre> [--monitor] | graficos comparar|aplicar <nombre> [--dry] | graficos medir [perfil] [--monitor] | graficos optimizar | graficos mediciones | graficos vuelos | graficos visor [nombre] [hz]");
         return 1;
 
         static void PrintAdvice(List<RigControl.Core.Graphics.GraphicsAdvice> advice)

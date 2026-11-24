@@ -125,6 +125,44 @@ public static class PimaxInfo
         return null;
     }
 
+    private const string HmdMark = "product name: ";
+
+    /// <summary>
+    /// Último visor conectado según PiService ("[Device::HmdConnected] HMD connected: Pimax K11, product name: Pimax Dream Air,
+    /// serial number: ..."): el nombre comercial. Null si no hay registro de Pimax o no aparece.
+    /// </summary>
+    public static string? ConnectedHeadset(string? logDir = null)
+    {
+        logDir ??= LogDir;
+        if (!Directory.Exists(logDir)) return null;
+        foreach (var file in Directory.EnumerateFiles(logDir, "PiService_*.log").OrderByDescending(File.GetLastWriteTimeUtc).Take(5))
+        {
+            string? found = null;
+            try
+            {
+                using var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                using var reader = new StreamReader(fs);
+                while (reader.ReadLine() is { } line)
+                    if (HeadsetInLine(line) is { } name) found = name;
+            }
+            catch (IOException) { continue; }
+            if (found is not null) return found;
+        }
+        return null;
+    }
+
+    /// <summary>El nombre del visor si la línea es la de "HMD connected"; si no, null.</summary>
+    public static string? HeadsetInLine(string line)
+    {
+        if (!line.Contains("HMD connected:", StringComparison.Ordinal)) return null;
+        var at = line.IndexOf(HmdMark, StringComparison.Ordinal);
+        if (at < 0) return null;
+        var rest = line[(at + HmdMark.Length)..];
+        var end = rest.IndexOf(',');
+        var name = (end < 0 ? rest : rest[..end]).Trim();
+        return name.Length > 0 ? name : null;
+    }
+
     /// <summary>
     /// Momento en que se apagó la pantalla del visor entre <paramref name="from"/> y <paramref name="to"/> (líneas
     /// "HMD screen state changed to false/true" de PiService: el sensor de proximidad la apaga si nadie lo lleva
@@ -172,20 +210,21 @@ public static class PimaxInfo
     /// Refresco al que iba el visor: el de Pimax si es de esta medición; si no, el ritmo de los fotogramas
     /// (mediana a menos de un 4 % de 72/90/120 Hz); si no, el configurado.
     /// </summary>
-    public static int DetectRefresh(double medianMs, int configured, PimaxSession? pimax, DateTime measuredFrom) =>
-        DetectRefresh([medianMs], configured, pimax, measuredFrom);
+    public static int DetectRefresh(double medianMs, int configured, PimaxSession? pimax, DateTime measuredFrom, IReadOnlyList<int>? rates = null) =>
+        DetectRefresh([medianMs], configured, pimax, measuredFrom, rates);
 
     /// <summary>
     /// Igual, con todos los fotogramas: gana el refresco con más fotogramas a menos de un 6 % de su periodo o del
     /// doble (Smart Smoothing a la mitad), si son al menos la mitad. Una sola mediana no vale: con unas escenas a
     /// 90 y otras a 45 caía en 17 ms (= mitad de 120 Hz) el 17/11/2026.
     /// </summary>
-    public static int DetectRefresh(IReadOnlyList<double> frameMs, int configured, PimaxSession? pimax, DateTime measuredFrom)
+    /// <paramref name="rates"/> = refrescos del visor (la Dream Air no tiene 120 Hz: 60 FPS no es "la mitad de 120").
+    public static int DetectRefresh(IReadOnlyList<double> frameMs, int configured, PimaxSession? pimax, DateTime measuredFrom, IReadOnlyList<int>? rates = null)
     {
         if (pimax is { TargetFps: > 0 } p && p.When >= measuredFrom.AddMinutes(-1)) return p.TargetFps;
         if (frameMs.Count == 0) return configured;
         static bool Near(double ms, double period) => Math.Abs(ms - period) / period < 0.06;
-        var best = new[] { 72, 90, 120 }
+        var best = (rates ?? HeadsetModels.DefaultRates)
             .Select(hz => (Hz: hz, Count: frameMs.Count(ms => Near(ms, 1000.0 / hz) || Near(ms, 2000.0 / hz))))
             .MaxBy(c => c.Count);
         return best.Count * 2 >= frameMs.Count ? best.Hz : configured;

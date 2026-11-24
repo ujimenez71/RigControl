@@ -224,8 +224,11 @@ public sealed class VrOptimizer(DcsBenchmark bench, HeadsetInfo headset)
     {
         List<string> notes = [];
         var pimax = PimaxInfo.LastSession(logDir: bench.PimaxLogDir);
-        if (holds && triedUp > 0 && passed == triedUp && hz < 120)
-            notes.Add($"Todas las subidas probadas caben a {hz} Hz: hay margen. Si prefieres fluidez, prueba {(hz == 72 ? 90 : 120)} Hz en Pimax Play y vuelve a optimizar.");
+        var higher = headset.RefreshRates.Where(r => r > hz).Order().Cast<int?>().FirstOrDefault();
+        if (holds && triedUp > 0 && passed == triedUp)
+            notes.Add($"Todas las subidas probadas caben a {hz} Hz: hay margen." + (higher is { } next
+                ? $" Si prefieres fluidez, prueba {next} Hz en Pimax Play y vuelve a optimizar."
+                : $" {hz} Hz es el máximo de la {headset.Name}: puedes subir calidad."));
         if (holds && passed == 0 && triedUp > 0)
             notes.Add($"Ninguna subida cabe a {hz} Hz: estás en el límite; tu configuración es la buena para este refresco.");
         if (!holds && !tests.Skip(1).Any(t => t.Holds))

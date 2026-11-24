@@ -41,6 +41,7 @@ public sealed class VrSessionRow(VrSession s)
     public string Gpu => $"{s.AvgGpu:0} %";
     public string GpuDetail => $"GPU media {s.AvgGpu:0} %; por encima del 80 % el {s.GpuOver80 * 100:0} % del tiempo. CPU media {s.AvgCpu:0} %." +
                                (s.Resolution is null ? "" : $" Resolución por ojo {s.Resolution}.") +
+                               (s.Headset is null ? "" : $" Visor: {s.Headset}.") +
                                (s.PimaxRendering is null ? "" : $" Pimax: quad views {(s.QuadViews == true ? "sí" : "no")}, foveated fijo {(s.Foveated == true ? "sí" : "no")}.");
     /// <summary>Veredicto y, debajo, la misión (o «Medición de RigControl»).</summary>
     public string Result => s.Verdict + (Mission.Length > 0 ? "\n" + Mission : "");
@@ -135,7 +136,8 @@ public sealed class GraphicsViewModel : ObservableObject, IDisposable
         }
         var profile = _measureChoice == CurrentSettings ? null : _file.Find(_measureChoice);
         var vr = _measureVr;
-        var refresh = _file.Headset.RefreshHz;
+        var headset = _file.Headset;
+        var refresh = headset.RefreshHz;
         IsMeasuring = true;
         MeasureLog.Clear();
         _measureCts = new CancellationTokenSource();
@@ -144,7 +146,7 @@ public sealed class GraphicsViewModel : ObservableObject, IDisposable
         ((IProgress<string>)progress).Report($"Midiendo {(profile is null ? "los ajustes actuales" : $"«{profile.Name}»")} {(vr ? $"en VR ({refresh} Hz)" : "en el monitor")}.");
         try
         {
-            var r = await Task.Run(() => new DcsBenchmark(saved, exe).Measure(profile, vr, refresh, progress, token), token);
+            var r = await Task.Run(() => new DcsBenchmark(saved, exe) { Headset = headset }.Measure(profile, vr, refresh, progress, token), token);
             AddLog($"Terminado: {r.Total.AvgFps:0.0} FPS de media" +
                            (vr ? $", {r.Total.MissedPercent:0.0} % fuera de tiempo." : "."));
             Message = "Medición guardada. Tu configuración de DCS está como antes.";
@@ -200,7 +202,7 @@ public sealed class GraphicsViewModel : ObservableObject, IDisposable
         try
         {
             var headset = _file.Headset;
-            var report = await Task.Run(() => new VrOptimizer(new DcsBenchmark(saved, exe), headset).Run(progress, token), token);
+            var report = await Task.Run(() => new VrOptimizer(new DcsBenchmark(saved, exe) { Headset = headset }, headset).Run(progress, token), token);
             var tests = "\n\nPruebas (✔ = llega al refresco):\n" + string.Join("\n", report.Tests.Select(t =>
                 $"{(t.Holds ? "✔" : "✘")} {t.Description}: {t.Result.Total.AvgFps:0.0} FPS, {t.Result.Total.MissedPercent:0.0} % fuera de tiempo" +
                 (t.Result.Scenes.Count > 1 ? $" ({string.Join(", ", t.Result.Scenes.Select(sc => $"{sc.Name} {sc.Stats.AvgFps:0.0}"))})" : "")));
@@ -295,7 +297,28 @@ public sealed class GraphicsViewModel : ObservableObject, IDisposable
     public void Dispose() => _measureCts?.Cancel();
 
     public IReadOnlyList<string> SimNames { get; } = ["DCS World", "MSFS 2024", "IL-2"];
-    public IReadOnlyList<int> RefreshRates { get; } = [72, 90, 120];
+    /// <summary>Refrescos del visor configurado (Dream Air: 72 y 90 Hz).</summary>
+    public IReadOnlyList<int> RefreshRates => _file.Headset.RefreshRates;
+
+    /// <summary>Visor conectado según Pimax Play, si es distinto del de graficos.json (para «Usar el visor conectado»).</summary>
+    public string? DetectedHeadset { get; private set; }
+    public bool HasOtherHeadset => DetectedHeadset is not null;
+    public string UseDetectedText => DetectedHeadset is null ? "" : $"Usar {DetectedHeadset}";
+    public string HeadsetDetail => $"{_file.Headset.Name}: {string.Join("/", _file.Headset.RefreshRates)} Hz, " +
+                                   (_file.Headset.EyeTracking ? "con seguimiento ocular" : "sin seguimiento ocular") +
+                                   (DetectedHeadset is null ? "" : $". Pimax Play dice que el visor conectado es la {DetectedHeadset}.");
+
+    /// <summary>Pasa graficos.json al visor que ve Pimax Play (modelo conocido: refrescos y seguimiento ocular de serie).</summary>
+    public void UseDetectedHeadset()
+    {
+        if (DetectedHeadset is not { } name || !_fileOk) return;
+        if (HeadsetModels.Find(name) is { } model) _file.Headset.SetModel(model);
+        else _file.Headset.Name = name;
+        Save();
+        Message = $"Visor cambiado a la {_file.Headset.Name} ({_file.Headset.RefreshHz} Hz, " +
+                  $"{(_file.Headset.EyeTracking ? "con" : "sin")} seguimiento ocular). Revisa el refresco si vuelas a otro.";
+        Reload(keep: _selected?.Name);
+    }
 
     public string FilePath => GraphicsFile.DefaultPath;
     public string PathsText => $"DCS: {_manager.DcsConfigDir ?? "(no encontrado)"}\nMSFS: {_manager.MsfsUserCfgPath ?? "(no encontrado)"}";
@@ -362,8 +385,15 @@ public sealed class GraphicsViewModel : ObservableObject, IDisposable
             _file = new GraphicsFile();
             Message = $"graficos.json está roto ({ex.Message}). Corrígelo a mano: no se sobrescribe.";
         }
+        var connected = PimaxInfo.ConnectedHeadset();
+        DetectedHeadset = connected is not null && !connected.Equals(_file.Headset.Name, StringComparison.OrdinalIgnoreCase) ? connected : null;
         Raise(nameof(HeadsetName));
+        Raise(nameof(RefreshRates));
         Raise(nameof(RefreshHz));
+        Raise(nameof(DetectedHeadset));
+        Raise(nameof(HasOtherHeadset));
+        Raise(nameof(UseDetectedText));
+        Raise(nameof(HeadsetDetail));
         Raise(nameof(PathsText));
         Raise(nameof(CanCapture));
 

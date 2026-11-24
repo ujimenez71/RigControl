@@ -32,6 +32,8 @@ public partial class GraphicsView : UserControl
 
     private void Reload_Click(object sender, RoutedEventArgs e) => Vm.Reload(Vm.Selected?.Name);
 
+    private void UseDetectedHeadset_Click(object sender, RoutedEventArgs e) => Vm.UseDetectedHeadset();
+
     private void OpenFile_Click(object sender, RoutedEventArgs e)
     {
         if (!File.Exists(Vm.FilePath))
@@ -66,7 +68,7 @@ public partial class GraphicsView : UserControl
         var target = Vm.MeasureChoice == GraphicsViewModel.CurrentSettings ? "los ajustes actuales" : $"el perfil «{Vm.MeasureChoice}»";
         if (MessageBox.Show(Window.GetWindow(this)!,
                 $"Se va a abrir DCS {(Vm.MeasureVr ? "en VR" : "en el monitor")} para medir {target}: unos 5 minutos sin tocar el ordenador.\n\n" +
-                (Vm.MeasureVr ? "Comprueba que la Crystal Light está encendida y despierta (puesta sin moverte o con el sensor de proximidad tapado).\n\n" : "") +
+                (Vm.MeasureVr ? $"Comprueba que la {Vm.HeadsetName} está encendida y despierta (puesta sin moverte o con el sensor de proximidad tapado).\n\n" : "") +
                 "DCS tiene que estar cerrado. Tu configuración queda como está. ¿Empezar?",
                 "RigControl", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
@@ -78,7 +80,7 @@ public partial class GraphicsView : UserControl
         if (MessageBox.Show(Window.GetWindow(this)!,
                 "Optimizar en VR: DCS se abre una o dos veces y prueba a subir o bajar cada ajuste (sombras, nubes, agua, SSAO...) " +
                 "midiendo si llega al refresco del visor. Unos 15-20 minutos sin tocar el ordenador.\n\n" +
-                "La Crystal Light encendida y despierta (puesta sin moverte o con el sensor de proximidad tapado). DCS cerrado.\n\n" +
+                $"La {Vm.HeadsetName} encendida y despierta (puesta sin moverte o con el sensor de proximidad tapado). DCS cerrado.\n\n" +
                 "Al final propone un perfil nuevo; no se aplica nada sin que lo decidas. ¿Empezar?",
                 "RigControl", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
